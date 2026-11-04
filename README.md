@@ -11,7 +11,7 @@ Prerequisites: Node 20.9+, Docker.
 ```bash
 npm run bootstrap     # installs dependencies, creates .env from .env.example
 # edit .env: add PayPal sandbox client id and secret (see docs/PAYPAL_SANDBOX_SETUP.md)
-npm run db:up         # Postgres 16 on localhost:5433
+npm run db:up         # Postgres 16 on localhost:5434
 npm run db:generate   # first time only (orchestrator), commit the migration
 npm run db:migrate
 npm run dev

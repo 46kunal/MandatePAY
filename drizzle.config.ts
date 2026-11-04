@@ -6,6 +6,6 @@ export default defineConfig({
   out: './db/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? 'postgres://mandatepay:mandatepay@localhost:5433/mandatepay',
+    url: process.env.DATABASE_URL ?? 'postgres://mandatepay:mandatepay@localhost:5434/mandatepay',
   },
 });
