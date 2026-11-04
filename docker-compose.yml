@@ -1,0 +1,26 @@
+# Local Postgres for development. Everything stays on your machine.
+# Host port 5433 avoids a clash with any Postgres already listening on 5432.
+# These credentials are for local development only.
+#
+# Later (owner: C): add an `app` service here so a judge can run the whole
+# project with `docker compose up`.
+services:
+  db:
+    image: postgres:16
+    container_name: mandatepay-db
+    environment:
+      POSTGRES_USER: mandatepay
+      POSTGRES_PASSWORD: mandatepay
+      POSTGRES_DB: mandatepay
+    ports:
+      - "5433:5432"
+    volumes:
+      - mandatepay-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mandatepay -d mandatepay"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mandatepay-pgdata:

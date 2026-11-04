@@ -1,0 +1,24 @@
+{
+  "name": "mandatepay",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Intent-backed agent purchases and fair dispute resolution on PayPal",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "bootstrap": "bash scripts/bootstrap.sh",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d --wait db",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx scripts/seed.ts"
+  }
+}
