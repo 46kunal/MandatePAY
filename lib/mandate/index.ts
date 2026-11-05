@@ -1,4 +1,11 @@
 export { ALG, KEY_ROLES, getKeyPair, resetKeyCache, resolveKeyDir } from './keys';
 export type { KeyRole, MandateKeyPair } from './keys';
 export { signJws, signOpenMandate, verifyJws, verifyOpenMandate } from './jws';
+export { evaluateCart } from './guard';
+export type { GuardOptions } from './guard';
+export { checkCart, checkCartById } from './check';
+export type { CheckCartOptions, CheckCartOutcome } from './check';
+export { computeReceiptHash, createClosedMandate, hashCart, hashOpenMandate, verifyClosedMandate } from './closed';
+export type { ClosedMandate, ReceiptInput } from './closed';
+export { draftMandate } from './draft';
 export type { KeyOptions, OpenMandateVerifyResult, RawVerifyResult, VerifyFailureReason } from './jws';
