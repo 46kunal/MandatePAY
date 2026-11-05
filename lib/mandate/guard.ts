@@ -101,11 +101,11 @@ export function evaluateCart(constraints: Constraints, cart: Cart, opts: GuardOp
   const threshold = constraints.require_approval_over ?? opts.approvalThreshold;
   if (threshold) checks.push(checkApproval(threshold, total));
 
-  const verdict = checks.some((c) => c.status === 'fail')
-    ? 'block'
-    : checks.some((c) => c.status === 'unsure' || c.status === 'escalate')
-      ? 'escalate'
-      : 'allow';
+  return { verdict: verdictOf(checks), checks, total: fromMinor(total), currency: cart.currency };
+}
 
-  return { verdict, checks, total: fromMinor(total), currency: cart.currency };
+export function verdictOf(checks: GuardCheck[]): GuardResult['verdict'] {
+  if (checks.some((c) => c.status === 'fail')) return 'block';
+  if (checks.some((c) => c.status === 'unsure' || c.status === 'escalate')) return 'escalate';
+  return 'allow';
 }

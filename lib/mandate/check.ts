@@ -5,6 +5,7 @@
  * Person A's order creation should call checkCartById() directly instead of making an HTTP call.
  */
 import type { Cart, Constraints, GuardResult } from '../../contracts/schemas';
+import { resolveUnsure } from './fuzzy';
 import { evaluateCart } from './guard';
 import { verifyOpenMandate, type KeyOptions } from './jws';
 
@@ -17,6 +18,8 @@ export interface CheckCartOptions extends KeyOptions {
   now?: number;
   /** Fallback approval threshold (defaults to APPROVAL_THRESHOLD from config). */
   approvalThreshold?: string;
+  /** Let the LLM settle "unsure" checks (B7). Default true; it can never override a failed check. */
+  fuzzy?: boolean;
 }
 
 /** Verify a mandate token and evaluate the cart. Pure apart from reading the signing key. */
@@ -36,7 +39,9 @@ export async function checkCart(mandateJws: string, cart: Cart, opts: CheckCartO
   }
 
   const { constraints, mandate_id } = verified.payload;
-  return { ok: true, guard: evaluateCart(constraints, cart, { approvalThreshold }), constraints, mandateId: mandate_id };
+  let guard = evaluateCart(constraints, cart, { approvalThreshold });
+  if (opts.fuzzy !== false) guard = await resolveUnsure(guard, constraints, cart);
+  return { ok: true, guard, constraints, mandateId: mandate_id };
 }
 
 /** Look the mandate up by id, then checkCart(). */

@@ -7,5 +7,6 @@ export { checkCart, checkCartById } from './check';
 export type { CheckCartOptions, CheckCartOutcome } from './check';
 export { computeReceiptHash, createClosedMandate, hashCart, hashOpenMandate, verifyClosedMandate } from './closed';
 export type { ClosedMandate, ReceiptInput } from './closed';
+export { resolveUnsure } from './fuzzy';
 export { draftMandate } from './draft';
 export type { KeyOptions, OpenMandateVerifyResult, RawVerifyResult, VerifyFailureReason } from './jws';
