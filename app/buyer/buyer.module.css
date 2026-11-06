@@ -1,0 +1,238 @@
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: #14213d;
+  background: #f6f7fb;
+  min-height: 100vh;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.title {
+  font-size: 1.6rem;
+  margin: 0;
+}
+.nav a {
+  color: #0b5fff;
+  margin-left: 1rem;
+  text-decoration: none;
+}
+.banner {
+  background: #fff7e0;
+  border: 1px solid #f0d58a;
+  color: #6b5200;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+.step {
+  background: #fff;
+  border: 1px solid #e3e6ef;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.stepTitle {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.num {
+  background: #14213d;
+  color: #fff;
+  border-radius: 50%;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 90px;
+  padding: 0.7rem;
+  border: 1px solid #c9cfdf;
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+.row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+.btn {
+  background: #0b5fff;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btnGhost {
+  background: transparent;
+  color: #0b5fff;
+  border: 1px solid #0b5fff;
+}
+.muted {
+  color: #5b6478;
+  font-size: 0.9rem;
+}
+.error {
+  background: #fdecec;
+  border: 1px solid #f3b4b4;
+  color: #8a1c1c;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  margin-top: 0.75rem;
+}
+.warnings {
+  background: #fff7e0;
+  border: 1px solid #f0d58a;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem 0.5rem 1.8rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+}
+.grid dt {
+  font-size: 0.8rem;
+  color: #5b6478;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.grid dd {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+}
+.chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.chip {
+  border: 1px solid #c9cfdf;
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  font: inherit;
+}
+.chipOn {
+  border-color: #0b5fff;
+  background: #e8f0ff;
+  font-weight: 600;
+}
+.cart {
+  border: 1px solid #e3e6ef;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  background: #fafbfe;
+}
+.cartItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.checks {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+}
+.check {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #eef0f6;
+}
+.badge {
+  min-width: 5.5rem;
+  text-align: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.pass {
+  background: #dff5e4;
+  color: #14672b;
+}
+.fail {
+  background: #fdd9d9;
+  color: #8a1c1c;
+}
+.unsure,
+.escalate {
+  background: #fff0cc;
+  color: #7a5200;
+}
+.rule {
+  font-weight: 600;
+}
+.verdict {
+  border-radius: 8px;
+  padding: 0.7rem 1rem;
+  font-weight: 600;
+}
+.verdictAllow {
+  background: #dff5e4;
+  color: #14672b;
+}
+.verdictBlock {
+  background: #fdd9d9;
+  color: #8a1c1c;
+}
+.verdictEscalate {
+  background: #fff0cc;
+  color: #7a5200;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.checkout {
+  margin-top: 1rem;
+  max-width: 420px;
+}
+.approval {
+  margin-top: 1rem;
+  background: #fff7e0;
+  border: 1px solid #f0d58a;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+}
+.approval p {
+  margin: 0.4rem 0 0;
+}
