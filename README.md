@@ -19,6 +19,17 @@ npm run dev
 
 Check: open http://localhost:3000/api/health, expect `{"ok":true,"service":"mandatepay"}`.
 
+## Analyst accuracy
+
+`npm run eval` runs the case analyst over 25 labelled disputes in `eval/cases.json` (not received, not as described, unauthorised, credit not processed, high value, restricted actions, and three prompt-injection cases, plus the tricky "within the mandate but wrong product" case). A case passes only if the fault, the action and (where labelled) `needs_human` are all right.
+
+| Analyst | Fault | Action | needs_human | Overall |
+|---|---|---|---|---|
+| Offline mock (`LLM_PROVIDER=mock`) | 100% (25/25) | 100% (25/25) | 100% (8/8) | **100% (25/25)** |
+| Claude (`LLM_PROVIDER=anthropic`) | not yet run | not yet run | not yet run | not yet run |
+
+**Read the mock row with care.** The mock is a small keyword reader that I tuned against these same 25 cases (before tuning it scored 64%), so 100% shows the pipeline and guardrails work end to end, not that the analyst is accurate on unseen disputes. The real accuracy number is the Claude row: run `LLM_PROVIDER=anthropic LLM_API_KEY=... npm run eval` and replace it. The prompt-injection guardrail (flagged text always needs a human) is plain code and does not depend on either model.
+
 ## Layout
 
 - `contracts/` shared Zod schemas and the API table
