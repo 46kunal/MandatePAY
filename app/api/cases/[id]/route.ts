@@ -1,8 +1,13 @@
-import { notImplemented } from '@/lib/http';
+import { apiError } from '@/lib/http';
+import { getCaseDetail } from '@/lib/paypal/cases';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-// OWNER: A. GET -> CaseRecord plus the linked mandate, cart and order for the detail view.
-export async function GET() {
-  return notImplemented('A', 'Case detail with mandate, cart and order');
+// OWNER: A. GET -> CaseRecord plus the linked mandate, cart and order for the detail view. 404 unknown case.
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const detail = await getCaseDetail(id);
+  if (!detail) return apiError(404, 'case_not_found', `No case with id ${id}.`);
+  return Response.json(detail);
 }
