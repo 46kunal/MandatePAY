@@ -2,6 +2,8 @@
 import type { Cart } from '../../contracts/schemas';
 import { checkCart, computeReceiptHash, createClosedMandate, hashCart, verifyClosedMandate } from '../mandate';
 import { getPayPalClient } from './client';
+import type { DisputeStore, PollDeps } from './disputeService';
+import { listDisputes, showDispute } from './disputes';
 import { captureOrder, createOrder } from './orders';
 import type { CartRow, LedgerStore, OrderDeps, OrderRow } from './service';
 
@@ -56,6 +58,58 @@ export function drizzleStore(): LedgerStore {
         .returning({ id: schema.orders.paypalOrderId });
       return updated.length > 0;
     },
+  };
+}
+
+/** Drizzle-backed store for dispute ingestion (events + cases). */
+export function drizzleDisputeStore(): DisputeStore {
+  const load = async () => {
+    const [{ eq }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
+    return { eq, db, schema };
+  };
+
+  return {
+    async hasEvent(eventId) {
+      const { eq, db, schema } = await load();
+      const [row] = await db.select({ id: schema.events.eventId }).from(schema.events).where(eq(schema.events.eventId, eventId)).limit(1);
+      return Boolean(row);
+    },
+    async insertEvent(e) {
+      const { db, schema } = await load();
+      await db.insert(schema.events).values(e).onConflictDoNothing();
+    },
+    async markEventProcessed(eventId) {
+      const { eq, db, schema } = await load();
+      await db.update(schema.events).set({ processed: true }).where(eq(schema.events.eventId, eventId));
+    },
+    async caseExists(disputeId) {
+      const { eq, db, schema } = await load();
+      const [row] = await db.select({ id: schema.cases.disputeId }).from(schema.cases).where(eq(schema.cases.disputeId, disputeId)).limit(1);
+      return Boolean(row);
+    },
+    async upsertCase(row) {
+      const { db, schema } = await load();
+      // On conflict only the PayPal-derived fields change; verdict, analysis_status and action stay as they were.
+      const { disputeId: _id, ...updatable } = row;
+      await db
+        .insert(schema.cases)
+        .values(row)
+        .onConflictDoUpdate({ target: schema.cases.disputeId, set: { ...updatable, updatedAt: new Date() } });
+    },
+    async findOrderByCapture(captureId) {
+      const { eq, db, schema } = await load();
+      const [o] = await db.select().from(schema.orders).where(eq(schema.orders.captureId, captureId)).limit(1);
+      return o ? { paypalOrderId: o.paypalOrderId, mandateId: o.mandateId, captureId } : undefined;
+    },
+  };
+}
+
+export function defaultPollDeps(): PollDeps {
+  const client = getPayPalClient();
+  return {
+    store: drizzleDisputeStore(),
+    listDisputes: () => listDisputes(client),
+    showDispute: (id) => showDispute(client, id),
   };
 }
 
