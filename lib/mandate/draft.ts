@@ -56,7 +56,9 @@ export function mockDraft(text: string): unknown {
 export async function draftMandate(requestText: string): Promise<{ constraints: Constraints; warnings: string[] }> {
   const draft = await generateJson({
     task: 'draft_mandate',
-    system: SYSTEM,
+    // The model does not know today's date and guesses a past year for "by Nov 20" without it.
+    system: `${SYSTEM}
+Today's date is ${new Date().toISOString().slice(0, 10)}. A deadline without a year means the next such date on or after today.`,
     user: requestText,
     schema: DraftMandateResponse,
     mock: ({ user }) => mockDraft(user),
