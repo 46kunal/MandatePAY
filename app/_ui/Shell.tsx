@@ -1,8 +1,8 @@
 'use client';
-// OWNER: C. Page frame with the top bar and Buyer / Merchant tabs, the demo-mode bar, and a small Badge.
+// OWNER: C. Page frames: BuyerShell (simple top bar) and MerchantShell (sidebar), plus the demo-mode bar.
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import type { Tone } from './labels';
 import u from './ui.module.css';
 
 interface DemoStatus {
@@ -12,7 +12,7 @@ interface DemoStatus {
 }
 
 /** Shown only when the server runs with DEMO_MODE=true. Offers a one-click reset of the demo data. */
-function DemoBar() {
+export function DemoBar() {
   const [status, setStatus] = useState<DemoStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,12 +50,12 @@ function DemoBar() {
       <div className={u.demoInner}>
         <span>
           <strong>Demo mode</strong> · {status.paypal_configured ? 'PayPal sandbox' : 'PayPal simulated'} ·{' '}
-          {status.llm_provider === 'mock' ? 'sample AI analyst' : `AI: ${status.llm_provider}`}
+          {status.llm_provider === 'mock' ? 'sample AI analyst' : `AI analyst: ${status.llm_provider}`}
         </span>
         <span className={u.demoActions}>
-          {error && <span className={u.demoError}>{error}</span>}
+          {error && <span>{error}</span>}
           <button className={u.demoBtn} onClick={reset} disabled={busy}>
-            {busy ? 'Resetting…' : 'Reset demo'}
+            {busy ? 'Resetting…' : 'Reset demo data'}
           </button>
         </span>
       </div>
@@ -63,35 +63,73 @@ function DemoBar() {
   );
 }
 
-export function Shell({ active, children }: { active: 'buyer' | 'merchant'; children: ReactNode }) {
-  const tab = (key: 'buyer' | 'merchant', href: string, label: string) => (
-    <Link
-      href={href}
-      className={`${u.tab} ${active === key ? u.tabOn : ''}`}
-      aria-current={active === key ? 'page' : undefined}
-    >
-      {label}
+function Brand() {
+  return (
+    <Link href="/" className={u.brand}>
+      <span className={u.brandMark} aria-hidden="true">
+        M
+      </span>
+      MandatePay
     </Link>
   );
+}
+
+export function BuyerShell({ children }: { children: ReactNode }) {
   return (
-    <div className={u.shell}>
-      <header className={u.bar}>
-        <div className={u.barInner}>
-          <Link href="/" className={u.brand}>
-            Mandate<span>Pay</span>
+    <div className={u.root}>
+      <header className={u.topbar}>
+        <div className={u.topbarInner}>
+          <Brand />
+          <Link href="/merchant" className={u.topLink}>
+            Merchant dashboard →
           </Link>
-          <nav className={u.tabs} aria-label="Main">
-            {tab('buyer', '/buyer', 'Buyer')}
-            {tab('merchant', '/merchant', 'Merchant')}
-          </nav>
         </div>
       </header>
       <DemoBar />
-      <main className={u.main}>{children}</main>
+      <main className={u.contentNarrow}>{children}</main>
     </div>
   );
 }
 
-export function Badge({ tone, children }: { tone: Tone; children: ReactNode }) {
-  return <span className={`${u.badge} ${u[tone]}`}>{children}</span>;
+const NAV = [
+  { href: '/merchant', label: 'Overview', exact: true },
+  { href: '/merchant/disputes', label: 'Disputes' },
+  { href: '/merchant/orders', label: 'Orders' },
+  { href: '/merchant/ledger', label: 'Mandate ledger' },
+  { href: '/merchant/evidence', label: 'Evidence reports' },
+  { href: '/merchant/settings', label: 'Settings' },
+];
+
+export function MerchantShell({ children }: { children: ReactNode }) {
+  const path = usePathname() ?? '';
+  return (
+    <div className={u.root}>
+      <div className={u.app}>
+        <aside className={u.sidebar}>
+          <Brand />
+          <nav aria-label="Merchant" className={u.navWrap}>
+            <ul className={u.navList}>
+              {NAV.map((n) => {
+                const on = n.exact ? path === n.href : path === n.href || path.startsWith(n.href + '/');
+                return (
+                  <li key={n.href}>
+                    <Link href={n.href} className={`${u.navItem} ${on ? u.navOn : ''}`} aria-current={on ? 'page' : undefined}>
+                      {n.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          <div className={u.navFoot}>
+            Shopping as a buyer? <Link href="/buyer">Open the buyer view</Link>
+          </div>
+        </aside>
+        <div className={u.main}>
+          <DemoBar />
+          <main className={u.content}>{children}</main>
+        </div>
+      </div>
+    </div>
+  );
 }
