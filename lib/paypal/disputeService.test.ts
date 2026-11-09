@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { toCaseRecord } from './cases';
-import { disputeEventId, ingestDispute, pollDisputes, type CaseUpsert, type DisputeStore, type LinkedOrder } from './disputeService';
+import { disputeEventId, fetchDisputeById, ingestDispute, pollDisputes, type CaseUpsert, type DisputeStore, type LinkedOrder } from './disputeService';
 import type { RawDispute } from './disputes';
 
 function memoryStore(orders: LinkedOrder[] = []) {
@@ -125,6 +125,17 @@ describe('pollDisputes', () => {
     assert.deepEqual(second, { fetched: 1, newCases: 0, linked: 0 });
     assert.equal(shown.length, 1);
     assert.equal(m.cases.size, 1);
+  });
+
+  it('fetches a dispute by id that the list does not show yet, and links it', async () => {
+    const m = memoryStore([ourOrder]);
+    const hidden = dispute({ dispute_id: 'PP-R-NEW-1', status: 'UNDER_REVIEW' });
+    const { deps, shown } = pollWith(m, [hidden]);
+    deps.listDisputes = async () => [];
+    assert.deepEqual(await fetchDisputeById(deps, 'PP-R-NEW-1'), { fetched: 1, newCases: 1, linked: 1 });
+    assert.deepEqual(shown, ['PP-R-NEW-1']);
+    assert.equal(m.cases.get('PP-R-NEW-1')!.paypalOrderId, 'ORDER1');
+    assert.deepEqual(await fetchDisputeById(deps, 'PP-R-NEW-1'), { fetched: 1, newCases: 0, linked: 0 });
   });
 
   it('handles an empty dispute list', async () => {

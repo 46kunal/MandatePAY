@@ -26,6 +26,7 @@ export default function DisputesPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [polling, setPolling] = useState(false);
   const [pollMsg, setPollMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [byId, setById] = useState('');
 
   const shown = useMemo(() => {
     if (!cases) return null;
@@ -37,11 +38,25 @@ export default function DisputesPage() {
     });
   }, [cases, filter]);
 
-  async function poll() {
+  async function poll(disputeId?: string) {
     setPolling(true);
     setPollMsg(null);
     try {
-      const r = await apiFetch<Poll>('/api/disputes/poll', { method: 'POST' });
+      const r = await apiFetch<Poll>('/api/disputes/poll', {
+        method: 'POST',
+        ...(disputeId ? { body: { dispute_id: disputeId } } : {}),
+      });
+      if (disputeId) {
+        setPollMsg({
+          ok: true,
+          text: r.data.new_cases
+            ? `Added ${disputeId}${r.data.linked ? ', linked to its order' : ', but it is not linked to an order placed here'}.`
+            : `${disputeId} is already up to date.`,
+        });
+        setById('');
+        reload();
+        return;
+      }
       const { fetched, new_cases, linked } = r.data;
       setPollMsg({
         ok: true,
@@ -68,12 +83,36 @@ export default function DisputesPage() {
             <button className={`${u.btn} ${u.btnSecondary}`} onClick={reload} disabled={polling}>
               Refresh
             </button>
-            <button className={u.btn} onClick={poll} disabled={polling}>
+            <button className={u.btn} onClick={() => poll()} disabled={polling}>
               {polling ? 'Checking PayPal…' : 'Check PayPal for new disputes'}
             </button>
           </>
         }
       />
+
+      <form
+        className={u.row}
+        style={{ marginBottom: '0.9rem', gap: '0.5rem' }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (byId.trim()) void poll(byId.trim().toUpperCase());
+        }}
+      >
+        <label htmlFor="dispute-id" className={u.muted}>
+          New dispute not showing yet? PayPal&apos;s list can lag. Fetch it by its ID:
+        </label>
+        <input
+          id="dispute-id"
+          value={byId}
+          onChange={(e) => setById(e.target.value)}
+          placeholder="PP-R-ABC-12345678"
+          style={{ width: '14rem' }}
+          disabled={polling}
+        />
+        <button className={`${u.btn} ${u.btnSecondary}`} type="submit" disabled={polling || !byId.trim()}>
+          Fetch
+        </button>
+      </form>
 
       {pollMsg && (
         <Notice tone={pollMsg.ok ? 'good' : 'bad'} alert={!pollMsg.ok}>

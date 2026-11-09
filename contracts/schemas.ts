@@ -253,6 +253,11 @@ export type OrderSummary = z.infer<typeof OrderSummary>;
 
 export const ListOrdersResponse = z.object({ orders: z.array(OrderSummary) });
 
+/** Optional body of POST /api/disputes/poll: fetch one dispute by id (PayPal's list can lag behind for new disputes). */
+export const PollDisputesRequest = z
+  .object({ dispute_id: z.string().regex(/^PP-[A-Z0-9-]{4,60}$/, 'a PayPal dispute id like PP-R-ABC-12345678') })
+  .strict();
+
 export const PollDisputesResponse = z.object({
   fetched: z.number().int(),
   new_cases: z.number().int(),
