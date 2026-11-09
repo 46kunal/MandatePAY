@@ -1,9 +1,8 @@
 /**
  * PayPal Disputes API (owner: A).
  *
- * UNVERIFIED AGAINST THE SANDBOX: field names follow PayPal's docs. Day 2 task: create a real dispute,
- * save the raw JSON from showDispute, and confirm (1) disputed_transactions[].seller_transaction_id equals
- * our orders.capture_id and (2) which links / allowed_response_options appear per stage. Adjust the mapper below.
+ * Verified against a real sandbox dispute (see README): seller_transaction_id equals our orders.capture_id.
+ * Links / allowed_response_options are only confirmed for the UNDER_PAYPAL_REVIEW stage (just a `self` link).
  */
 import { OfferType, type ActionType, type DisputeSummary, type Money } from '../../contracts/schemas';
 import type { PayPalClient } from './client';

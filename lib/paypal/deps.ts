@@ -3,7 +3,8 @@ import type { Cart } from '../../contracts/schemas';
 import { checkCart, computeReceiptHash, createClosedMandate, hashCart, verifyClosedMandate } from '../mandate';
 import { getPayPalClient } from './client';
 import type { DisputeStore, PollDeps } from './disputeService';
-import { listDisputes, showDispute } from './disputes';
+import type { ActDeps, ActStore } from './caseActions';
+import { acceptClaim, listDisputes, makeOffer, provideEvidence, sendMessage, showDispute, type RawDispute } from './disputes';
 import { captureOrder, createOrder } from './orders';
 import type { CartRow, LedgerStore, OrderDeps, OrderRow } from './service';
 
@@ -100,6 +101,52 @@ export function drizzleDisputeStore(): DisputeStore {
       const { eq, db, schema } = await load();
       const [o] = await db.select().from(schema.orders).where(eq(schema.orders.captureId, captureId)).limit(1);
       return o ? { paypalOrderId: o.paypalOrderId, mandateId: o.mandateId, captureId } : undefined;
+    },
+  };
+}
+
+/** Drizzle-backed store for acting on cases. */
+export function drizzleActStore(): ActStore {
+  const load = async () => {
+    const [{ and, eq, ne }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
+    return { and, eq, ne, db, schema };
+  };
+
+  return {
+    async getCase(disputeId) {
+      const { eq, db, schema } = await load();
+      const [row] = await db.select().from(schema.cases).where(eq(schema.cases.disputeId, disputeId)).limit(1);
+      return row ? { row, rawDispute: (row.rawDispute as RawDispute | null) ?? null } : undefined;
+    },
+    async markActed(disputeId, f) {
+      const { and, eq, ne, db, schema } = await load();
+      const now = new Date();
+      const [row] = await db
+        .update(schema.cases)
+        .set({
+          analysisStatus: 'acted',
+          actionTaken: f.action,
+          outcome: f.outcome,
+          humanApprovedAt: f.humanApproved ? now : null,
+          updatedAt: now,
+        })
+        // Conditional update: the second of two concurrent requests matches nothing and gets a 409.
+        .where(and(eq(schema.cases.disputeId, disputeId), ne(schema.cases.analysisStatus, 'acted')))
+        .returning();
+      return row;
+    },
+  };
+}
+
+export function defaultActDeps(): ActDeps {
+  const client = getPayPalClient();
+  return {
+    store: drizzleActStore(),
+    actions: {
+      provideEvidence: (id, notes) => provideEvidence(client, id, notes),
+      makeOffer: (id, offer) => makeOffer(client, id, offer),
+      acceptClaim: (id, note) => acceptClaim(client, id, note),
+      sendMessage: (id, message) => sendMessage(client, id, message),
     },
   };
 }
