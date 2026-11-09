@@ -22,10 +22,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "eval": "tsx --env-file=.env eval/run.ts",
-    "keys:export": "tsx scripts/keys-export.ts"
+    "keys:export": "tsx scripts/keys-export.ts",
+    "auth:create-user": "tsx scripts/auth-create-user.ts"
   },
   "dependencies": {
     "@paypal/react-paypal-js": "^10.6.1",
+    "better-auth": "1.7.14",
     "dotenv": "^18.0.9",
     "drizzle-orm": "^0.45.4",
     "jose": "^6.2.15",

@@ -3,6 +3,8 @@
 // the server is connected to (GET /api/status); those are environment variables and secrets, so not editable here.
 import { useEffect, useState } from 'react';
 import type { StoreSettings } from '@/contracts/schemas';
+import { useSession } from '@/lib/auth/client';
+import { can } from '@/lib/auth/roles';
 import { apiFetch } from '../../_ui/api';
 import { Badge, Card, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
 import u from '../../_ui/ui.module.css';
@@ -59,6 +61,8 @@ function toPatch(d: Draft): { ok: true; body: Record<string, unknown> } | { ok: 
 }
 
 function StoreSettingsCard() {
+  const { data: session } = useSession();
+  const canEdit = can((session?.user as { role?: string } | undefined)?.role, 'settings:write');
   const [saved, setSaved] = useState<StoreSettings | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -103,7 +107,7 @@ function StoreSettingsCard() {
         value={draft?.[key] ?? ''}
         placeholder={placeholder}
         onChange={(e) => setDraft((d) => (d ? { ...d, [key]: e.target.value } : d))}
-        disabled={!draft || busy}
+        disabled={!draft || busy || !canEdit}
       />
       <span className={u.muted} style={{ fontSize: '0.85em' }}>{hint}</span>
     </div>
@@ -122,9 +126,13 @@ function StoreSettingsCard() {
             {field('min_confidence', 'Minimum AI confidence (%)', 'AI verdicts below this need a person.')}
           </div>
           <div className={u.row} style={{ gap: '0.75rem' }}>
-            <button className={u.btn} type="submit" disabled={busy}>
-              {busy ? 'Saving…' : 'Save'}
-            </button>
+            {canEdit ? (
+              <button className={u.btn} type="submit" disabled={busy}>
+                {busy ? 'Saving…' : 'Save'}
+              </button>
+            ) : (
+              <span className={u.muted}>Only the store owner can change these.</span>
+            )}
             {saved?.updated_at ? (
               <span className={u.muted}>Last saved {new Date(saved.updated_at).toLocaleString()}</span>
             ) : (

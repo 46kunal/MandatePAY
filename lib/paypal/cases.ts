@@ -17,6 +17,8 @@ export interface CaseRow {
   analysisStatus: string;
   actionTaken: string | null;
   outcome: string | null;
+  /** The user who sent the action to PayPal (null before sign-in existed or while not acted). */
+  actedBy?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

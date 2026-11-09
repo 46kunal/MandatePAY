@@ -37,9 +37,10 @@ export function toOrderSummary(r: OrderListRow): OrderSummary {
   };
 }
 
-export async function listOrders(limit = 200): Promise<OrderSummary[]> {
+/** Every order, or only the orders of one buyer (through their mandates). */
+export async function listOrders(opts: { userId?: string; limit?: number } = {}): Promise<OrderSummary[]> {
   const [{ desc, eq }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
-  const { orders, carts, cases } = schema;
+  const { orders, carts, cases, mandates } = schema;
   const rows = await db
     .select({
       paypalOrderId: orders.paypalOrderId,
@@ -57,9 +58,11 @@ export async function listOrders(limit = 200): Promise<OrderSummary[]> {
     })
     .from(orders)
     .innerJoin(carts, eq(carts.cartId, orders.cartId))
+    .innerJoin(mandates, eq(mandates.mandateId, orders.mandateId))
     .leftJoin(cases, eq(cases.paypalOrderId, orders.paypalOrderId))
+    .where(opts.userId ? eq(mandates.userId, opts.userId) : undefined)
     .orderBy(desc(orders.createdAt))
-    .limit(limit);
+    .limit(opts.limit ?? 200);
   // An order with more than one dispute joins once per dispute; keep one row per order.
   const seen = new Set<string>();
   return rows.filter((r) => !seen.has(r.paypalOrderId) && seen.add(r.paypalOrderId)).map(toOrderSummary);

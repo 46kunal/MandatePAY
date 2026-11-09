@@ -54,7 +54,7 @@ function setup(c: { row?: Partial<CaseRow>; rawDispute?: RawDispute | null } = {
       getCase: async (id) => (found && id === found.row.disputeId ? found : undefined),
       markActed: async (_id, f) => {
         if (row!.analysisStatus === 'acted') return undefined;
-        row = { ...row!, analysisStatus: 'acted', actionTaken: f.action, outcome: f.outcome, updatedAt: new Date('2026-11-09T11:00:00Z') };
+        row = { ...row!, analysisStatus: 'acted', actionTaken: f.action, outcome: f.outcome, actedBy: f.actedBy ?? null, updatedAt: new Date('2026-11-09T11:00:00Z') };
         return row;
       },
     },
@@ -101,6 +101,12 @@ describe('actOnCase: happy paths', () => {
     s.deps.evidenceFiles = async () => ((built = true), []);
     await actOnCase(s.deps, 'PP-D-1', { humanApproved: false });
     assert.equal(built, false);
+  });
+
+  it('records who sent the action', async () => {
+    const s = setup();
+    const r = await actOnCase(s.deps, 'PP-D-1', { humanApproved: false, actedBy: 'usr_owner' });
+    assert.ok(r.ok && r.row.actedBy === 'usr_owner');
   });
 
   it('makes an offer with the dispute currency', async () => {

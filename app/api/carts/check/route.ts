@@ -1,6 +1,8 @@
 import { apiError } from '@/lib/http';
 import { checkCartById } from '@/lib/mandate/check';
 import { CartCheckRequest } from '@/contracts/schemas';
+import { requirePermission } from '@/lib/auth/guard';
+import { mandateOwnerId, notOwned } from '@/lib/auth/ownership';
 
 export const runtime = 'nodejs';
 // Calls the AI model: up to 60 s per attempt plus one fallback attempt.
@@ -9,8 +11,13 @@ export const maxDuration = 150;
 // OWNER: B. POST { mandate_id, cart } -> GuardResult. 404 unknown mandate, 410 expired.
 // Deterministic rules first; LLM only for fuzzy matches (B7). Person A should call checkCartById() directly.
 export async function POST(req: Request) {
+  const authz = await requirePermission(req, 'shop');
+  if (!authz.ok) return authz.response;
   const body = CartCheckRequest.safeParse(await req.json().catch(() => null));
   if (!body.success) return apiError(400, 'invalid_request', 'Expected { mandate_id, cart }', body.error.issues);
+
+  const denied = notOwned(await mandateOwnerId(body.data.mandate_id), authz.user.id, 'mandate', body.data.mandate_id);
+  if (denied) return denied;
 
   const result = await checkCartById(body.data.mandate_id, body.data.cart);
   if (!result.ok) return apiError(result.status, result.error, result.message);

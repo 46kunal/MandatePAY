@@ -6,6 +6,8 @@ import { getSettings } from '@/lib/settings';
 import { apiError } from '@/lib/http';
 import { checkCart, verifyOpenMandate } from '@/lib/mandate';
 import type { z } from 'zod';
+import { requirePermission } from '@/lib/auth/guard';
+import { mandateOwnerId, notOwned } from '@/lib/auth/ownership';
 
 export const runtime = 'nodejs';
 // Calls the AI model: up to 60 s per attempt plus one fallback attempt.
@@ -14,8 +16,13 @@ export const maxDuration = 150;
 // POST { mandate_id } -> AgentShopResponse. The agent reads the merchant catalog and proposes a cart, which the guard checks.
 // 404 mandate, 410 expired, 422 empty catalog / nothing fits, 500 LLM not configured, 502 LLM failed.
 export async function POST(req: Request) {
+  const authz = await requirePermission(req, 'shop');
+  if (!authz.ok) return authz.response;
   const body = AgentShopRequest.safeParse(await req.json().catch(() => null));
   if (!body.success) return apiError(400, 'invalid_request', 'Expected { mandate_id }.', body.error.issues);
+
+  const denied = notOwned(await mandateOwnerId(body.data.mandate_id), authz.user.id, 'mandate', body.data.mandate_id);
+  if (denied) return denied;
 
   try {
     const result = await shop(

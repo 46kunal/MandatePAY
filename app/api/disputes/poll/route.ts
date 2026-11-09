@@ -4,6 +4,7 @@ import { PayPalConfigError, PayPalError } from '@/lib/paypal';
 import { defaultPollDeps } from '@/lib/paypal/deps';
 import { fetchDisputeById, pollDisputes } from '@/lib/paypal/disputeService';
 import type { z } from 'zod';
+import { requirePermission } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +12,8 @@ export const runtime = 'nodejs';
 // Lists disputes, fetches the ones that changed, upserts cases, links them to orders by capture_id.
 // With { dispute_id } it fetches that one dispute instead: PayPal's list can take a while to show a new dispute.
 export async function POST(req: Request) {
+  const authz = await requirePermission(req, 'disputes:poll');
+  if (!authz.ok) return authz.response;
   const text = await req.text();
   let disputeId: string | undefined;
   if (text.trim()) {

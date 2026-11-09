@@ -201,7 +201,8 @@ export const DraftMandateResponse = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
-export const CreateMandateRequest = z.object({ buyer_ref: z.string().min(1), constraints: Constraints });
+// buyer_ref is ignored if sent: the mandate is signed for the signed-in user (their user id becomes buyer_ref).
+export const CreateMandateRequest = z.object({ buyer_ref: z.string().optional(), constraints: Constraints });
 export const CreateMandateResponse = z.object({
   mandate_id: z.string(),
   constraints: Constraints,

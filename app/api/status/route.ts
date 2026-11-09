@@ -1,11 +1,14 @@
 import { getConfig } from '@/lib/config';
 import { getSettings } from '@/lib/settings';
+import { requirePermission } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // GET -> what the server is connected to, for the settings page and the buyer checkout. No secrets.
-export async function GET() {
+export async function GET(req: Request) {
+  const authz = await requirePermission(req, 'status:read');
+  if (!authz.ok) return authz.response;
   const c = getConfig();
   return Response.json({
     paypal_configured: Boolean(c.PAYPAL_CLIENT_ID?.trim() && c.PAYPAL_CLIENT_SECRET?.trim()),
