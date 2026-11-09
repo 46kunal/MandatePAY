@@ -2,7 +2,7 @@
  * LLM entry point (owner: B): pick a provider from the environment, ask for JSON, validate with Zod.
  *
  * Environment (see .env.example):
- *   LLM_PROVIDER  "mock" | "anthropic". Empty means mock, so a fresh clone runs with no key.
+ *   LLM_PROVIDER  "mock" | "anthropic" | "gemini". Empty means mock, so a fresh clone runs with no key.
  *   LLM_API_KEY   required for "anthropic".
  *   LLM_MODEL     optional model override.
  *
@@ -11,6 +11,7 @@
  */
 import { z } from 'zod';
 import { AnthropicProvider } from './anthropic';
+import { GeminiProvider } from './gemini';
 import { MockProvider } from './mock';
 import { LlmError, type LlmProvider, type LlmRequest } from './types';
 
@@ -37,8 +38,12 @@ export function resolveProvider(env: Env = process.env): LlmProvider {
       if (!apiKey) throw new LlmError('config', 'LLM_PROVIDER=anthropic needs LLM_API_KEY (or use LLM_PROVIDER=mock).');
       return new AnthropicProvider({ apiKey, model: clean(env.LLM_MODEL) });
     }
+    case 'gemini': {
+      if (!apiKey) throw new LlmError('config', 'LLM_PROVIDER=gemini needs LLM_API_KEY (or use LLM_PROVIDER=mock).');
+      return new GeminiProvider({ apiKey, model: clean(env.LLM_MODEL) });
+    }
     default:
-      throw new LlmError('config', `Unknown LLM_PROVIDER "${name}". Use "mock" or "anthropic".`);
+      throw new LlmError('config', `Unknown LLM_PROVIDER "${name}". Use "mock", "anthropic" or "gemini".`);
   }
 }
 
