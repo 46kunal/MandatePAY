@@ -34,7 +34,7 @@ export class GeminiProvider implements LlmProvider {
     this.apiKey = opts.apiKey;
     this.model = opts.model ?? DEFAULT_GEMINI_MODEL;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
-    this.maxOutputTokens = opts.maxOutputTokens ?? 4096;
+    this.maxOutputTokens = opts.maxOutputTokens ?? 16384; // Gemini 3 models spend part of this on thinking
   }
 
   async complete(call: ProviderCall): Promise<unknown> {

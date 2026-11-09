@@ -69,7 +69,10 @@ async function main() {
   let allOk = 0;
   const failures: string[] = [];
 
+  // EVAL_DELAY_MS spaces the calls out so a free-tier rate limit does not turn into false failures.
+  const delayMs = Number(process.env.EVAL_DELAY_MS ?? 0);
   for (const c of cases) {
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
     const input = toInput(c);
     let line: string;
     try {
