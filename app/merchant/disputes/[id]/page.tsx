@@ -397,9 +397,16 @@ export default function CaseDetailPage() {
       <Card
         id="evidence"
         title="Evidence summary"
-        subtitle="A preview of the document that backs this case. PDF export is not connected yet; use your browser's print to save it as a PDF."
+        subtitle="A preview of the document that backs this case. Download it as a PDF built from the signed mandate, the cart and the payment record."
         actions={
           <div className={`${u.row} ${u.noPrint}`}>
+            <a
+              href={`/api/cases/${encodeURIComponent(detail.dispute_id)}/evidence-pack?download=1`}
+              className={u.btn}
+              style={{ textDecoration: 'none' }}
+            >
+              Download PDF
+            </a>
             <Link href={`/merchant/evidence/${encodeURIComponent(detail.dispute_id)}`} className={`${u.btn} ${u.btnSecondary}`} style={{ textDecoration: 'none' }}>
               Open full page
             </Link>
