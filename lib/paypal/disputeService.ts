@@ -20,6 +20,8 @@ export interface CaseUpsert {
   status: string | null;
   amountMinor: number | null;
   currency: string | null;
+  /** Final result once PayPal resolved the dispute; null while it is open (an existing outcome is then kept). */
+  outcome: string | null;
   rawDispute: Record<string, unknown>;
 }
 
@@ -48,6 +50,14 @@ export interface IngestResult {
 
 export function disputeEventId(raw: Pick<RawDispute, 'dispute_id' | 'update_time' | 'status' | 'dispute_life_cycle_stage'>): string {
   return `dispute:${raw.dispute_id}:${raw.update_time ?? `${raw.dispute_life_cycle_stage ?? ''}-${raw.status ?? ''}`}`;
+}
+
+/** PayPal's final outcome code, only for a resolved dispute. */
+export function disputeOutcome(raw: Pick<RawDispute, 'status' | 'dispute_outcome'>): string | null {
+  const code = raw.dispute_outcome?.outcome_code;
+  if (!code) return raw.status === 'RESOLVED' ? 'RESOLVED' : null;
+  const refunded = raw.dispute_outcome?.amount_refunded;
+  return refunded ? `${code} (refunded ${refunded.value} ${refunded.currency_code})` : code;
 }
 
 /** Store one dispute change and upsert its case. Idempotent on the event id. */
@@ -82,6 +92,7 @@ export async function ingestDispute(
     status: raw.status ?? null,
     amountMinor: raw.dispute_amount ? toMinor(raw.dispute_amount.value) : null,
     currency: raw.dispute_amount?.currency_code ?? null,
+    outcome: disputeOutcome(raw),
     rawDispute: raw as unknown as Record<string, unknown>,
   });
   await store.markEventProcessed(eventId);

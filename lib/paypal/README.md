@@ -17,6 +17,12 @@ const summary = toDisputeSummary(await showDispute(client, disputeId)); // input
 `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_BASE_URL` (default sandbox), `PAYPAL_WEBHOOK_ID` (optional),
 `APP_BASE_URL`. Missing credentials throw `PayPalConfigError` (route: 500).
 
+## Webhooks
+
+`POST /api/webhooks/paypal` verifies the signature (needs `PAYPAL_WEBHOOK_ID`; without it the route answers 500 and accepts nothing),
+re-fetches the dispute from PayPal instead of trusting the payload, and ingests it once per webhook event id.
+Polling still works without webhooks. Resolved disputes get `cases.outcome` from `dispute_outcome`.
+
 ## Behaviour
 
 - **Token cache:** one token, refreshed 60 s before expiry; concurrent callers share a single refresh; one retry on 401.
@@ -39,7 +45,14 @@ A real buyer dispute (`PP-R-...`, reason `MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBE
 - A new dispute can take a few minutes to appear in `GET /v1/customer/disputes`; poll again.
 - At `INQUIRY` / `UNDER_REVIEW` / `UNDER_PAYPAL_REVIEW` the response has **only a `self` link and no
   `allowed_response_options`**, so `deriveAllowedActions` correctly yields `['NO_ACTION']` and `POST /api/cases/:id/act`
-  returns 422 for any PayPal call. Links for actionable stages (for example `WAITING_FOR_SELLER_RESPONSE`) have not been seen yet.
+  returns 422 for any PayPal call.
+- The same dispute later moved to `WAITING_FOR_SELLER_RESPONSE` / `REQUIRED_ACTION`. Link rels are **underscored**
+  (`accept_claim`, `send_message`, `make_offer`, `escalate`), not the hyphenated names in the docs, so the mapper
+  normalises `_` to `-`. `allowed_response_options` was `{ accept_claim: { accept_claim_types: [PARTIAL_REFUND,
+  REFUND_WITH_RETURN, REFUND] }, make_offer: { offer_types: [REFUND, REFUND_WITH_RETURN] } }`. No `provide_evidence` at INQUIRY.
+- A real `send-message` worked with the body shape we use. Afterwards the dispute went to `WAITING_FOR_BUYER_RESPONSE`
+  (links: `send_message`, `accept_claim`, `escalate`; **no `make_offer`**), so a merchant should make the offer before messaging.
+- Not yet run for real: `make-offer`, `accept-claim` (PayPal may also want an `accept_claim_type` in the body) and `provide-evidence`.
 
 ## Tests
 
