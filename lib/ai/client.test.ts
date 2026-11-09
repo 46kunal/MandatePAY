@@ -35,14 +35,14 @@ function scripted(answers: unknown[]): LlmProvider & { calls: ProviderCall[] } {
 }
 
 describe('provider selection', () => {
-  it('uses the mock provider when LLM_PROVIDER is empty or missing', () => {
-    assert.equal(resolveProvider({}).name, 'mock');
-    assert.equal(resolveProvider({ LLM_PROVIDER: '' }).name, 'mock');
-    assert.equal(resolveProvider({ LLM_PROVIDER: '  ' }).name, 'mock');
+  it('refuses to run without LLM_PROVIDER: there is no offline stand-in', () => {
+    for (const env of [{}, { LLM_PROVIDER: '' }, { LLM_PROVIDER: '  ' }]) {
+      assert.throws(() => resolveProvider(env), (err) => err instanceof LlmError && err.code === 'config' && /LLM_PROVIDER/.test(err.message));
+    }
   });
 
-  it('accepts LLM_PROVIDER=mock in any case', () => {
-    assert.equal(resolveProvider({ LLM_PROVIDER: 'MOCK' }).name, 'mock');
+  it('no longer accepts LLM_PROVIDER=mock', () => {
+    assert.throws(() => resolveProvider({ LLM_PROVIDER: 'mock', LLM_API_KEY: 'k' }), (err) => err instanceof LlmError && err.code === 'config');
   });
 
   it('builds the anthropic provider when a key is present', () => {
@@ -61,69 +61,6 @@ describe('provider selection', () => {
       () => resolveProvider({ LLM_PROVIDER: 'carrier-pigeon' }),
       (err) => err instanceof LlmError && err.code === 'config' && /carrier-pigeon/.test(err.message),
     );
-  });
-});
-
-describe('generateJson with LLM_PROVIDER=mock', () => {
-  const provider = resolveProvider({ LLM_PROVIDER: 'mock' });
-
-  it('returns the canned answer, validated against the contract schema', async () => {
-    const result = await generateJson(
-      { ...draftTask, schema: Constraints, mock: () => validConstraints },
-      provider,
-    );
-    assert.deepEqual(result, validConstraints);
-  });
-
-  it('passes the prompts to the canned responder', async () => {
-    let seen = '';
-    await generateJson(
-      {
-        ...draftTask,
-        schema: Constraints,
-        mock: (input) => {
-          seen = `${input.task}|${input.user}`;
-          return validConstraints;
-        },
-      },
-      provider,
-    );
-    assert.equal(seen, 'draft_mandate|white trainers under 50 pounds');
-  });
-
-  it('supports async canned responders', async () => {
-    const result = await generateJson(
-      { ...draftTask, schema: Constraints, mock: async () => validConstraints },
-      provider,
-    );
-    assert.deepEqual(result, validConstraints);
-  });
-
-  it('fails loudly when a task has no canned answer', async () => {
-    await assert.rejects(
-      () => generateJson({ ...draftTask, schema: Constraints }, provider),
-      (err) => err instanceof LlmError && err.code === 'no_mock_responder',
-    );
-  });
-
-  it('rejects a canned answer that breaks the schema, without retrying', async () => {
-    let calls = 0;
-    await assert.rejects(
-      () =>
-        generateJson(
-          {
-            ...draftTask,
-            schema: Constraints,
-            mock: () => {
-              calls++;
-              return { ...validConstraints, surprise: true }; // Constraints is .strict()
-            },
-          },
-          provider,
-        ),
-      (err) => err instanceof LlmError && err.code === 'schema_mismatch',
-    );
-    assert.equal(calls, 1);
   });
 });
 
@@ -170,7 +107,7 @@ describe('generateJson validation and retry', () => {
 
   it('returns the parsed value, so schema defaults are applied', async () => {
     const Small = z.object({ warnings: z.array(z.string()).default([]), n: z.number() });
-    const result = await generateJson({ ...draftTask, schema: Small, mock: () => ({ n: 1 }) }, resolveProvider({}));
+    const result = await generateJson({ ...draftTask, schema: Small }, scripted([{ n: 1 }]));
     assert.deepEqual(result, { warnings: [], n: 1 });
   });
 });

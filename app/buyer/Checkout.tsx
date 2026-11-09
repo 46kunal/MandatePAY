@@ -2,13 +2,12 @@
 // OWNER: C. PayPal checkout for the buyer page.
 //  - create: POST /api/orders   (guard runs on the server; 422 guard_blocked, or needs_approval)
 //  - capture: POST /api/orders/:id/capture after the buyer approves in the PayPal popup
-// With NEXT_PUBLIC_PAYPAL_CLIENT_ID set it renders the real PayPal buttons (sandbox). Without it, it shows a
-// "simulate" button that runs the same two API calls, so the demo works with no PayPal credentials.
-import { useEffect, useState } from 'react';
+// It renders the real PayPal sandbox buttons, which need NEXT_PUBLIC_PAYPAL_CLIENT_ID. Without it, it says what to set.
+import { useState } from 'react';
 import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
 import type { Cart, CaptureOrderResponse, GuardResult, PlaceOrderResponse } from '@/contracts/schemas';
 import type { z } from 'zod';
-import { ApiClientError, apiFetch } from '@/fixtures/api';
+import { ApiClientError, apiFetch } from '@/app/_ui/api';
 import { formatMoney } from '../_ui/labels';
 import { Notice } from '../_ui/Ui';
 import u from '../_ui/ui.module.css';
@@ -35,26 +34,13 @@ export default function Checkout({
   mandateId,
   cart,
   guard,
-  onFixture,
   onPaid,
 }: {
   mandateId: string;
   cart: Cart;
   guard: GuardResult;
-  /** Called when a fixture answered instead of the server, so the page can show its sample-data notice. */
-  onFixture: () => void;
   onPaid: () => void;
 }) {
-  // Simulation is only honest when the server runs in demo mode. With real PayPal credentials and no public
-  // client id there is no way to get the buyer's approval, so say what to configure instead of failing at capture.
-  const [demoMode, setDemoMode] = useState<boolean | null>(null);
-  useEffect(() => {
-    if (CLIENT_ID) return;
-    fetch('/api/demo/status')
-      .then((r) => r.json())
-      .then((d: { demo?: boolean }) => setDemoMode(Boolean(d.demo)))
-      .catch(() => setDemoMode(false));
-  }, []);
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +54,6 @@ export default function Checkout({
     const r = await apiFetch<Placed>('/api/orders', {
       body: { mandate_id: mandateId, cart, buyer_approved: approved },
     });
-    if (r.fromFixture) onFixture();
     if (r.data.status === 'needs_approval') {
       setServerNeedsApproval(true);
       throw new NeedsApprovalError('This order needs your approval first.');
@@ -78,23 +63,7 @@ export default function Checkout({
 
   async function capture(orderId: string): Promise<Captured> {
     const r = await apiFetch<Captured>(`/api/orders/${encodeURIComponent(orderId)}/capture`, { method: 'POST' });
-    if (r.fromFixture) onFixture();
     return r.data;
-  }
-
-  async function simulate() {
-    setBusy(true);
-    setError(null);
-    try {
-      const placed = await place();
-      const done = await capture(placed.paypal_order_id);
-      setPaid(done);
-      onPaid();
-    } catch (e) {
-      setError(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
   }
 
   if (guard.verdict === 'block') {
@@ -176,22 +145,11 @@ export default function Checkout({
             onError={(e) => setError((prev) => prev ?? errMsg(e))}
           />
         </PayPalScriptProvider>
-      ) : demoMode === false ? (
-        <div className={s.error} role="alert">
-          The PayPal button is not configured. Set NEXT_PUBLIC_PAYPAL_CLIENT_ID in .env (same value as PAYPAL_CLIENT_ID) and
-          restart the server, or start the app with DEMO_MODE=true and no PayPal credentials to simulate payment.
-        </div>
-      ) : demoMode === null ? (
-        <p className={s.muted}>Loading payment options…</p>
       ) : (
-        <>
-          <p className={u.muted} style={{ marginTop: 0 }}>
-            PayPal is simulated in demo mode, so no real money moves.
-          </p>
-          <button className={u.btn} onClick={simulate} disabled={busy}>
-            {busy ? 'Paying…' : `Pay ${formatMoney(guard.total, guard.currency)} with PayPal`}
-          </button>
-        </>
+        <div className={s.error} role="alert">
+          The PayPal button is not configured. Set NEXT_PUBLIC_PAYPAL_CLIENT_ID in .env (same value as PAYPAL_CLIENT_ID)
+          and restart the server.
+        </div>
       )}
     </div>
   );

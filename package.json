@@ -20,8 +20,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:seed": "tsx scripts/seed.ts",
-    "eval": "tsx eval/run.ts"
+    "eval": "tsx --env-file=.env eval/run.ts"
   },
   "dependencies": {
     "@paypal/react-paypal-js": "^10.6.1",

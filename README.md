@@ -10,14 +10,24 @@ Prerequisites: Node 20.9+, Docker.
 
 ```bash
 npm run bootstrap     # installs dependencies, creates .env from .env.example
-# edit .env: add PayPal sandbox client id and secret (see docs/PAYPAL_SANDBOX_SETUP.md)
+# edit .env: PayPal sandbox keys (docs/PAYPAL_SANDBOX_SETUP.md) and an LLM key (LLM_PROVIDER, LLM_API_KEY)
 npm run db:up         # Postgres 16 on localhost:5434
-npm run db:generate   # first time only (orchestrator), commit the migration
 npm run db:migrate
 npm run dev
 ```
 
-Check: open http://localhost:3000/api/health, expect `{"ok":true,"service":"mandatepay"}`.
+Check: open http://localhost:3000/api/health, expect `{"ok":true,"service":"mandatepay"}`, and /merchant/settings
+shows what is connected.
+
+Nothing in the app is canned. To use it:
+
+1. **Merchant → Products:** add the products you sell (price, stock, attributes such as colour and size, delivery days).
+2. **Buyer:** describe what you want; the AI drafts limits, you sign them as a mandate.
+3. **Ask the agent to shop:** it picks products from your catalog that fit the mandate and says why. Prices and
+   details come from the catalog, never from the model. The guard checks the cart; you can change it.
+4. **Pay** with the PayPal sandbox button (needs `NEXT_PUBLIC_PAYPAL_CLIENT_ID`).
+5. **Disputes** are real: open one as the sandbox buyer in PayPal's Resolution Center, then **Poll disputes**. Run the
+   AI analysis, approve an action, download the PDF evidence pack.
 
 ## Analyst accuracy
 
@@ -25,18 +35,18 @@ Check: open http://localhost:3000/api/health, expect `{"ok":true,"service":"mand
 
 | Analyst | Fault | Action | needs_human | Overall |
 |---|---|---|---|---|
-| Offline mock (`LLM_PROVIDER=mock`) | 100% (25/25) | 100% (25/25) | 100% (8/8) | **100% (25/25)** |
 | Claude (`LLM_PROVIDER=anthropic`) | not yet run | not yet run | not yet run | not yet run |
-| Gemini (`LLM_PROVIDER=gemini`) | not yet run | not yet run | not yet run | not yet run |
+| Grok (`LLM_PROVIDER=grok`) | not yet run | not yet run | not yet run | not yet run |
+| Gemini 3.1 Flash-Lite (`LLM_PROVIDER=gemini`, free tier, run 2026-11-09) | 68% (17/25) | 52% (13/25) | 100% (7/7) | **36% (9/25)**, 3 of the 25 errored on provider timeouts or overload |
 
-**Read the mock row with care.** The mock is a small keyword reader that I tuned against these same 25 cases (before tuning it scored 64%), so 100% shows the pipeline and guardrails work end to end, not that the analyst is accurate on unseen disputes. The real accuracy number is the Claude row: run `LLM_PROVIDER=anthropic LLM_API_KEY=... npm run eval` and replace it. The prompt-injection guardrail (flagged text always needs a human) is plain code and does not depend on either model.
+These are real-model numbers on 25 hand-labelled cases; there is no offline analyst to compare against. Run `npm run eval` (needs `LLM_PROVIDER` and `LLM_API_KEY` in `.env`; set `EVAL_DELAY_MS=4000` on a free tier) and replace a row. The prompt-injection guardrail (flagged text always needs a human) is plain code and does not depend on the model.
 
 ## Layout
 
 - `contracts/` shared Zod schemas and the API table
 - `db/` Drizzle schema and client
 - `lib/` server modules (see `lib/README.md`)
-- `app/` Next.js UI and API routes (unbuilt routes return 501)
+- `app/` Next.js UI and API routes
 - `docs/` roles and PayPal sandbox setup
 - `eval/` analyst evaluation set
 

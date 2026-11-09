@@ -1,18 +1,19 @@
 'use client';
-// OWNER: C. Buyer view: request -> mandate -> product recommendations -> cart and mandate check -> checkout.
-// Uses apiFetch, which falls back to sample responses only when the backend cannot answer (see fixtures/api.ts).
-// The product list is a demo catalogue (fixtures), not real PayPal listings, and is labelled that way.
+// OWNER: C. Buyer view: request -> signed mandate -> the AI agent shops the merchant catalog -> cart and mandate
+// check -> PayPal checkout. Every step calls the real API; errors are shown as they are.
 import { useState } from 'react';
 import type {
+  AgentPick,
+  AgentShopResponse,
   Cart,
   Constraints,
   CreateMandateResponse,
   DraftMandateResponse,
   GuardResult,
+  Product,
 } from '@/contracts/schemas';
 import type { z } from 'zod';
-import { ApiClientError, apiFetch } from '@/fixtures/api';
-import { cartAllowed, cartBlocked, cartNeedsApproval } from '@/fixtures';
+import { ApiClientError, apiFetch } from '@/app/_ui/api';
 import { Badge, Card, Notice, PageHeader, ResultMark } from '../_ui/Ui';
 import { CHECK_RESULT, formatDay, formatMoney, ruleLabel, titleCase } from '../_ui/labels';
 import u from '../_ui/ui.module.css';
@@ -21,44 +22,59 @@ import s from './buyer.module.css';
 
 type Draft = z.infer<typeof DraftMandateResponse>;
 type Created = z.infer<typeof CreateMandateResponse>;
+type Shopped = z.infer<typeof AgentShopResponse>;
 
-const BUYER_REF = 'buyer_demo';
-const EXAMPLE = 'Buy me white trainers, size 10, under 110 USD, delivered by Nov 20.';
-const STEPS = ['Request', 'Mandate', 'Products', 'Review', 'Checkout'];
-
-const PRODUCTS: { key: string; cart: Cart }[] = [
-  { key: 'a', cart: cartAllowed },
-  { key: 'b', cart: cartNeedsApproval },
-  { key: 'c', cart: cartBlocked },
-];
+const BUYER_REF = 'buyer_web';
+const STEPS = ['Request', 'Mandate', 'Agent', 'Review', 'Checkout'];
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function errMsg(e: unknown): string {
   if (e instanceof ApiClientError) return e.body.message ?? e.body.error ?? `Request failed (${e.status})`;
   return e instanceof Error ? e.message : 'Something went wrong';
 }
 
+/** Rebuild a cart from catalog data after the buyer edits it, so names, prices and delivery always come from the catalog. */
+function cartFrom(lines: { sku: string; quantity: number }[], catalog: Product[], base: Cart): Cart | null {
+  const bySku = new Map(catalog.map((p) => [p.sku, p]));
+  const items = lines
+    .filter((l) => l.quantity > 0 && bySku.has(l.sku))
+    .map((l) => {
+      const p = bySku.get(l.sku)!;
+      return {
+        sku: p.sku,
+        name: p.name,
+        category: p.category,
+        quantity: l.quantity,
+        unit_price: p.unit_price,
+        ...(Object.keys(p.attributes).length ? { attributes: p.attributes } : {}),
+      };
+    });
+  if (!items.length) return null;
+  const slowest = Math.max(...items.map((i) => bySku.get(i.sku)!.delivery_days));
+  return { ...base, items, delivery_eta: new Date(Date.now() + slowest * DAY_MS).toISOString() };
+}
+
 export default function BuyerPage() {
-  const [text, setText] = useState(EXAMPLE);
+  const [text, setText] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [mandate, setMandate] = useState<Created | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [shopped, setShopped] = useState<Shopped | null>(null);
+  const [catalog, setCatalog] = useState<Product[]>([]);
+  const [cart, setCart] = useState<Cart | null>(null);
   const [guard, setGuard] = useState<GuardResult | null>(null);
-  const [busy, setBusy] = useState<'draft' | 'confirm' | 'check' | null>(null);
+  const [addSku, setAddSku] = useState('');
+  const [busy, setBusy] = useState<'draft' | 'confirm' | 'shop' | 'check' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [usingFixtures, setUsingFixtures] = useState(false);
   const [paid, setPaid] = useState(false);
 
-  const cart = PRODUCTS.find((p) => p.key === selected)?.cart ?? null;
-  // A blocked cart cannot be checked out, so the progress stays on "Review" until the buyer picks something else.
-  const current = paid ? 5 : !draft ? 0 : !mandate ? 1 : !selected ? 2 : !guard || guard.verdict === 'block' ? 3 : 4;
+  // A blocked cart cannot be checked out, so the progress stays on "Review" until the buyer changes it.
+  const current = paid ? 5 : !draft ? 0 : !mandate ? 1 : !cart ? 2 : !guard || guard.verdict === 'block' ? 3 : 4;
 
-  async function run<T>(kind: NonNullable<typeof busy>, fn: () => Promise<{ data: T; fromFixture: boolean }>) {
+  async function run<T>(kind: NonNullable<typeof busy>, fn: () => Promise<{ data: T }>) {
     setBusy(kind);
     setError(null);
     try {
-      const r = await fn();
-      if (r.fromFixture) setUsingFixtures(true);
-      return r.data;
+      return (await fn()).data;
     } catch (e) {
       setError(errMsg(e));
       return null;
@@ -67,14 +83,19 @@ export default function BuyerPage() {
     }
   }
 
+  function clearCart() {
+    setShopped(null);
+    setCart(null);
+    setGuard(null);
+    setPaid(false);
+  }
+
   async function onDraft() {
     const data = await run('draft', () => apiFetch<Draft>('/api/mandates/draft', { body: { request_text: text } }));
     if (data) {
       setDraft(data);
       setMandate(null);
-      setSelected(null);
-      setGuard(null);
-      setPaid(false);
+      clearCart();
     }
   }
 
@@ -85,35 +106,50 @@ export default function BuyerPage() {
     );
     if (data) {
       setMandate(data);
-      setSelected(null);
-      setGuard(null);
+      clearCart();
     }
   }
 
-  /** Adding to the cart checks it against the mandate straight away, so the result is never out of date. */
-  async function addToCart(key: string) {
+  async function onShop() {
     if (!mandate) return;
-    const picked = PRODUCTS.find((p) => p.key === key)!.cart;
-    setSelected(key);
+    clearCart();
+    const [result, products] = await Promise.all([
+      run('shop', () => apiFetch<Shopped>('/api/agent/shop', { body: { mandate_id: mandate.mandate_id } })),
+      apiFetch<Product[]>('/api/products?active=1')
+        .then((r) => r.data)
+        .catch(() => [] as Product[]),
+    ]);
+    setCatalog(products.filter((p) => p.currency === mandate.constraints.max_total.currency && p.stock > 0));
+    if (result) {
+      setShopped(result);
+      setCart(result.cart);
+      setGuard(result.guard);
+    }
+  }
+
+  /** Any change by the buyer is checked against the mandate again, so the result is never out of date. */
+  async function changeCart(lines: { sku: string; quantity: number }[]) {
+    if (!mandate || !cart) return;
+    const next = cartFrom(lines, catalog, cart);
     setGuard(null);
     setPaid(false);
+    setCart(next);
+    if (!next) return;
     const data = await run('check', () =>
-      apiFetch<GuardResult>('/api/carts/check', { body: { mandate_id: mandate.mandate_id, cart: picked } }),
+      apiFetch<GuardResult>('/api/carts/check', { body: { mandate_id: mandate.mandate_id, cart: next } }),
     );
     if (data) setGuard(data);
   }
 
-  function removeFromCart() {
-    setSelected(null);
-    setGuard(null);
-    setPaid(false);
-  }
+  const lines = cart?.items.map((i) => ({ sku: i.sku, quantity: i.quantity })) ?? [];
+  const addable = catalog.filter((p) => !lines.some((l) => l.sku === p.sku));
+  const reasonFor = (sku: string): AgentPick | undefined => shopped?.picks.find((p) => p.sku === sku);
 
   return (
     <>
       <PageHeader
         title="Buy with an AI agent"
-        subtitle="You set the limits. Every purchase is checked against them before PayPal is charged."
+        subtitle="You set the limits. The agent shops within them, and every cart is checked before PayPal is charged."
       />
 
       <ol className={s.stepper} aria-label="Progress">
@@ -129,7 +165,6 @@ export default function BuyerPage() {
         })}
       </ol>
 
-      {usingFixtures && <Notice tone="warn">Sample data: the server could not answer some steps, so example responses are shown.</Notice>}
       {error && (
         <Notice tone="bad" alert>
           {error}
@@ -137,7 +172,11 @@ export default function BuyerPage() {
       )}
 
       {/* 1. Request */}
-      <Card id="request" title="1. What do you want to buy?" subtitle="Write it the way you would tell a person. We turn it into limits you can review.">
+      <Card
+        id="request"
+        title="1. What do you want to buy?"
+        subtitle="Write it the way you would tell a person: what, budget, size or colour, and when you need it."
+      >
         <label className={u.srOnly} htmlFor="request-text">
           Purchase request
         </label>
@@ -147,6 +186,7 @@ export default function BuyerPage() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={1000}
+          placeholder="For example: white running trainers, size 10, under 110 USD, delivered within two weeks"
         />
         <div className={u.row} style={{ marginTop: '0.75rem' }}>
           <button className={u.btn} onClick={onDraft} disabled={busy !== null || text.trim() === ''}>
@@ -191,82 +231,112 @@ export default function BuyerPage() {
         </Card>
       )}
 
-      {/* 3. Products */}
+      {/* 3. Agent */}
       {mandate && (
         <Card
-          id="products"
-          title="3. Choose a product"
-          subtitle="Demo catalogue: sample products for this demo, not real PayPal listings. Adding one checks it against your mandate."
+          id="agent"
+          title="3. Let your agent shop"
+          subtitle="The agent reads the merchant's catalog and picks what fits your signed mandate. Prices come from the catalog, not the AI."
         >
-          <div className={s.products}>
-            {PRODUCTS.map((p) => {
-              const item = p.cart.items[0];
-              const on = selected === p.key;
-              return (
-                <div key={p.key} className={`${s.product} ${on ? s.productOn : ''}`}>
-                  <div className={s.productName}>{item.name}</div>
-                  <div className={u.muted}>{p.cart.merchant}</div>
-                  <div className={s.price}>{formatMoney(item.unit_price, p.cart.currency)}</div>
-                  <div className={s.chips}>
-                    {Object.entries(item.attributes ?? {}).map(([k, v]) => (
-                      <span key={k} className={s.chip}>
-                        {titleCase(k)}: {v}
-                      </span>
-                    ))}
-                  </div>
-                  <div className={u.muted}>{p.cart.delivery_eta ? `Delivery by ${formatDay(p.cart.delivery_eta)}` : 'No delivery estimate'}</div>
-                  <div className={s.productFoot}>
-                    <button
-                      className={`${u.btn} ${on ? u.btnSecondary : ''}`}
-                      onClick={() => addToCart(p.key)}
-                      disabled={busy !== null || on}
-                      aria-label={`${on ? 'In cart' : 'Add to cart'}: ${item.name}, ${formatMoney(item.unit_price, p.cart.currency)}`}
-                    >
-                      {on ? 'In your cart' : 'Add to cart'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+          <div className={u.row}>
+            <button className={u.btn} onClick={onShop} disabled={busy !== null}>
+              {busy === 'shop' ? 'Agent is shopping…' : shopped ? 'Ask the agent again' : 'Ask the agent to shop'}
+            </button>
+            {shopped && <span className={u.muted}>Chose from {shopped.considered} in-stock products.</span>}
           </div>
+          {shopped && <p className={s.quote}>Agent: &ldquo;{shopped.summary}&rdquo;</p>}
         </Card>
       )}
 
       {/* 4. Cart and mandate check, 5. Checkout */}
       {mandate && cart && (
-        <Card id="cart" title="4. Your cart and mandate check">
-          {cart.items.map((i) => (
-            <div key={i.sku} className={s.cartItem}>
-              <div>
-                <strong>{i.name}</strong> × {i.quantity}
-                <div className={u.muted}>
-                  {Object.entries(i.attributes ?? {}).map(([k, v]) => `${titleCase(k)}: ${v}`).join(' · ')}
+        <Card id="cart" title="4. Your cart and mandate check" subtitle="Change anything you like; the cart is checked against your mandate again.">
+          {cart.items.map((i) => {
+            const pick = reasonFor(i.sku);
+            const stock = catalog.find((p) => p.sku === i.sku)?.stock ?? i.quantity;
+            return (
+              <div key={i.sku} className={s.cartItem}>
+                <div>
+                  <strong>{i.name}</strong>
+                  <div className={u.muted}>
+                    {[i.category, ...Object.entries(i.attributes ?? {}).map(([k, v]) => `${titleCase(k)}: ${v}`)]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                  {pick && <div className={u.muted}>Why the agent chose it: {pick.reason}</div>}
                 </div>
-                <div className={u.muted}>{cart.merchant}</div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className={s.price}>{formatMoney(i.unit_price, cart.currency)}</div>
+                  <div className={u.row} style={{ marginTop: '0.4rem', justifyContent: 'flex-end' }}>
+                    <label className={u.srOnly} htmlFor={`qty-${i.sku}`}>
+                      Quantity for {i.name}
+                    </label>
+                    <input
+                      id={`qty-${i.sku}`}
+                      type="number"
+                      min={1}
+                      max={stock}
+                      value={i.quantity}
+                      disabled={busy !== null}
+                      style={{ width: '4rem' }}
+                      onChange={(e) => {
+                        const q = Math.max(1, Math.min(stock, Number(e.target.value) || 1));
+                        changeCart(lines.map((l) => (l.sku === i.sku ? { ...l, quantity: q } : l)));
+                      }}
+                    />
+                    <button
+                      className={`${u.btn} ${u.btnSecondary}`}
+                      onClick={() => changeCart(lines.filter((l) => l.sku !== i.sku))}
+                      disabled={busy !== null}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className={s.price}>{formatMoney(i.unit_price, cart.currency)}</div>
-                <button className={`${u.btn} ${u.btnSecondary}`} style={{ marginTop: '0.4rem' }} onClick={removeFromCart} disabled={busy !== null}>
-                  Remove
-                </button>
-              </div>
+            );
+          })}
+
+          {addable.length > 0 && (
+            <div className={u.row} style={{ margin: '0.75rem 0' }}>
+              <label className={u.srOnly} htmlFor="add-product">
+                Add a product
+              </label>
+              <select id="add-product" value={addSku} onChange={(e) => setAddSku(e.target.value)} disabled={busy !== null}>
+                <option value="">Add another product from the catalog…</option>
+                {addable.map((p) => (
+                  <option key={p.sku} value={p.sku}>
+                    {p.name} · {formatMoney(p.unit_price, p.currency)}
+                  </option>
+                ))}
+              </select>
+              <button
+                className={`${u.btn} ${u.btnSecondary}`}
+                disabled={!addSku || busy !== null}
+                onClick={() => {
+                  changeCart([...lines, { sku: addSku, quantity: 1 }]);
+                  setAddSku('');
+                }}
+              >
+                Add
+              </button>
             </div>
-          ))}
+          )}
 
           {busy === 'check' && !guard && <p className={u.muted}>Checking this cart against your mandate…</p>}
           {guard && <GuardView guard={guard} />}
           {guard && (
             <Checkout
-              key={`${mandate.mandate_id}:${selected}`}
+              key={`${mandate.mandate_id}:${lines.map((l) => `${l.sku}x${l.quantity}`).join(',')}`}
               mandateId={mandate.mandate_id}
               cart={cart}
               guard={guard}
-              onFixture={() => setUsingFixtures(true)}
               onPaid={() => setPaid(true)}
             />
           )}
         </Card>
       )}
+      {mandate && shopped && !cart && <Notice tone="warn">Your cart is empty. Ask the agent again or add a product.</Notice>}
     </>
   );
 }

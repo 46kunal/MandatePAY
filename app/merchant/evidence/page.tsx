@@ -9,7 +9,7 @@ import u from '../../_ui/ui.module.css';
 import m from '../merchant.module.css';
 
 export default function EvidenceListPage() {
-  const { cases, error, fixtures, reload } = useCases();
+  const { cases, error, reload } = useCases();
 
   return (
     <>
@@ -17,7 +17,6 @@ export default function EvidenceListPage() {
       <Notice tone="info">
         Automatic PDF reports are not connected yet. Open a summary and use your browser&apos;s print option to save it as a PDF.
       </Notice>
-      {fixtures && <Notice tone="warn">Sample data: the disputes service is not available, so example disputes are shown.</Notice>}
       {error && (
         <Notice tone="bad" alert>
           Could not load disputes: {error}{' '}

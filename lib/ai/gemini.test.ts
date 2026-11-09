@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 import { z } from 'zod';
-import { generateJson, GeminiProvider, LlmError, resolveProvider } from './index';
+import { generateJson, GeminiProvider, isTransientLlmError, LlmError, resolveProvider } from './index';
 
 const Out = z.object({ answer: z.string(), n: z.number() });
 const task = { task: 'demo_task', system: 'You answer.', user: 'Question?' };
@@ -74,5 +74,58 @@ describe('GeminiProvider', () => {
     mock.restoreAll();
     fakeFetch({ json: { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '{' }] } }] } });
     await assert.rejects(p.complete(call), /cut off/);
+  });
+});
+
+describe('timeouts and fallbacks', () => {
+  afterEach(() => mock.restoreAll());
+  const okBody = (text: string) => JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] });
+
+  it('classifies transient errors', () => {
+    assert.equal(isTransientLlmError(new LlmError('provider_error', 'LLM request timed out')), true);
+    assert.equal(isTransientLlmError(new LlmError('provider_error', 'x', 503)), true);
+    assert.equal(isTransientLlmError(new LlmError('provider_error', 'x', 429)), true);
+    assert.equal(isTransientLlmError(new LlmError('provider_error', 'x', 403)), false);
+    assert.equal(isTransientLlmError(new LlmError('config', 'no key')), false);
+  });
+
+  it('retries once on the fallback model after an overload, and uses low thinking on Gemini 3', async () => {
+    const models: string[] = [];
+    const bodies: any[] = [];
+    mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+      models.push(String(url).split('/models/')[1].split(':')[0]);
+      bodies.push(JSON.parse(String(init.body)));
+      return models.length === 1
+        ? new Response(JSON.stringify({ error: { message: 'high demand' } }), { status: 503 })
+        : new Response(okBody('{"answer":"ok","n":1}'), { status: 200 });
+    });
+    const p = new GeminiProvider({ apiKey: 'k', model: 'gemini-3.1-flash-lite', fallbackModel: 'gemini-3-flash-preview' });
+    assert.deepEqual(await generateJson({ ...task, schema: Out }, p), { answer: 'ok', n: 1 });
+    assert.deepEqual(models, ['gemini-3.1-flash-lite', 'gemini-3-flash-preview']);
+    assert.deepEqual(bodies[0].generationConfig.thinkingConfig, { thinkingLevel: 'low' });
+  });
+
+  it('does not retry a bad key on the fallback model', async () => {
+    let calls = 0;
+    mock.method(globalThis, 'fetch', async () => {
+      calls++;
+      return new Response(JSON.stringify({ error: { message: 'API key not valid' } }), { status: 400 });
+    });
+    await assert.rejects(generateJson({ ...task, schema: Out }, new GeminiProvider({ apiKey: 'k' })));
+    assert.equal(calls, 1);
+  });
+
+  it('reports the error when both models are unavailable; nothing is made up', async () => {
+    let calls = 0;
+    mock.method(globalThis, 'fetch', async () => {
+      calls++;
+      return new Response(JSON.stringify({ error: { message: 'busy' } }), { status: 503 });
+    });
+    mock.method(console, 'warn', () => {});
+    await assert.rejects(
+      generateJson({ ...task, schema: Out }, new GeminiProvider({ apiKey: 'k' })),
+      (e) => e instanceof LlmError && e.status === 503,
+    );
+    assert.equal(calls, 2); // main model, then the fallback model, then give up
   });
 });

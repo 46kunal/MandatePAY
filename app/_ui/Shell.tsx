@@ -1,67 +1,9 @@
 'use client';
-// OWNER: C. Page frames: BuyerShell (simple top bar) and MerchantShell (sidebar), plus the demo-mode bar.
+// OWNER: C. Page frames: BuyerShell (simple top bar) and MerchantShell (sidebar).
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import u from './ui.module.css';
-
-interface DemoStatus {
-  demo: boolean;
-  paypal_configured: boolean;
-  llm_provider: string;
-}
-
-/** Shown only when the server runs with DEMO_MODE=true. Offers a one-click reset of the demo data. */
-export function DemoBar() {
-  const [status, setStatus] = useState<DemoStatus | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const ctl = new AbortController();
-    fetch('/api/demo/status', { signal: ctl.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s: DemoStatus | null) => setStatus(s))
-      .catch(() => undefined);
-    return () => ctl.abort();
-  }, []);
-
-  if (!status?.demo) return null;
-
-  async function reset() {
-    if (!window.confirm('Reset the demo? This replaces all current data with the sample disputes.')) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await fetch('/api/demo/reset', { method: 'POST' });
-      if (!r.ok) {
-        const body = (await r.json().catch(() => ({}))) as { message?: string };
-        throw new Error(body.message ?? `Reset failed (${r.status})`);
-      }
-      window.location.reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Reset failed');
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className={u.demoBar} role="status">
-      <div className={u.demoInner}>
-        <span>
-          <strong>Demo mode</strong> · {status.paypal_configured ? 'PayPal sandbox' : 'PayPal simulated'} ·{' '}
-          {status.llm_provider === 'mock' ? 'sample AI analyst' : `AI analyst: ${status.llm_provider}`}
-        </span>
-        <span className={u.demoActions}>
-          {error && <span>{error}</span>}
-          <button className={u.demoBtn} onClick={reset} disabled={busy}>
-            {busy ? 'Resetting…' : 'Reset demo data'}
-          </button>
-        </span>
-      </div>
-    </div>
-  );
-}
 
 function Brand() {
   return (
@@ -85,7 +27,6 @@ export function BuyerShell({ children }: { children: ReactNode }) {
           </Link>
         </div>
       </header>
-      <DemoBar />
       <main className={u.contentNarrow}>{children}</main>
     </div>
   );
@@ -94,6 +35,7 @@ export function BuyerShell({ children }: { children: ReactNode }) {
 const NAV = [
   { href: '/merchant', label: 'Overview', exact: true },
   { href: '/merchant/disputes', label: 'Disputes' },
+  { href: '/merchant/products', label: 'Products' },
   { href: '/merchant/orders', label: 'Orders' },
   { href: '/merchant/ledger', label: 'Mandate ledger' },
   { href: '/merchant/evidence', label: 'Evidence reports' },
@@ -126,8 +68,7 @@ export function MerchantShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
         <div className={u.main}>
-          <DemoBar />
-          <main className={u.content}>{children}</main>
+              <main className={u.content}>{children}</main>
         </div>
       </div>
     </div>

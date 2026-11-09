@@ -10,7 +10,7 @@ import u from '../../_ui/ui.module.css';
 import m from '../merchant.module.css';
 
 export default function OrdersPage() {
-  const { cases, error, fixtures, reload } = useCases();
+  const { cases, error, reload } = useCases();
   const { details, failed } = useCaseDetails(cases);
   const rows = details?.filter((d) => d.order) ?? null;
 
@@ -20,7 +20,6 @@ export default function OrdersPage() {
       <Notice tone="info">
         Only orders that have a dispute are listed here. A full order list will appear once an orders service is connected.
       </Notice>
-      {fixtures && <Notice tone="warn">Sample data: the disputes service is not available, so example orders are shown.</Notice>}
       {error && (
         <Notice tone="bad" alert>
           Could not load orders: {error}{' '}

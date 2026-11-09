@@ -8,18 +8,23 @@
  *
  * The API key travels in the x-goog-api-key header, never in the URL, so it cannot end up in logs or error messages.
  */
-import { LlmError, type LlmProvider, type ProviderCall } from './types';
+import { isTransientLlmError, LlmError, type LlmProvider, type ProviderCall } from './types';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 /** Override with LLM_MODEL. */
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+/** Tried once when the main model times out, is overloaded (503) or out of quota (429). Override with LLM_FALLBACK_MODEL. */
+export const DEFAULT_GEMINI_FALLBACK_MODEL = 'gemini-3-flash-preview';
 
 export interface GeminiOptions {
   apiKey: string;
   model?: string;
+  /** Second model for transient failures. Pass '' to disable. */
+  fallbackModel?: string;
   timeoutMs?: number;
   maxOutputTokens?: number;
 }
+
 
 export class GeminiProvider implements LlmProvider {
   readonly name = 'gemini';
@@ -27,23 +32,36 @@ export class GeminiProvider implements LlmProvider {
 
   private readonly apiKey: string;
   private readonly model: string;
+  private readonly fallbackModel: string;
   private readonly timeoutMs: number;
   private readonly maxOutputTokens: number;
 
   constructor(opts: GeminiOptions) {
     this.apiKey = opts.apiKey;
     this.model = opts.model ?? DEFAULT_GEMINI_MODEL;
-    this.timeoutMs = opts.timeoutMs ?? 30_000;
-    this.maxOutputTokens = opts.maxOutputTokens ?? 4096;
+    this.fallbackModel = opts.fallbackModel ?? DEFAULT_GEMINI_FALLBACK_MODEL;
+    // The free tier often takes 6-20 s per call and the analyst prompt is long, so 30 s was too tight.
+    this.timeoutMs = opts.timeoutMs ?? 60_000;
+    this.maxOutputTokens = opts.maxOutputTokens ?? 16384; // Gemini 3 models spend part of this on thinking
   }
 
   async complete(call: ProviderCall): Promise<unknown> {
+    try {
+      return await this.completeWith(this.model, call);
+    } catch (err) {
+      if (!this.fallbackModel || this.fallbackModel === this.model || !isTransientLlmError(err)) throw err;
+      console.warn(`[llm] ${this.model} failed (${(err as Error).message.slice(0, 80)}); retrying once with ${this.fallbackModel}`);
+      return this.completeWith(this.fallbackModel, call);
+    }
+  }
+
+  private async completeWith(model: string, call: ProviderCall): Promise<unknown> {
     const { $schema: _ignored, ...schema } = call.jsonSchema();
     const system = `${call.system}\n\nReturn ONLY a JSON object that matches this JSON Schema, with no prose and no code fences:\n${JSON.stringify(schema)}`;
 
     let res: Response;
     try {
-      res = await fetch(`${BASE_URL}/${encodeURIComponent(this.model)}:generateContent`, {
+      res = await fetch(`${BASE_URL}/${encodeURIComponent(model)}:generateContent`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey },
         body: JSON.stringify({
@@ -53,6 +71,8 @@ export class GeminiProvider implements LlmProvider {
             responseMimeType: 'application/json',
             maxOutputTokens: this.maxOutputTokens,
             temperature: 0,
+            // Gemini 3 models think before answering; these are short structured tasks, so keep that light.
+            ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: 'low' } } : {}),
           },
         }),
         signal: AbortSignal.timeout(this.timeoutMs),

@@ -1,7 +1,8 @@
-/** B9 checks, using fixtures (no database, mock LLM). Run: npx tsx --test lib/analyst/analyst.test.ts */
+/** B9 checks. Run: npx tsx --test lib/analyst/analyst.test.ts. A scripted provider stands in for the model; no network. */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { Verdict, type DisputeSummary } from '../../contracts/schemas';
+import type { LlmProvider, ProviderCall } from '../ai';
 import { analyseCase, enforce, resolvePath, type AnalystInput } from './analyst';
 
 function input(dispute: Partial<DisputeSummary> = {}): AnalystInput {
@@ -93,39 +94,42 @@ describe('guardrails (enforce)', () => {
   });
 });
 
-describe('analyseCase with the mock LLM', () => {
-  it('within the mandate but wrong product: blames the agent, offers a refund with return, asks a human', async () => {
-    const v = await analyseCase(input());
-    assert.ok(Verdict.safeParse(v).success);
-    assert.equal(v.fault, 'agent');
-    assert.equal(v.action, 'MAKE_OFFER');
-    assert.equal(v.offer_type, 'REFUND_WITH_RETURN');
-    assert.equal(v.offer_amount, '89.99');
-    assert.equal(v.needs_human, false); // 89.99 is under the 100.00 review limit and 0.72 is above the 0.7 floor
-    assert.ok((await analyseCase(input({ amount: { value: '150.00', currency: 'USD' } }))).needs_human);
-  });
+/** Stands in for the model: returns the given proposal and records what it was asked. */
+function modelSays(v: Verdict): LlmProvider & { calls: ProviderCall[] } {
+  const calls: ProviderCall[] = [];
+  return { name: 'scripted', deterministic: false, calls, complete: async (c) => (calls.push(c), v) };
+}
 
-  it('item never arrived: blames the merchant and refunds', async () => {
-    const v = await analyseCase(input({ reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED', tracking: { status: 'IN_TRANSIT' } }), { humanReviewOver: '500.00' });
-    assert.equal(v.fault, 'merchant');
-    assert.equal(v.action, 'MAKE_OFFER');
+describe('analyseCase: the model proposes, the guardrails decide', () => {
+  it('passes the dispute, mandate and cart to the model and returns a valid verdict', async () => {
+    const m = modelSays(proposal({ offer_amount: '89.99' }));
+    const v = await analyseCase(input(), { provider: m, humanReviewOver: '500.00' });
+    assert.ok(Verdict.safeParse(v).success);
+    const sent = JSON.parse(m.calls[0].user) as AnalystInput;
+    assert.equal(sent.dispute.dispute_id, 'PP-D-1');
+    assert.equal(sent.mandate.mandate_id, 'mnd_1');
+    assert.equal(sent.cart.items[0].sku, 's1');
     assert.equal(v.needs_human, false);
   });
 
-  it('delivered per tracking: buyer regret, merchant provides evidence', async () => {
-    const v = await analyseCase(input({ reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED', tracking: { status: 'DELIVERED' } }), { humanReviewOver: '500.00' });
-    assert.equal(v.fault, 'buyer_regret');
-    assert.equal(v.action, 'PROVIDE_EVIDENCE');
-  });
-
-  it('only ever picks an allowed action', async () => {
-    const v = await analyseCase(input({ allowed_actions: ['NO_ACTION'], offer_types: [] }));
-    assert.equal(v.action, 'NO_ACTION');
-  });
-
-  it('unknown dispute reason goes to a human', async () => {
-    const v = await analyseCase(input({ reason: 'SOMETHING_NEW' }), { humanReviewOver: '500.00' });
-    assert.equal(v.fault, 'unclear');
+  it('a high-value dispute always needs a human, whatever the model said', async () => {
+    const v = await analyseCase(input({ amount: { value: '150.00', currency: 'USD' } }), { provider: modelSays(proposal()) });
     assert.ok(v.needs_human);
+  });
+
+  it('an action PayPal does not allow becomes NO_ACTION', async () => {
+    const v = await analyseCase(input({ allowed_actions: ['NO_ACTION'], offer_types: [] }), { provider: modelSays(proposal()) });
+    assert.equal(v.action, 'NO_ACTION');
+    assert.ok(v.needs_human);
+  });
+
+  it('an unclear verdict goes to a human', async () => {
+    const v = await analyseCase(input(), { provider: modelSays(proposal({ fault: 'unclear', action: 'SEND_MESSAGE', offer_type: undefined, offer_amount: undefined })), humanReviewOver: '500.00' });
+    assert.ok(v.needs_human);
+  });
+
+  it('a model answer that is not a Verdict is rejected', async () => {
+    const broken: LlmProvider = { name: 'scripted', deterministic: false, complete: async () => ({ fault: 'nobody' }) };
+    await assert.rejects(analyseCase(input(), { provider: broken }));
   });
 });

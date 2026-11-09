@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { ApiClientError, apiFetch } from '@/fixtures/api';
-import type { CaseDetail } from '@/fixtures';
+import { ApiClientError, apiFetch } from '@/app/_ui/api';
+import type { CaseDetail } from '@/lib/paypal/cases';
 import { Card, EmptyState, Notice, PageHeader, Skeleton } from '../../../_ui/Ui';
 import { errMsg } from '../../../_ui/useCases';
 import { EvidenceSummary } from '../../_components/EvidenceSummary';
@@ -15,14 +15,12 @@ export default function EvidencePage() {
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [error, setError] = useState<{ notFound: boolean; text: string } | null>(null);
-  const [fixtures, setFixtures] = useState(false);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
       setError(null);
       try {
         const r = await apiFetch<CaseDetail>(`/api/cases/${encodeURIComponent(id)}`, { signal });
-        if (r.fromFixture) setFixtures(true);
         if (!r.data) throw new ApiClientError(404, { error: 'case_not_found' });
         setDetail(r.data);
       } catch (e) {
@@ -60,7 +58,6 @@ export default function EvidencePage() {
           )
         }
       />
-      {fixtures && <Notice tone="warn">Sample data: the disputes service is not available, so an example dispute is shown.</Notice>}
       {error && (
         <Card>
           <EmptyState

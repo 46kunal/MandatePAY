@@ -240,6 +240,57 @@ export const PollDisputesResponse = z.object({
   linked: z.number().int(), // cases matched to one of our orders
 });
 
+// ---------- merchant catalog + shopping agent ----------
+
+/** What a merchant enters for one product. Prices are strings with two decimals, like every amount here. */
+export const ProductInput = z
+  .object({
+    sku: z.string().trim().min(1).max(64),
+    name: z.string().trim().min(1).max(127),
+    description: z.string().max(1000).optional(),
+    category: z.string().trim().min(1).max(64),
+    unit_price: Amount,
+    currency: CurrencyCode,
+    /** e.g. { color: "white", size: "10" }; the guard compares these with the mandate's required_attributes */
+    attributes: z.record(z.string(), z.string()).default({}),
+    stock: z.number().int().min(0),
+    /** Working days from order to delivery; becomes the cart's delivery_eta */
+    delivery_days: z.number().int().min(0).max(365),
+  })
+  .strict();
+export type ProductInput = z.infer<typeof ProductInput>;
+
+export const Product = ProductInput.extend({
+  product_id: z.string(),
+  active: z.boolean(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type Product = z.infer<typeof Product>;
+
+/** PATCH body: any subset of the input fields, plus active to hide a product from the agent. */
+export const UpdateProductRequest = ProductInput.partial().extend({ active: z.boolean().optional() }).strict();
+
+export const AgentShopRequest = z.object({ mandate_id: z.string() });
+
+/** One product the agent chose and why. */
+export const AgentPick = z.object({
+  sku: z.string(),
+  quantity: z.number().int().positive(),
+  reason: z.string(),
+});
+export type AgentPick = z.infer<typeof AgentPick>;
+
+/** The agent's proposal: a cart built from the catalog (prices from the database, never from the model), checked by the guard. */
+export const AgentShopResponse = z.object({
+  cart: Cart,
+  picks: z.array(AgentPick),
+  summary: z.string(),
+  guard: GuardResult,
+  /** How many in-stock products in the mandate's currency the agent could choose from */
+  considered: z.number().int(),
+});
+
 export const ActOnCaseRequest = z.object({
   /** Required when verdict.needs_human is true */
   human_approved: z.boolean().default(false),

@@ -1,7 +1,7 @@
 'use client';
 // OWNER: C. A printable evidence summary built only from the case data the API returned: the signed mandate, the cart,
 // the guard result, the payment record and the AI assessment. It is a document preview, not a PayPal submission.
-import type { CaseDetail } from '@/fixtures';
+import type { CaseDetail } from '@/lib/paypal/cases';
 import { CHECK_RESULT, FAULT, formatDateTime, formatMoney, reasonLabel, ruleLabel } from '../../_ui/labels';
 import { parseCase, summariseConstraints } from '../../_ui/parse';
 import u from '../../_ui/ui.module.css';

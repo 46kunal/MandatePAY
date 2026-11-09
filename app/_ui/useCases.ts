@@ -1,10 +1,9 @@
 'use client';
-// OWNER: C. Data hooks for the merchant dashboard. They call the real API through apiFetch (which only falls back to
-// sample data when the backend is not reachable, and says so via `fixtures`).
+// OWNER: C. Data hooks for the merchant dashboard. They call the real API through apiFetch; errors are shown as they are.
 import { useCallback, useEffect, useState } from 'react';
 import type { CaseRecord } from '@/contracts/schemas';
-import type { CaseDetail } from '@/fixtures';
-import { ApiClientError, apiFetch } from '@/fixtures/api';
+import type { CaseDetail } from '@/lib/paypal/cases';
+import { ApiClientError, apiFetch } from '@/app/_ui/api';
 
 export function errMsg(e: unknown): string {
   if (e instanceof ApiClientError) return e.body.message ?? e.body.error ?? `Request failed (${e.status})`;
@@ -14,13 +13,11 @@ export function errMsg(e: unknown): string {
 export function useCases() {
   const [cases, setCases] = useState<CaseRecord[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [fixtures, setFixtures] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setError(null);
     try {
       const r = await apiFetch<CaseRecord[]>('/api/cases', { signal });
-      if (r.fromFixture) setFixtures(true);
       setCases([...r.data].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)));
     } catch (e) {
       if (signal?.aborted) return;
@@ -34,7 +31,7 @@ export function useCases() {
     return () => ctl.abort();
   }, [load]);
 
-  return { cases, error, fixtures, reload: () => load(), setCases };
+  return { cases, error, reload: () => load(), setCases };
 }
 
 /** Fetches the detail (mandate, cart, order) of every case. Used by Orders, Mandate ledger and Evidence reports. */

@@ -31,7 +31,7 @@ function activity(cases: CaseRecord[]): Activity[] {
 }
 
 export default function OverviewPage() {
-  const { cases, error, fixtures, reload } = useCases();
+  const { cases, error, reload } = useCases();
 
   const stats = useMemo(() => {
     if (!cases) return null;
@@ -50,7 +50,6 @@ export default function OverviewPage() {
     <>
       <PageHeader title="Overview" subtitle="Disputes on your orders and what the AI recommends for each." />
 
-      {fixtures && <Notice tone="warn">Sample data: the disputes service is not available, so example disputes are shown.</Notice>}
       {error && (
         <Notice tone="bad" alert>
           Could not load disputes: {error}{' '}
