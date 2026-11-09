@@ -1,4 +1,5 @@
 import { getConfig } from '@/lib/config';
+import { getSettings } from '@/lib/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,6 @@ export async function GET() {
     llm_provider: c.LLM_PROVIDER?.trim().toLowerCase() || null,
     llm_model: c.LLM_MODEL?.trim() || null,
     llm_configured: Boolean(c.LLM_PROVIDER?.trim() && c.LLM_API_KEY?.trim()),
-    merchant_name: c.MERCHANT_NAME ?? null,
+    merchant_name: (await getSettings()).store_name,
   });
 }

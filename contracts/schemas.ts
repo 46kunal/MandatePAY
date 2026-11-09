@@ -253,6 +253,22 @@ export type OrderSummary = z.infer<typeof OrderSummary>;
 
 export const ListOrdersResponse = z.object({ orders: z.array(OrderSummary) });
 
+// ---------- store settings ----------
+
+/** Settings the store owner edits in the app. Secrets are not settings: they stay in environment variables. */
+export const StoreSettings = z.object({
+  store_name: z.string().min(1).max(80).nullable(), // shown on carts, evidence and receipts
+  support_email: z.string().email().max(200).nullable(),
+  approval_threshold: Amount, // carts above this need the buyer's click, unless the mandate sets its own limit
+  human_review_over: Amount, // disputes at or above this always need a person
+  min_confidence: z.number().min(0).max(1), // AI verdicts below this need a person
+  updated_at: z.string().nullable(), // null while every value is still the default
+});
+export type StoreSettings = z.infer<typeof StoreSettings>;
+
+export const UpdateStoreSettingsRequest = StoreSettings.omit({ updated_at: true }).partial().strict();
+export type UpdateStoreSettingsRequest = z.infer<typeof UpdateStoreSettingsRequest>;
+
 /** Optional body of POST /api/disputes/poll: fetch one dispute by id (PayPal's list can lag behind for new disputes). */
 export const PollDisputesRequest = z
   .object({ dispute_id: z.string().regex(/^PP-[A-Z0-9-]{4,60}$/, 'a PayPal dispute id like PP-R-ABC-12345678') })

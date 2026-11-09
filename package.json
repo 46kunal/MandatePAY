@@ -11,16 +11,18 @@
     "bootstrap": "bash scripts/bootstrap.sh",
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "drizzle-kit migrate && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test \"lib/**/*.test.ts\"",
+    "test": "tsx --test \"lib/**/*.test.ts\" \"lib/*.test.ts\"",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down",
     "db:reset": "docker compose down -v && docker compose up -d --wait db",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "eval": "tsx --env-file=.env eval/run.ts"
+    "eval": "tsx --env-file=.env eval/run.ts",
+    "keys:export": "tsx scripts/keys-export.ts"
   },
   "dependencies": {
     "@paypal/react-paypal-js": "^10.6.1",

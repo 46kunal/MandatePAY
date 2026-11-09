@@ -16,7 +16,7 @@ export type CheckCartOutcome =
 export interface CheckCartOptions extends KeyOptions {
   /** Unix seconds, injectable for tests. */
   now?: number;
-  /** Fallback approval threshold (defaults to APPROVAL_THRESHOLD from config). */
+  /** Fallback approval threshold (defaults to the store setting, which defaults to APPROVAL_THRESHOLD). */
   approvalThreshold?: string;
   /** Let the LLM settle "unsure" checks (B7). Default true; it can never override a failed check. */
   fuzzy?: boolean;
@@ -34,8 +34,8 @@ export async function checkCart(mandateJws: string, cart: Cart, opts: CheckCartO
 
   let approvalThreshold = opts.approvalThreshold;
   if (approvalThreshold === undefined) {
-    const { getConfig } = await import('../config');
-    approvalThreshold = getConfig().APPROVAL_THRESHOLD;
+    const { getSettings } = await import('../settings');
+    approvalThreshold = (await getSettings()).approval_threshold;
   }
 
   const { constraints, mandate_id } = verified.payload;

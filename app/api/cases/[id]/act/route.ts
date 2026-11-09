@@ -6,6 +6,8 @@ import { toCaseRecord } from '@/lib/paypal/cases';
 import { defaultActDeps } from '@/lib/paypal/deps';
 
 export const runtime = 'nodejs';
+// Builds the evidence PDF and calls PayPal.
+export const maxDuration = 60;
 
 // OWNER: A. POST ActOnCaseRequest -> updated CaseRecord. Executes the verdict (or the override) through the
 // Disputes API. 404 unknown case, 409 already acted, 422 action/offer not allowed, 403 needs human approval, 502 PayPal.

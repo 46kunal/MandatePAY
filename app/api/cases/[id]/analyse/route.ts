@@ -2,12 +2,14 @@ import { eq, or } from 'drizzle-orm';
 import { db, schema } from '@/db/client';
 import { LlmError } from '@/lib/ai';
 import { analyseCase } from '@/lib/analyst/analyst';
-import { getConfig } from '@/lib/config';
+import { getSettings } from '@/lib/settings';
 import { apiError } from '@/lib/http';
 import { toDisputeSummary, type RawDispute } from '@/lib/paypal';
 import type { Constraints } from '@/contracts/schemas';
 
 export const runtime = 'nodejs';
+// Calls the AI model: up to 60 s per attempt plus one fallback attempt.
+export const maxDuration = 150;
 
 // OWNER: B. POST -> Verdict, saved on the case. Input: DisputeSummary + mandate + cart + tracking.
 // The analyst may only choose actions listed in DisputeSummary.allowed_actions (enforced in lib/analyst).
@@ -29,6 +31,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const [cartRow] = order ? await db.select().from(schema.carts).where(eq(schema.carts.cartId, order.cartId)).limit(1) : [];
   if (!mandate || !cartRow) return apiError(422, 'case_not_linked', 'The mandate or cart for this dispute could not be found.');
 
+  const settings = await getSettings();
   try {
     const verdict = await analyseCase(
       {
@@ -37,7 +40,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
         cart: cartRow.cart,
         guard: cartRow.guard,
       },
-      { humanReviewOver: getConfig().APPROVAL_THRESHOLD },
+      { humanReviewOver: settings.human_review_over, minConfidence: settings.min_confidence },
     );
 
     await db

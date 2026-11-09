@@ -1,0 +1,34 @@
+# Typecheck, unit tests and a production build on every pull request and every push to main.
+# Needs no secrets: the tests use scripted AI providers and a fake PayPal, and the build reads no real credentials.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+        env:
+          # Placeholder only: the build does not connect to the database.
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+          NEXT_TELEMETRY_DISABLED: '1'

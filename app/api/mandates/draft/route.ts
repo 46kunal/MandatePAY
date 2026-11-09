@@ -5,6 +5,8 @@ import { draftMandate } from '@/lib/mandate/draft';
 import { DraftMandateRequest } from '@/contracts/schemas';
 
 export const runtime = 'nodejs';
+// Calls the AI model: up to 60 s per attempt plus one fallback attempt.
+export const maxDuration = 150;
 
 // OWNER: B. POST { request_text } -> { constraints, warnings }. LLM drafts, buyer confirms. See contracts/api.md.
 export async function POST(req: Request) {

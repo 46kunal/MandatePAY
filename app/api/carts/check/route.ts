@@ -3,6 +3,8 @@ import { checkCartById } from '@/lib/mandate/check';
 import { CartCheckRequest } from '@/contracts/schemas';
 
 export const runtime = 'nodejs';
+// Calls the AI model: up to 60 s per attempt plus one fallback attempt.
+export const maxDuration = 150;
 
 // OWNER: B. POST { mandate_id, cart } -> GuardResult. 404 unknown mandate, 410 expired.
 // Deterministic rules first; LLM only for fuzzy matches (B7). Person A should call checkCartById() directly.

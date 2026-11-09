@@ -13,6 +13,8 @@ Errors always use `ApiError` (`{ error, message?, details? }`). Amounts are stri
 | POST `/api/orders` | A | `PlaceOrderRequest` | `PlaceOrderResponse` (`created` or `needs_approval`) | 422 `guard_blocked`, 502 PayPal |
 | POST `/api/orders/:id/capture` | A | none | `CaptureOrderResponse` | 404 order, 409 already captured, 502 PayPal |
 | POST `/api/webhooks/paypal` | A | PayPal event | `200` fast | 400 bad signature |
+| GET `/api/settings` | A | none | `StoreSettings` (defaults from env until saved) | none |
+| PATCH `/api/settings` | A | `UpdateStoreSettingsRequest` (any subset) | `StoreSettings` | 400 invalid body. Open until logins land (Phase 1), then owner only |
 | POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal |
 | GET `/api/cases` | A | none | `CaseRecord[]` | none |
 | GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order | 404 |

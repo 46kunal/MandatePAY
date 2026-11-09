@@ -2,12 +2,14 @@ import { AgentShopRequest, type AgentShopResponse } from '@/contracts/schemas';
 import { LlmError } from '@/lib/ai';
 import { shop } from '@/lib/agent/shop';
 import { listBuyableProducts } from '@/lib/catalog/products';
-import { getConfig } from '@/lib/config';
+import { getSettings } from '@/lib/settings';
 import { apiError } from '@/lib/http';
 import { checkCart, verifyOpenMandate } from '@/lib/mandate';
 import type { z } from 'zod';
 
 export const runtime = 'nodejs';
+// Calls the AI model: up to 60 s per attempt plus one fallback attempt.
+export const maxDuration = 150;
 
 // POST { mandate_id } -> AgentShopResponse. The agent reads the merchant catalog and proposes a cart, which the guard checks.
 // 404 mandate, 410 expired, 422 empty catalog / nothing fits, 500 LLM not configured, 502 LLM failed.
@@ -37,7 +39,7 @@ export async function POST(req: Request) {
           if (!r.ok) throw new Error(r.message);
           return r.guard;
         },
-        merchantName: getConfig().MERCHANT_NAME ?? null,
+        merchantName: (await getSettings()).store_name,
       },
       body.data.mandate_id,
     );
