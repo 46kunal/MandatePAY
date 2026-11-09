@@ -95,9 +95,23 @@ describe('sanitising', () => {
 });
 
 describe('analyst with injected dispute text (B11)', () => {
-  it('mock analyst ignores the injected text and reaches the right verdict, flagged for a human', async () => {
-    const v = await analyseCase(input(INJECTED), { humanReviewOver: '500.00' });
-    assert.equal(v.fault, 'buyer_regret'); // tracking says delivered
+  it('a model that ignores the injected text still gets the case flagged for a human', async () => {
+    const sensible: LlmProvider = {
+      name: 'sensible',
+      deterministic: false,
+      async complete() {
+        const v: Verdict = {
+          fault: 'buyer_regret',
+          action: 'PROVIDE_EVIDENCE',
+          confidence: 0.8,
+          evidence_points: [{ claim: 'Tracking shows delivery.', source: 'dispute.tracking.status' }],
+          reasoning: 'Tracking shows the parcel was delivered.',
+          needs_human: false,
+        };
+        return v;
+      },
+    };
+    const v = await analyseCase(input(INJECTED), { provider: sensible, humanReviewOver: '500.00' });
     assert.equal(v.action, 'PROVIDE_EVIDENCE');
     assert.ok(v.needs_human);
     assert.match(v.reasoning, /prompt injection/i);

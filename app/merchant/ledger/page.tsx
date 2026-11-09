@@ -12,7 +12,7 @@ import m from '../merchant.module.css';
 const GUARD_LABEL = { allow: 'Passed', escalate: 'Buyer approved', block: 'Blocked' } as const;
 
 export default function LedgerPage() {
-  const { cases, error, fixtures, reload } = useCases();
+  const { cases, error, reload } = useCases();
   const { details, failed } = useCaseDetails(cases);
   const rows = details?.filter((d) => d.mandate) ?? null;
 
@@ -22,7 +22,6 @@ export default function LedgerPage() {
       <Notice tone="info">
         Only mandates behind disputed orders are listed here. The full ledger will appear once a mandates service is connected.
       </Notice>
-      {fixtures && <Notice tone="warn">Sample data: the disputes service is not available, so example mandates are shown.</Notice>}
       {error && (
         <Notice tone="bad" alert>
           Could not load the ledger: {error}{' '}

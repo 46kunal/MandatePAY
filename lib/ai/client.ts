@@ -2,86 +2,61 @@
  * LLM entry point (owner: B): pick a provider from the environment, ask for JSON, validate with Zod.
  *
  * Environment (see .env.example):
- *   LLM_PROVIDER  "mock" | "anthropic" | "gemini" | "grok". Empty means mock, so a fresh clone runs with no key.
- *   LLM_API_KEY   required for "anthropic".
+ *   LLM_PROVIDER  "gemini" | "grok" | "anthropic". Required: there is no offline stand-in.
+ *   LLM_API_KEY   the provider's key.
  *   LLM_MODEL     optional model override.
  *
  * Callers never see raw model text: generateJson() returns data that already passed the schema, or
- * throws LlmError (routes turn that into HTTP 502).
+ * throws LlmError (routes turn 'config' into HTTP 500 and everything else into 502).
  */
 import { z } from 'zod';
 import { AnthropicProvider } from './anthropic';
 import { GeminiProvider } from './gemini';
 import { GrokProvider } from './grok';
-import { MockProvider } from './mock';
-import { isTransientLlmError, LlmError, type LlmProvider, type LlmRequest } from './types';
+import { LlmError, type LlmProvider, type LlmRequest } from './types';
 
 type Env = Record<string, string | undefined>;
 
 const clean = (value: string | undefined) => value?.trim() || undefined;
 
-let warnedAboutIgnoredKey = false;
+const PROVIDERS = '"gemini", "grok" or "anthropic"';
 
 /** Build the provider named by the environment. Pass `env` in tests. */
 export function resolveProvider(env: Env = process.env): LlmProvider {
-  const name = clean(env.LLM_PROVIDER)?.toLowerCase() ?? 'mock';
+  const name = clean(env.LLM_PROVIDER)?.toLowerCase();
   const apiKey = clean(env.LLM_API_KEY);
+  if (!name) throw new LlmError('config', `LLM_PROVIDER is not set. Set it to ${PROVIDERS} and add LLM_API_KEY in .env.`);
+  if (!apiKey && ['gemini', 'grok', 'anthropic'].includes(name)) {
+    throw new LlmError('config', `LLM_PROVIDER=${name} needs LLM_API_KEY in .env.`);
+  }
 
   switch (name) {
-    case 'mock': {
-      if (apiKey && !clean(env.LLM_PROVIDER) && !warnedAboutIgnoredKey) {
-        warnedAboutIgnoredKey = true;
-        console.warn('LLM_API_KEY is set but LLM_PROVIDER is empty: using the mock LLM. Set LLM_PROVIDER=anthropic to use it.');
-      }
-      return new MockProvider();
-    }
-    case 'anthropic': {
-      if (!apiKey) throw new LlmError('config', 'LLM_PROVIDER=anthropic needs LLM_API_KEY (or use LLM_PROVIDER=mock).');
-      return new AnthropicProvider({ apiKey, model: clean(env.LLM_MODEL) });
-    }
-    case 'gemini': {
-      if (!apiKey) throw new LlmError('config', 'LLM_PROVIDER=gemini needs LLM_API_KEY (or use LLM_PROVIDER=mock).');
-      return new GeminiProvider({ apiKey, model: clean(env.LLM_MODEL), fallbackModel: env.LLM_FALLBACK_MODEL?.trim() });
-    }
-    case 'grok': {
-      if (!apiKey) throw new LlmError('config', 'LLM_PROVIDER=grok needs LLM_API_KEY (or use LLM_PROVIDER=mock).');
-      return new GrokProvider({ apiKey, model: clean(env.LLM_MODEL) });
-    }
+    case 'anthropic':
+      return new AnthropicProvider({ apiKey: apiKey!, model: clean(env.LLM_MODEL) });
+    case 'gemini':
+      return new GeminiProvider({ apiKey: apiKey!, model: clean(env.LLM_MODEL), fallbackModel: env.LLM_FALLBACK_MODEL?.trim() });
+    case 'grok':
+      return new GrokProvider({ apiKey: apiKey!, model: clean(env.LLM_MODEL) });
     default:
-      throw new LlmError('config', `Unknown LLM_PROVIDER "${name}". Use "mock", "anthropic", "gemini" or "grok".`);
+      throw new LlmError('config', `Unknown LLM_PROVIDER "${name}". Use ${PROVIDERS}.`);
   }
 }
 
 export interface GenerateJsonOptions<T> extends LlmRequest {
   schema: z.ZodType<T>;
-  /**
-   * Canned answer used when LLM_PROVIDER=mock. Required for anything the demo must run without a key.
-   * Its return value is validated against `schema` exactly like a real model answer.
-   */
-  mock?: (input: LlmRequest) => unknown | Promise<unknown>;
-  /** Extra attempts after a malformed or schema-invalid answer (real providers only). Default 1. */
+  /** Extra attempts after a malformed or schema-invalid answer. Default 1. */
   maxRetries?: number;
 }
 
 /**
  * Ask the model for JSON matching `schema`. Retries once with the validation errors fed back.
- *
- * If the real model is temporarily unavailable (timeout, overload, rate limit) and the call site has a mock answer,
- * the mock answers instead so the app keeps working, and a warning is logged. Set LLM_FALLBACK_TO_MOCK=false to
- * get the error instead. Configuration errors and bad keys are never hidden.
+ * A model that is down or out of quota surfaces as an LlmError; nothing is ever made up in its place.
  */
 export async function generateJson<T>(
   opts: GenerateJsonOptions<T>,
   provider: LlmProvider = resolveProvider(),
 ): Promise<T> {
-  try {
-    return await generateJsonWith(opts, provider);
-  } catch (err) {
-    const fallbackAllowed = process.env.LLM_FALLBACK_TO_MOCK?.trim().toLowerCase() !== 'false';
-    if (!fallbackAllowed || provider.deterministic || !opts.mock || !isTransientLlmError(err)) throw err;
-    console.warn(`[llm] ${provider.name} unavailable for "${opts.task}" (${(err as Error).message.slice(0, 80)}); using the offline mock answer`);
-    return generateJsonWith(opts, new MockProvider());
-  }
+  return generateJsonWith(opts, provider);
 }
 
 async function generateJsonWith<T>(opts: GenerateJsonOptions<T>, provider: LlmProvider): Promise<T> {
@@ -94,7 +69,6 @@ async function generateJsonWith<T>(opts: GenerateJsonOptions<T>, provider: LlmPr
       task: opts.task,
       system: opts.system,
       user,
-      mock: opts.mock,
       jsonSchema: () => z.toJSONSchema(opts.schema, { io: 'input' }) as Record<string, unknown>,
     });
 

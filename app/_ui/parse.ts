@@ -1,7 +1,7 @@
 // OWNER: C. Turns the raw case detail from GET /api/cases/:id into typed mandate / cart / guard data,
 // and summarises a mandate in one line. Nothing here invents data: it only reads what the API returned.
 import { Cart, Constraints, GuardResult } from '@/contracts/schemas';
-import type { CaseDetail } from '@/fixtures';
+import type { CaseDetail } from '@/lib/paypal/cases';
 import { formatDay, formatMoney, titleCase } from './labels';
 
 export interface ParsedCase {

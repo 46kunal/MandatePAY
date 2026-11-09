@@ -78,10 +78,7 @@ describe('GeminiProvider', () => {
 });
 
 describe('timeouts and fallbacks', () => {
-  afterEach(() => {
-    mock.restoreAll();
-    delete process.env.LLM_FALLBACK_TO_MOCK;
-  });
+  afterEach(() => mock.restoreAll());
   const okBody = (text: string) => JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] });
 
   it('classifies transient errors', () => {
@@ -114,25 +111,21 @@ describe('timeouts and fallbacks', () => {
       calls++;
       return new Response(JSON.stringify({ error: { message: 'API key not valid' } }), { status: 400 });
     });
-    await assert.rejects(generateJson({ ...task, schema: Out, mock: () => ({ answer: 'm', n: 0 }) }, new GeminiProvider({ apiKey: 'k' })));
+    await assert.rejects(generateJson({ ...task, schema: Out }, new GeminiProvider({ apiKey: 'k' })));
     assert.equal(calls, 1);
   });
 
-  it('falls back to the mock answer when both models are unavailable', async () => {
-    mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: { message: 'busy' } }), { status: 503 }));
-    const warn = mock.method(console, 'warn', () => {});
-    const r = await generateJson({ ...task, schema: Out, mock: () => ({ answer: 'mock', n: 0 }) }, new GeminiProvider({ apiKey: 'k' }));
-    assert.deepEqual(r, { answer: 'mock', n: 0 });
-    assert.ok(warn.mock.calls.some((c) => String(c.arguments[0]).includes('offline mock')));
-  });
-
-  it('LLM_FALLBACK_TO_MOCK=false surfaces the error instead', async () => {
-    process.env.LLM_FALLBACK_TO_MOCK = 'false';
-    mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ error: { message: 'busy' } }), { status: 503 }));
+  it('reports the error when both models are unavailable; nothing is made up', async () => {
+    let calls = 0;
+    mock.method(globalThis, 'fetch', async () => {
+      calls++;
+      return new Response(JSON.stringify({ error: { message: 'busy' } }), { status: 503 });
+    });
     mock.method(console, 'warn', () => {});
     await assert.rejects(
-      generateJson({ ...task, schema: Out, mock: () => ({ answer: 'mock', n: 0 }) }, new GeminiProvider({ apiKey: 'k' })),
+      generateJson({ ...task, schema: Out }, new GeminiProvider({ apiKey: 'k' })),
       (e) => e instanceof LlmError && e.status === 503,
     );
+    assert.equal(calls, 2); // main model, then the fallback model, then give up
   });
 });

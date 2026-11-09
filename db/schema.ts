@@ -18,6 +18,23 @@ export const mandates = pgTable('mandates', {
   createdAt: ts('created_at').notNull().defaultNow(),
 });
 
+/** The merchant's catalog. The shopping agent may only buy products listed here, at these prices. */
+export const products = pgTable('products', {
+  productId: text('product_id').primaryKey(), // "prd_<hex>"
+  sku: text('sku').notNull().unique(),
+  name: text('name').notNull(),
+  description: text('description'),
+  category: text('category').notNull(),
+  unitPriceMinor: integer('unit_price_minor').notNull(),
+  currency: text('currency').notNull(),
+  attributes: jsonb('attributes').$type<Record<string, string>>().notNull().default({}),
+  stock: integer('stock').notNull(),
+  deliveryDays: integer('delivery_days').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
 /** Every cart the guard evaluated, including blocked ones (useful for the demo and for evidence). */
 export const carts = pgTable('carts', {
   cartId: text('cart_id').primaryKey(), // "cart_<hex>", used as PayPal invoice_id

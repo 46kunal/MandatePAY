@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import type { PollDisputesResponse } from '@/contracts/schemas';
 import type { z } from 'zod';
-import { apiFetch } from '@/fixtures/api';
+import { apiFetch } from '@/app/_ui/api';
 import { Badge, Card, EmptyState, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
 import { FAULT, STATUS, formatMoney, formatWhen, needsReview, reasonLabel } from '../../_ui/labels';
 import { errMsg, useCases } from '../../_ui/useCases';
@@ -22,11 +22,10 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 export default function DisputesPage() {
-  const { cases, error, fixtures, reload } = useCases();
+  const { cases, error, reload } = useCases();
   const [filter, setFilter] = useState<Filter>('all');
   const [polling, setPolling] = useState(false);
   const [pollMsg, setPollMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [usingSample, setUsingSample] = useState(false);
 
   const shown = useMemo(() => {
     if (!cases) return null;
@@ -43,7 +42,6 @@ export default function DisputesPage() {
     setPollMsg(null);
     try {
       const r = await apiFetch<Poll>('/api/disputes/poll', { method: 'POST' });
-      if (r.fromFixture) setUsingSample(true);
       const { fetched, new_cases, linked } = r.data;
       setPollMsg({
         ok: true,
@@ -77,7 +75,6 @@ export default function DisputesPage() {
         }
       />
 
-      {(fixtures || usingSample) && <Notice tone="warn">Sample data: the disputes service is not available, so example disputes are shown.</Notice>}
       {pollMsg && (
         <Notice tone={pollMsg.ok ? 'good' : 'bad'} alert={!pollMsg.ok}>
           {pollMsg.text}

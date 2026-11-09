@@ -30,21 +30,19 @@ services:
     build:
       context: .
       args:
-        # Baked into the browser bundle. Leave empty to use the simulated PayPal button.
+        # Baked into the browser bundle: the PayPal sandbox client id for the buyer's checkout button.
         NEXT_PUBLIC_PAYPAL_CLIENT_ID: ${NEXT_PUBLIC_PAYPAL_CLIENT_ID:-}
     container_name: mandatepay-app
     depends_on:
       db:
         condition: service_healthy
-    # Optional: PayPal / LLM keys from your local .env. Values below win over the file.
+    # PayPal and LLM keys come from your local .env. Values below win over the file.
     env_file:
       - path: .env
         required: false
     environment:
       DATABASE_URL: postgres://mandatepay:mandatepay@db:5432/mandatepay
       APP_BASE_URL: http://localhost:3000
-      DEMO_MODE: "true"
-      SEED_ON_START: "true"
       KEY_DIR: /app/.keys
     ports:
       - "3000:3000"

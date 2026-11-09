@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ActionType, OfferType, type CaseRecord, type Verdict } from '@/contracts/schemas';
-import { ApiClientError, apiFetch } from '@/fixtures/api';
-import type { CaseDetail } from '@/fixtures';
+import { ApiClientError, apiFetch } from '@/app/_ui/api';
+import type { CaseDetail } from '@/lib/paypal/cases';
 import { Dialog } from '../../../_ui/Dialog';
 import { Badge, Card, EmptyState, Notice, PageHeader, Skeleton } from '../../../_ui/Ui';
 import {
@@ -46,7 +46,6 @@ export default function CaseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [loadError, setLoadError] = useState<{ notFound: boolean; text: string } | null>(null);
-  const [fixtures, setFixtures] = useState(false);
   const [busy, setBusy] = useState<'act' | 'analyse' | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -57,7 +56,6 @@ export default function CaseDetailPage() {
       setLoadError(null);
       try {
         const r = await apiFetch<CaseDetail>(`/api/cases/${encodeURIComponent(id)}`, { signal });
-        if (r.fromFixture) setFixtures(true);
         if (!r.data) throw new ApiClientError(404, { error: 'case_not_found' });
         setDetail(r.data);
       } catch (e) {
@@ -81,7 +79,6 @@ export default function CaseDetailPage() {
       const r = await apiFetch<CaseRecord>(`/api/cases/${encodeURIComponent(id)}/act`, {
         body: { human_approved: true, ...(p.override ? { override: p.override } : {}) },
       });
-      if (r.fromFixture) setFixtures(true);
       setDetail((cur) => (cur ? { ...cur, ...r.data } : cur));
       setPending(null);
       setForm(null);
@@ -110,7 +107,6 @@ export default function CaseDetailPage() {
     setNotice(null);
     try {
       const r = await apiFetch<Verdict>(`/api/cases/${encodeURIComponent(id)}/analyse`, { method: 'POST' });
-      if (r.fromFixture) setFixtures(true);
       setDetail((cur) =>
         cur ? { ...cur, verdict: r.data, analysis_status: r.data.needs_human ? 'awaiting_human' : 'analysed' } : cur,
       );
@@ -218,7 +214,6 @@ export default function CaseDetailPage() {
         actions={<Badge tone={status.tone}>{status.label}</Badge>}
       />
 
-      {fixtures && <Notice tone="warn">Sample data: the disputes service is not available, so an example dispute is shown.</Notice>}
       {notice && (
         <Notice tone={notice.ok ? 'good' : 'bad'} alert={!notice.ok}>
           {notice.text}

@@ -10,7 +10,7 @@ used to measure the analyst. Report accuracy in the README and the demo video.
 
 ## Labelling rules
 
-Labels say what the right answer is, not what the mock outputs. Do not edit a label to make a run pass. Add a case instead.
+Labels say what the right answer is, not what any model outputs. Do not edit a label to make a run pass. Add a case instead.
 
 - `merchant`: not delivered, damaged, counterfeit, or a different item from the cart was shipped.
 - `agent`: the cart fitted the mandate but was the wrong product, or the cart contradicted the mandate.

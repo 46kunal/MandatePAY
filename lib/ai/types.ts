@@ -8,9 +8,7 @@ export type LlmErrorCode =
   /** The model answered but it was not parseable JSON. */
   | 'invalid_json'
   /** The model answered with JSON that does not match the Zod schema. */
-  | 'schema_mismatch'
-  /** Mock mode was used for a call that has no canned answer. */
-  | 'no_mock_responder';
+  | 'schema_mismatch';
 
 /** API routes map any LlmError to HTTP 502 (see contracts/api.md), except 'config' which is a 500. */
 export class LlmError extends Error {
@@ -34,22 +32,20 @@ export function isTransientLlmError(err: unknown): boolean {
 
 /** What a call site supplies: which task this is and the prompts. */
 export interface LlmRequest {
-  /** Short stable snake_case name, e.g. "draft_mandate". Used as the tool name and for mock lookups. */
+  /** Short stable snake_case name, e.g. "draft_mandate". Used as the tool name. */
   task: string;
   system: string;
   user: string;
 }
 
-/** What a provider receives. jsonSchema is lazy because the mock provider never needs it. */
+/** What a provider receives. */
 export interface ProviderCall extends LlmRequest {
   jsonSchema: () => Record<string, unknown>;
-  /** Canned answer for mock mode, supplied by the call site. Real providers ignore it. */
-  mock?: (input: LlmRequest) => unknown | Promise<unknown>;
 }
 
 export interface LlmProvider {
   readonly name: string;
-  /** Deterministic providers (mock) give the same answer every time, so retrying is pointless. */
+  /** Deterministic providers give the same answer every time, so retrying a bad answer is pointless. */
   readonly deterministic: boolean;
   /** Return the model's structured answer: a parsed object, or a JSON string. Validation happens in generateJson. */
   complete(call: ProviderCall): Promise<unknown>;

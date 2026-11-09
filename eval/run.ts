@@ -7,8 +7,8 @@
  *  - needs_human accuracy:  verdict.needs_human equals expect.needs_human (only for cases that set it)
  *  - overall:               a case passes only if every one of its checks passes
  *
- * LLM_PROVIDER=mock (the default) scores the offline stand-in, which is NOT a real judge. Set LLM_PROVIDER=anthropic
- * and LLM_API_KEY to score the real model, and report that number.
+ * Scores a real model: set LLM_PROVIDER and LLM_API_KEY in .env, then `npm run eval`. EVAL_DELAY_MS spaces the calls
+ * out for free-tier rate limits.
  */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -60,7 +60,8 @@ const pct = (n: number, d: number) => (d === 0 ? 'n/a' : `${((100 * n) / d).toFi
 async function main() {
   const verbose = process.argv.includes('--verbose');
   const cases = JSON.parse(readFileSync(path.join(__dirname, 'cases.json'), 'utf8')) as EvalCase[];
-  const provider = process.env.LLM_PROVIDER?.trim() || 'mock';
+  const provider = process.env.LLM_PROVIDER?.trim();
+  if (!provider) throw new Error('LLM_PROVIDER is not set. The eval scores a real model; set LLM_PROVIDER and LLM_API_KEY.');
 
   let faultOk = 0;
   let actionOk = 0;
@@ -113,7 +114,6 @@ async function main() {
     console.log('\nFailures:');
     for (const f of failures) console.log(`  ${f}`);
   }
-  if (provider === 'mock') console.log('\nNote: this scores the offline mock, not a real model. Re-run with LLM_PROVIDER=anthropic for the real number.');
 }
 
 main().catch((err) => {

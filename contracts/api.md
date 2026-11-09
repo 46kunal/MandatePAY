@@ -18,11 +18,15 @@ Errors always use `ApiError` (`{ error, message?, details? }`). Amounts are stri
 | POST `/api/cases/:id/analyse` | B | none | `Verdict` (saved on case) | 404, 502 LLM failed |
 | GET `/api/cases/:id/evidence-pack` | A | none | `application/pdf` | 404 |
 | POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal |
-| POST `/api/demo/reset` | C | none | `{ ok }` | 403 outside demo mode |
+| GET `/api/products` | A | `?active=1` optional | `Product[]` | none |
+| POST `/api/products` | A | `ProductInput` | `Product` (201) | 400 invalid, 409 duplicate SKU |
+| PATCH `/api/products/:id` | A | `UpdateProductRequest` | `Product` | 400, 404, 409 duplicate SKU |
+| POST `/api/agent/shop` | A | `AgentShopRequest` | `AgentShopResponse` | 404 mandate, 410 expired, 422 empty catalog / nothing fits, 500 LLM not configured, 502 LLM failed |
+| GET `/api/status` | A | none | connection status (no secrets) | none |
 
 ## Rules
 
 - Change a shape only through a PR that edits `contracts/schemas.ts` and this file; the orchestrator reviews it.
-- Routes that are not built yet return HTTP 501 via `notImplemented(owner, hint)`. The UI must handle 501 by using fixtures.
+- Routes that are not built yet return HTTP 501 via `notImplemented(owner, hint)`. The UI shows the error; there is no sample data.
 - PayPal order: `custom_id` = mandate id, `invoice_id` = cart id.
 - Sandbox only. `getConfig()` refuses to start against a live PayPal host.

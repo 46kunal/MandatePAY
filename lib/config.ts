@@ -9,6 +9,11 @@ const Env = z.object({
   PAYPAL_BASE_URL: z.string().url().default('https://api-m.sandbox.paypal.com'),
   PAYPAL_WEBHOOK_ID: z.string().optional(),
   APP_BASE_URL: z.string().url().default('http://localhost:3000'),
+  /** The store name shown on carts and evidence. Optional. */
+  MERCHANT_NAME: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || undefined),
   APPROVAL_THRESHOLD: Amount.default('100.00'),
   KEY_DIR: z.string().default('.keys'),
   LLM_PROVIDER: z.string().optional(),

@@ -144,88 +144,6 @@ export function enforce(proposed: Verdict, input: AnalystInput, opts: AnalystOpt
   };
 }
 
-// ---------- mock mode ----------
-
-/** Canned analysis for LLM_PROVIDER=mock: a small keyword reader so the demo runs with no key. Not a real judge. */
-export function mockVerdict(input: AnalystInput): Verdict {
-  const { dispute, mandate, cart } = input;
-  const reason = dispute.reason.toUpperCase();
-  const said = dispute.messages.map((m) => m.text).join(' ').toLowerCase();
-  const trackStatus = dispute.tracking?.status ?? '';
-  // "Delivered" only counts when it was delivered to the right place and not sent back.
-  const delivered = /deliver/i.test(trackStatus) && !/wrong|return|fail|attempt/i.test(trackStatus);
-  const matchesMandate = evaluateCart(mandate.constraints, cart).verdict !== 'block';
-  const pick = (...prefs: Verdict['action'][]) => prefs.find((a) => dispute.allowed_actions.includes(a)) ?? 'NO_ACTION';
-  const refundType = dispute.offer_types.find((t) => t === 'REFUND_WITH_RETURN') ?? dispute.offer_types[0];
-  const none = { offer_type: undefined, offer_amount: undefined } as Pick<Verdict, 'offer_type' | 'offer_amount'>;
-  const refundOffer = (): Pick<Verdict, 'offer_type' | 'offer_amount'> =>
-    refundType && dispute.amount ? { offer_type: refundType, offer_amount: dispute.amount.value } : none;
-
-  const refund = (fault: Verdict['fault'], confidence: number, evidence_points: Verdict['evidence_points'], reasoning: string): Verdict => {
-    const action = pick('MAKE_OFFER', 'ACCEPT_CLAIM', 'SEND_MESSAGE', 'NO_ACTION');
-    return { fault, action, ...(action === 'MAKE_OFFER' ? refundOffer() : none), confidence, needs_human: false, evidence_points, reasoning };
-  };
-  const defend = (fault: Verdict['fault'], confidence: number, evidence_points: Verdict['evidence_points'], reasoning: string): Verdict => ({
-    fault, action: pick('PROVIDE_EVIDENCE', 'SEND_MESSAGE', 'NO_ACTION'), ...none, confidence, needs_human: false, evidence_points, reasoning,
-  });
-  const unclear = (evidence_points: Verdict['evidence_points'], reasoning: string): Verdict => ({
-    fault: 'unclear', action: pick('SEND_MESSAGE', 'NO_ACTION'), ...none, confidence: 0.4, needs_human: true, evidence_points, reasoning,
-  });
-  const reasonEvidence = { claim: `Dispute reason is ${dispute.reason}.`, source: 'dispute.reason' };
-
-  if (/NOT_RECEIVED|NOT_DELIVERED/.test(reason)) {
-    if (delivered && /maybe|not sure|might have|i will check|i\'ll check|flatmate|neighbou?r/.test(said)) {
-      return unclear(
-        [{ claim: 'Tracking shows delivery but the buyer is unsure.', source: 'dispute.tracking.status' }, reasonEvidence],
-        'Delivery is recorded but the buyer is not certain it was lost, so ask before acting.',
-      );
-    }
-    return delivered
-      ? defend('buyer_regret', 0.75, [{ claim: 'Tracking shows the parcel was delivered.', source: 'dispute.tracking.status' }, reasonEvidence],
-          'Carrier tracking shows delivery, so the merchant should supply it as evidence.')
-      : refund('merchant', 0.85, [{ claim: 'No successful delivery is recorded for this order.', source: 'dispute.tracking.status' }, reasonEvidence],
-          'There is no proof of delivery to the buyer, so a refund is the fair outcome.');
-  }
-
-  if (/NOT_AS_DESCRIBED/.test(reason)) {
-    // The only "complaint" is an instruction to the analyst: nothing real supports either side.
-    if (dispute.messages.length > 0 && dispute.messages.every((m) => looksLikeInjection(m.text))) {
-      return unclear([reasonEvidence], 'The buyer message only contains instructions, not facts about the order, so a human must decide.');
-    }
-
-    const attrs = mandate.constraints.required_attributes ?? {};
-    const firstKey = Object.keys(attrs)[0];
-    const evidence = [
-      { claim: matchesMandate ? 'The cart satisfied the mandate.' : 'The cart did not satisfy the mandate.', source: 'mandate.constraints.max_total.value' },
-      reasonEvidence,
-      ...(firstKey ? [{ claim: `The mandate required ${firstKey} ${attrs[firstKey]}.`, source: `mandate.constraints.required_attributes.${firstKey}` }] : []),
-    ];
-    // The buyer describes a fault in what the merchant actually sent.
-    if (/damag|broken|crushed|defect|came away|counterfeit|fake|misspelt|not genuine|\bbut the (box|label|item|shoe|package)\b/.test(said)) {
-      return refund('merchant', 0.8, evidence, 'The buyer describes a fault in what was shipped, which the merchant is responsible for.');
-    }
-    // The buyer says the item matches but they do not want it.
-    if (matchesMandate && /do not like|don't like|doesn't fit|does not fit|a bit different|slightly|changed my mind/.test(said)) {
-      return defend('buyer_regret', 0.75, evidence, 'The item matches the listing and the mandate; the buyer simply does not want it.');
-    }
-    return matchesMandate
-      ? refund('agent', 0.72, evidence, 'The merchant shipped what was in the cart and the cart fitted the mandate, but the agent likely picked the wrong product. A return-based refund is fair to both sides.')
-      : refund('agent', 0.8, evidence, 'The cart did not fit what the buyer authorised, which the agent should have caught before buying.');
-  }
-
-  if (/CREDIT_NOT_PROCESSED/.test(reason) && /return/.test(said)) {
-    return refund('merchant', 0.8, [{ claim: 'The buyer says the item was returned without a refund.', source: 'dispute.messages[0].text' }, reasonEvidence],
-      'The buyer reports returning the item; the merchant owes the refund.');
-  }
-
-  if (/UNAUTHORI[SZ]ED/.test(reason)) {
-    return defend('buyer_regret', 0.7, [{ claim: 'The purchase was made under a mandate signed by the buyer.', source: 'mandate.mandate_id' }],
-      'A signed mandate shows the buyer authorised this agent purchase; submit it as evidence.');
-  }
-
-  return unclear([reasonEvidence], 'This dispute reason is not covered by the offline analyst; a human should decide.');
-}
-
 // ---------- entry point ----------
 
 /** Ask the model for a verdict, then apply the guardrails. Throws LlmError if the model cannot produce a valid Verdict. */
@@ -238,7 +156,6 @@ export async function analyseCase(input: AnalystInput, opts: AnalystOptions = {}
       system: SYSTEM,
       user: JSON.stringify(safe),
       schema: Verdict,
-      mock: () => mockVerdict(safe),
     },
     opts.provider,
   );
