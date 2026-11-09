@@ -6,14 +6,14 @@ import { evaluateCart } from './guard';
 import { resolveUnsure } from './fuzzy';
 
 const constraints: Constraints = {
-  max_total: { value: '110.00', currency: 'GBP' },
+  max_total: { value: '110.00', currency: 'USD' },
   categories: ['shoes'],
   required_attributes: { color: 'white' },
   request_text: 'white shoes under 110',
 };
 
 const cart = (name: string, extra: Partial<Cart['items'][number]> = {}): Cart => ({
-  currency: 'GBP',
+  currency: 'USD',
   items: [{ sku: 's', name, quantity: 1, unit_price: '80.00', ...extra }],
 });
 

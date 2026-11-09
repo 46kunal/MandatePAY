@@ -14,7 +14,7 @@ import { resetKeyCache } from './keys';
 const NOW = 1_800_000_000;
 
 const constraints: Constraints = {
-  max_total: { value: '110.00', currency: 'GBP' },
+  max_total: { value: '110.00', currency: 'USD' },
   categories: ['shoes'],
   max_quantity: 2,
   required_attributes: { color: 'white', size: '10' },
@@ -24,7 +24,7 @@ const constraints: Constraints = {
 
 function cart(overrides: Partial<Cart['items'][number]> = {}, extra: Partial<Cart> = {}): Cart {
   return {
-    currency: 'GBP',
+    currency: 'USD',
     delivery_eta: '2027-01-20T00:00:00Z',
     items: [
       { sku: 'sku1', name: 'White trainers', category: 'shoes', quantity: 1, unit_price: '89.99', attributes: { color: 'White', size: '10' }, ...overrides },
@@ -47,11 +47,11 @@ describe('guard rules (B5)', () => {
     assert.equal(status(constraints, cart({ unit_price: '110.01' }), 'max_total'), 'fail');
     assert.equal(status(constraints, cart({ unit_price: '110.00' }), 'max_total'), 'pass');
     // 0.1 + 0.2 style rounding traps
-    assert.equal(evaluateCart({ ...constraints, max_total: { value: '0.30', currency: 'GBP' } }, cart({ unit_price: '0.10', quantity: 3 })).total, '0.30');
+    assert.equal(evaluateCart({ ...constraints, max_total: { value: '0.30', currency: 'USD' } }, cart({ unit_price: '0.10', quantity: 3 })).total, '0.30');
   });
 
   it('fails a different currency', () => {
-    assert.equal(status(constraints, cart({}, { currency: 'USD' }), 'max_total'), 'fail');
+    assert.equal(status(constraints, cart({}, { currency: 'GBP' }), 'max_total'), 'fail');
   });
 
   it('fails the wrong category and is unsure when the category is missing', () => {
@@ -122,7 +122,7 @@ describe('cart check and closed mandate (B6, B8)', () => {
   it('rejects a tampered mandate instead of trusting its constraints', async () => {
     const jws = await open();
     const [h, , s] = jws.split('.');
-    const forged = Buffer.from(JSON.stringify({ typ: 'checkout_mandate.open', mandate_id: 'mnd_1', buyer_ref: 'b1', constraints: { max_total: { value: '9999.00', currency: 'GBP' } }, iat: NOW, exp: NOW + 3600 })).toString('base64url');
+    const forged = Buffer.from(JSON.stringify({ typ: 'checkout_mandate.open', mandate_id: 'mnd_1', buyer_ref: 'b1', constraints: { max_total: { value: '9999.00', currency: 'USD' } }, iat: NOW, exp: NOW + 3600 })).toString('base64url');
     const r = await checkCart(`${h}.${forged}.${s}`, cart(), { keyDir, now: NOW, approvalThreshold: '100.00' });
     assert.ok(!r.ok);
     assert.equal(r.status, 422);

@@ -21,7 +21,7 @@ type Draft = z.infer<typeof DraftMandateResponse>;
 type Created = z.infer<typeof CreateMandateResponse>;
 
 const BUYER_REF = 'buyer_demo';
-const EXAMPLE = 'Buy me white trainers, size 10, under 110 GBP, delivered by Nov 20.';
+const EXAMPLE = 'Buy me white trainers, size 10, under 110 USD, delivered by Nov 20.';
 
 const CART_OPTIONS: { key: string; label: string; cart: Cart }[] = [
   { key: 'allowed', label: 'Matches the mandate', cart: cartAllowed },

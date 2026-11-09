@@ -19,7 +19,7 @@ function samplePayload(overrides: Partial<OpenMandatePayload> = {}): OpenMandate
     mandate_id: 'mnd_test_1',
     buyer_ref: 'buyer_1',
     constraints: {
-      max_total: { value: '110.00', currency: 'GBP' },
+      max_total: { value: '110.00', currency: 'USD' },
       categories: ['shoes'],
       required_attributes: { color: 'white', size: '10' },
       request_text: 'white trainers size 10 under 110 pounds',
@@ -104,7 +104,7 @@ describe('mandate signing (B1)', () => {
   });
 
   it('refuses to sign a payload that breaks the contract', async () => {
-    const bad = samplePayload({ constraints: { max_total: { value: '110', currency: 'GBP' } } });
+    const bad = samplePayload({ constraints: { max_total: { value: '110', currency: 'USD' } } });
     await assert.rejects(() => signOpenMandate(bad, { keyDir }));
   });
 

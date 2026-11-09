@@ -16,7 +16,7 @@ import { z } from 'zod';
 
 // ---------- primitives ----------
 
-export const CurrencyCode = z.string().regex(/^[A-Z]{3}$/, 'ISO 4217 code, e.g. GBP');
+export const CurrencyCode = z.string().regex(/^[A-Z]{3}$/, 'ISO 4217 code, e.g. USD');
 export const Amount = z.string().regex(/^\d+\.\d{2}$/, 'exactly two decimals, e.g. 110.00');
 export const IsoDateTime = z
   .string()

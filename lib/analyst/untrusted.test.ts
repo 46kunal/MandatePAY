@@ -16,15 +16,15 @@ function input(messageText: string, overrides: Partial<AnalystInput['dispute']> 
       reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED',
       stage: 'INQUIRY',
       status: 'WAITING_FOR_SELLER_RESPONSE',
-      amount: { value: '60.00', currency: 'GBP' },
+      amount: { value: '60.00', currency: 'USD' },
       allowed_actions: ['PROVIDE_EVIDENCE', 'MAKE_OFFER', 'ACCEPT_CLAIM', 'SEND_MESSAGE', 'NO_ACTION'],
       offer_types: ['REFUND'],
       messages: [{ from: 'BUYER', text: messageText }],
       tracking: { carrier: 'RM', number: 'X1', status: 'DELIVERED' },
       ...overrides,
     },
-    mandate: { mandate_id: 'mnd_1', constraints: { max_total: { value: '110.00', currency: 'GBP' } } },
-    cart: { currency: 'GBP', items: [{ sku: 's', name: 'Trainers', quantity: 1, unit_price: '60.00' }] },
+    mandate: { mandate_id: 'mnd_1', constraints: { max_total: { value: '110.00', currency: 'USD' } } },
+    cart: { currency: 'USD', items: [{ sku: 's', name: 'Trainers', quantity: 1, unit_price: '60.00' }] },
   };
 }
 

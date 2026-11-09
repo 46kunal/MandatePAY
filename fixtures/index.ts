@@ -1,21 +1,21 @@
 /**
  * Typed fixtures (owner: C). Shapes come from contracts/schemas.ts so the UI can render with no backend.
- * Scenario: buyer asks an agent for "white trainers, size 10, under 110 GBP".
+ * Scenario: buyer asks an agent for "white trainers, size 10, under 110 USD".
  */
 import type { Cart, CaseRecord, Constraints, GuardResult, Verdict } from '../contracts/schemas';
 
-const GBP = 'GBP';
+const USD = 'USD';
 
 // ---------- mandate ----------
 
 export const mandateConstraints: Constraints = {
-  max_total: { value: '110.00', currency: GBP },
+  max_total: { value: '110.00', currency: USD },
   categories: ['shoes'],
   max_quantity: 1,
   required_attributes: { color: 'white', size: '10' },
   deadline: '2026-11-20T23:59:59Z',
   require_approval_over: '100.00',
-  request_text: 'Buy me white trainers, size 10, under 110 GBP, delivered by Nov 20.',
+  request_text: 'Buy me white trainers, size 10, under 110 USD, delivered by Nov 20.',
 };
 
 export const mandate = {
@@ -30,7 +30,7 @@ export const draftWarnings = ['Delivery deadline assumed to be end of day on Nov
 // ---------- carts ----------
 
 export const cartAllowed: Cart = {
-  currency: GBP,
+  currency: USD,
   merchant: 'Sole Trader Ltd',
   delivery_eta: '2026-11-15T12:00:00Z',
   items: [
@@ -46,7 +46,7 @@ export const cartAllowed: Cart = {
 };
 
 export const cartBlocked: Cart = {
-  currency: GBP,
+  currency: USD,
   merchant: 'Sole Trader Ltd',
   delivery_eta: '2026-11-25T12:00:00Z',
   items: [
@@ -62,7 +62,7 @@ export const cartBlocked: Cart = {
 };
 
 export const cartNeedsApproval: Cart = {
-  currency: GBP,
+  currency: USD,
   merchant: 'Sole Trader Ltd',
   delivery_eta: '2026-11-16T12:00:00Z',
   items: [
@@ -82,9 +82,9 @@ export const cartNeedsApproval: Cart = {
 export const guardAllow: GuardResult = {
   verdict: 'allow',
   total: '89.00',
-  currency: GBP,
+  currency: USD,
   checks: [
-    { rule: 'max_total', status: 'pass', detail: 'Total 89.00 GBP is within the 110.00 GBP limit.' },
+    { rule: 'max_total', status: 'pass', detail: 'Total 89.00 USD is within the 110.00 USD limit.' },
     { rule: 'categories', status: 'pass', detail: 'Category "shoes" is allowed.' },
     { rule: 'max_quantity', status: 'pass', detail: 'Quantity 1 is within the limit of 1.' },
     { rule: 'required_attributes', status: 'pass', detail: 'color=white and size=10 match the mandate.' },
@@ -96,9 +96,9 @@ export const guardAllow: GuardResult = {
 export const guardBlock: GuardResult = {
   verdict: 'block',
   total: '119.00',
-  currency: GBP,
+  currency: USD,
   checks: [
-    { rule: 'max_total', status: 'fail', detail: 'Total 119.00 GBP exceeds the 110.00 GBP limit.' },
+    { rule: 'max_total', status: 'fail', detail: 'Total 119.00 USD exceeds the 110.00 USD limit.' },
     { rule: 'categories', status: 'pass', detail: 'Category "shoes" is allowed.' },
     { rule: 'max_quantity', status: 'pass', detail: 'Quantity 1 is within the limit of 1.' },
     {
@@ -114,9 +114,9 @@ export const guardBlock: GuardResult = {
 export const guardEscalate: GuardResult = {
   verdict: 'escalate',
   total: '105.00',
-  currency: GBP,
+  currency: USD,
   checks: [
-    { rule: 'max_total', status: 'pass', detail: 'Total 105.00 GBP is within the 110.00 GBP limit.' },
+    { rule: 'max_total', status: 'pass', detail: 'Total 105.00 USD is within the 110.00 USD limit.' },
     { rule: 'categories', status: 'pass', detail: 'Category "shoes" is allowed.' },
     { rule: 'max_quantity', status: 'pass', detail: 'Quantity 1 is within the limit of 1.' },
     { rule: 'required_attributes', status: 'pass', detail: 'color=white and size=10 match the mandate.' },
@@ -124,7 +124,7 @@ export const guardEscalate: GuardResult = {
     {
       rule: 'require_approval_over',
       status: 'escalate',
-      detail: 'Total 105.00 GBP is over the 100.00 approval threshold. Buyer must approve.',
+      detail: 'Total 105.00 USD is over the 100.00 approval threshold. Buyer must approve.',
     },
   ],
 };
@@ -205,7 +205,7 @@ export const cases: CaseRecord[] = [
     paypal_order_id: 'ORD-1001',
     mandate_id: mandate.mandate_id,
     reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED',
-    amount: { value: '89.00', currency: GBP },
+    amount: { value: '89.00', currency: USD },
     verdict: verdictMerchantFault,
     analysis_status: 'analysed',
   },
@@ -216,7 +216,7 @@ export const cases: CaseRecord[] = [
     paypal_order_id: 'ORD-1002',
     mandate_id: mandate.mandate_id,
     reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED',
-    amount: { value: '119.00', currency: GBP },
+    amount: { value: '119.00', currency: USD },
     verdict: verdictAgentError,
     analysis_status: 'awaiting_human',
   },
@@ -227,7 +227,7 @@ export const cases: CaseRecord[] = [
     paypal_order_id: 'ORD-1003',
     mandate_id: mandate.mandate_id,
     reason: 'UNAUTHORISED',
-    amount: { value: '89.00', currency: GBP },
+    amount: { value: '89.00', currency: USD },
     verdict: verdictBuyerRegret,
     analysis_status: 'analysed',
   },
@@ -238,7 +238,7 @@ export const cases: CaseRecord[] = [
     paypal_order_id: 'ORD-1004',
     mandate_id: mandate.mandate_id,
     reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED',
-    amount: { value: '105.00', currency: GBP },
+    amount: { value: '105.00', currency: USD },
     verdict: verdictWrongProduct,
     analysis_status: 'awaiting_human',
   },
@@ -249,7 +249,7 @@ export const cases: CaseRecord[] = [
     paypal_order_id: 'ORD-1005',
     mandate_id: mandate.mandate_id,
     reason: 'ITEM_NOT_RECEIVED',
-    amount: { value: '89.00', currency: GBP },
+    amount: { value: '89.00', currency: USD },
     verdict: null,
     analysis_status: 'pending',
   },

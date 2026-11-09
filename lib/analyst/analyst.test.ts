@@ -11,7 +11,7 @@ function input(dispute: Partial<DisputeSummary> = {}): AnalystInput {
       reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED',
       stage: 'INQUIRY',
       status: 'WAITING_FOR_SELLER_RESPONSE',
-      amount: { value: '89.99', currency: 'GBP' },
+      amount: { value: '89.99', currency: 'USD' },
       allowed_actions: ['PROVIDE_EVIDENCE', 'MAKE_OFFER', 'ACCEPT_CLAIM', 'SEND_MESSAGE', 'NO_ACTION'],
       offer_types: ['REFUND', 'REFUND_WITH_RETURN'],
       messages: [],
@@ -20,13 +20,13 @@ function input(dispute: Partial<DisputeSummary> = {}): AnalystInput {
     mandate: {
       mandate_id: 'mnd_1',
       constraints: {
-        max_total: { value: '110.00', currency: 'GBP' },
+        max_total: { value: '110.00', currency: 'USD' },
         required_attributes: { color: 'white', size: '10' },
         request_text: 'white trainers size 10 under 110',
       },
     },
     cart: {
-      currency: 'GBP',
+      currency: 'USD',
       items: [{ sku: 's1', name: 'White trainers', quantity: 1, unit_price: '89.99', attributes: { color: 'white', size: '10' } }],
     },
   };
@@ -46,7 +46,7 @@ const proposal = (over: Partial<Verdict> = {}): Verdict => ({
 
 describe('guardrails (enforce)', () => {
   it('leaves a sound, low-value proposal alone', () => {
-    const out = enforce(proposal(), input({ amount: { value: '50.00', currency: 'GBP' } }));
+    const out = enforce(proposal(), input({ amount: { value: '50.00', currency: 'USD' } }));
     assert.equal(out.action, 'MAKE_OFFER');
     assert.equal(out.needs_human, false);
   });
@@ -78,10 +78,10 @@ describe('guardrails (enforce)', () => {
   });
 
   it('forces a human for low confidence, unclear fault, or high value, and never lowers needs_human', () => {
-    const small = input({ amount: { value: '20.00', currency: 'GBP' } });
+    const small = input({ amount: { value: '20.00', currency: 'USD' } });
     assert.ok(enforce(proposal({ confidence: 0.5 }), small).needs_human);
     assert.ok(enforce(proposal({ fault: 'unclear' }), small).needs_human);
-    assert.ok(enforce(proposal(), input({ amount: { value: '100.00', currency: 'GBP' } })).needs_human);
+    assert.ok(enforce(proposal(), input({ amount: { value: '100.00', currency: 'USD' } })).needs_human);
     assert.ok(enforce(proposal({ needs_human: true }), small).needs_human);
   });
 
@@ -102,7 +102,7 @@ describe('analyseCase with the mock LLM', () => {
     assert.equal(v.offer_type, 'REFUND_WITH_RETURN');
     assert.equal(v.offer_amount, '89.99');
     assert.equal(v.needs_human, false); // 89.99 is under the 100.00 review limit and 0.72 is above the 0.7 floor
-    assert.ok((await analyseCase(input({ amount: { value: '150.00', currency: 'GBP' } }))).needs_human);
+    assert.ok((await analyseCase(input({ amount: { value: '150.00', currency: 'USD' } }))).needs_human);
   });
 
   it('item never arrived: blames the merchant and refunds', async () => {
