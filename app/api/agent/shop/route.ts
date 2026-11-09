@@ -31,6 +31,7 @@ export async function POST(req: Request) {
           const [{ eq }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('@/db/client')]);
           const [row] = await db.select().from(schema.mandates).where(eq(schema.mandates.mandateId, mandateId)).limit(1);
           if (!row) return { ok: false, status: 404, error: 'mandate_not_found', message: `No mandate with id ${mandateId}.` };
+          if (row.revokedAt) return { ok: false, status: 410, error: 'mandate_revoked', message: 'The buyer revoked this mandate. Sign a new one to keep shopping.' };
           // Constraints come from the signed token, never from the unsigned column.
           const v = await verifyOpenMandate(row.jws);
           if (!v.ok) {

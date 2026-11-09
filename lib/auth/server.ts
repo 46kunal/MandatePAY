@@ -47,6 +47,23 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       role: { type: 'string', required: false, defaultValue: 'buyer', input: false },
+      disabledAt: { type: 'date', required: false, input: false },
+    },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        // A disabled account cannot sign in.
+        async before(session) {
+          const { eq } = await import('drizzle-orm');
+          const [u] = await db
+            .select({ disabledAt: schema.users.disabledAt })
+            .from(schema.users)
+            .where(eq(schema.users.id, session.userId))
+            .limit(1);
+          if (u?.disabledAt) return false;
+        },
+      },
     },
   },
   session: {

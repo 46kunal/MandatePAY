@@ -24,6 +24,13 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/disputes/poll` | `disputes:poll` (staff, owner, admin) |
 | GET `/api/settings`, GET `/api/status` | `settings:read` / `status:read` (staff, owner, admin) |
 | PATCH `/api/settings` | `settings:write` (owner, admin) |
+| GET `/api/team` | `settings:read` (staff, owner, admin) |
+| POST `/api/team` | `team:manage` (owner, admin). Only an admin gives or takes `admin`; nobody changes their own role; the last owner cannot be removed |
+| GET `/api/audit` | `audit:read` (owner, admin) |
+| GET `/api/export/orders`, `/api/export/disputes` | `orders:read:all` / `cases:read` (staff, owner, admin) |
+| GET `/api/admin/users`, PATCH `/api/admin/users/:id` | `users:manage` (admin). Disabling ends the person's sessions |
+| GET `/api/admin/health` | `system:read` (admin) |
+| GET `/api/me/mandates`, POST `/api/me/mandates/:id/revoke`, GET `/api/me/export` | `shop`, own data only |
 
 ## Routes
 
@@ -39,6 +46,16 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/webhooks/paypal` | A | PayPal event | `200` fast | 400 bad signature |
 | GET `/api/settings` | A | none | `StoreSettings` (defaults from env until saved) | none |
 | PATCH `/api/settings` | A | `UpdateStoreSettingsRequest` (any subset) | `StoreSettings` | 400 invalid body |
+| GET `/api/team` | A | none | `ListTeamResponse` | none |
+| POST `/api/team` | A | `SetTeamRoleRequest` | `AccountSummary` | 404 no account with that email, 409 `role_change_refused` |
+| GET `/api/admin/users?q=` | A | none | `ListUsersResponse` (newest 200) | none |
+| PATCH `/api/admin/users/:id` | A | `UpdateUserRequest` | `AccountSummary` | 404, 409 `role_change_refused` / `cannot_disable_self` |
+| GET `/api/admin/health` | A | none | `SystemHealth` (never shows secret values; does not call the AI) | none |
+| GET `/api/audit?limit=` | A | none | `ListAuditResponse` (newest first, max 1000) | none |
+| GET `/api/export/orders`, `/api/export/disputes` | A | none | `text/csv` download (formulas defused) | none |
+| GET `/api/me/mandates` | A | none | `ListMyMandatesResponse` | none |
+| POST `/api/me/mandates/:id/revoke` | A | none | `MyMandate`. After this, cart checks, the agent and new orders on it answer 410 `mandate_revoked` | 404 not yours |
+| GET `/api/me/export` | A | none | JSON download of the person's account, mandates, carts and orders | none |
 | POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal |
 | GET `/api/cases` | A | none | `CaseRecord[]` | none |
 | GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order | 404 |

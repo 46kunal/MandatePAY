@@ -24,7 +24,10 @@ export const PERMISSIONS = [
   'status:read',
   'settings:read',
   'settings:write',
-  'users:manage',
+  'team:manage', // give or take store-team roles (staff, owner) on existing accounts
+  'audit:read',
+  'users:manage', // every account: any role, disable sign-in
+  'system:read', // system health
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -44,7 +47,7 @@ const STAFF: readonly Permission[] = [
 const GRANTS: Record<Role, readonly Permission[]> = {
   buyer: ['shop', 'products:read'],
   staff: STAFF,
-  owner: [...STAFF, 'cases:approve', 'settings:write'],
+  owner: [...STAFF, 'cases:approve', 'settings:write', 'team:manage', 'audit:read'],
   admin: PERMISSIONS,
 };
 

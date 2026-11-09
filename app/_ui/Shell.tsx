@@ -71,12 +71,15 @@ function BuyerTopRight() {
           Merchant dashboard →
         </Link>
       )}
+      <Link href="/buyer/account" className={u.topLink}>
+        Account
+      </Link>
       <UserBox after="/login" />
     </div>
   );
 }
 
-const NAV = [
+const NAV: { href: string; label: string; exact?: boolean; adminOnly?: boolean }[] = [
   { href: '/merchant', label: 'Overview', exact: true },
   { href: '/merchant/disputes', label: 'Disputes' },
   { href: '/merchant/products', label: 'Products' },
@@ -84,6 +87,7 @@ const NAV = [
   { href: '/merchant/ledger', label: 'Mandate ledger' },
   { href: '/merchant/evidence', label: 'Evidence reports' },
   { href: '/merchant/settings', label: 'Settings' },
+  { href: '/admin', label: 'Admin', adminOnly: true },
 ];
 
 export function MerchantShell({ children }: { children: ReactNode }) {
@@ -100,7 +104,7 @@ export function MerchantShell({ children }: { children: ReactNode }) {
           <Brand />
           <nav aria-label="Merchant" className={u.navWrap}>
             <ul className={u.navList}>
-              {NAV.map((n) => {
+              {NAV.filter((n) => !n.adminOnly || role === 'admin').map((n) => {
                 const on = n.exact ? path === n.href : path === n.href || path.startsWith(n.href + '/');
                 return (
                   <li key={n.href}>

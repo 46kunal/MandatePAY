@@ -1,34 +1,16 @@
 'use client';
-// OWNER: C. Settings. "Store and rules" edits the store settings (GET/PATCH /api/settings). "Connections" reports what
-// the server is connected to (GET /api/status); those are environment variables and secrets, so not editable here.
+// OWNER: C. Settings, in tabs. The tab is in the URL hash (#store, #connections, #team, #security, #data) so it can be
+// linked. Store and rules: GET/PATCH /api/settings (owner edits, staff read). The other tabs are in ./sections.tsx;
+// Security is the signed-in person's own name, password and devices.
 import { useEffect, useState } from 'react';
 import type { StoreSettings } from '@/contracts/schemas';
 import { useSession } from '@/lib/auth/client';
 import { can } from '@/lib/auth/roles';
+import { PasswordCard, ProfileCard, SessionsCard } from '../../_ui/AccountPanels';
 import { apiFetch } from '../../_ui/api';
-import { Badge, Card, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
+import { Card, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
 import u from '../../_ui/ui.module.css';
-
-interface Status {
-  paypal_configured: boolean;
-  paypal_button_configured: boolean;
-  webhooks_configured: boolean;
-  llm_provider: string | null;
-  llm_model: string | null;
-  llm_configured: boolean;
-  merchant_name: string | null;
-}
-
-function Row({ ok, label, good, bad }: { ok: boolean; label: string; good: string; bad: string }) {
-  return (
-    <>
-      <dt>{label}</dt>
-      <dd>
-        {ok ? <Badge tone="good">Connected</Badge> : <Badge tone="bad">Not set</Badge>} <span className={u.muted}>{ok ? good : bad}</span>
-      </dd>
-    </>
-  );
-}
+import { ConnectionsCard, DataCard, TeamCard } from './sections';
 
 type Draft = { store_name: string; support_email: string; approval_threshold: string; human_review_over: string; min_confidence: string };
 
@@ -152,61 +134,60 @@ function StoreSettingsCard() {
   );
 }
 
-export default function SettingsPage() {
-  const [status, setStatus] = useState<Status | null>(null);
-  const [error, setError] = useState(false);
+const TABS = [
+  { id: 'store', label: 'Store and rules' },
+  { id: 'connections', label: 'Connections' },
+  { id: 'team', label: 'Team' },
+  { id: 'security', label: 'Security' },
+  { id: 'data', label: 'Data' },
+] as const;
+type TabId = (typeof TABS)[number]['id'];
 
+function tabFromHash(): TabId {
+  const h = window.location.hash.slice(1);
+  return TABS.find((t) => t.id === h)?.id ?? 'store';
+}
+
+export default function SettingsPage() {
+  const [tab, setTab] = useState<TabId>('store');
   useEffect(() => {
-    const ctl = new AbortController();
-    fetch('/api/status', { signal: ctl.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((s: Status) => setStatus(s))
-      .catch(() => !ctl.signal.aborted && setError(true));
-    return () => ctl.abort();
+    const sync = () => setTab(tabFromHash());
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
   }, []);
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Your store, its rules, and what it is connected to." />
-      <StoreSettingsCard />
-
-      {error && (
-        <Notice tone="bad" alert>
-          Could not read the connection status from the server.
-        </Notice>
-      )}
-      {!status && !error && <Skeleton height={160} label="Loading connection status" />}
-
-      {status && (
-        <Card id="connections" title="Connections" subtitle="Set on the server with environment variables (see .env.example).">
-          <dl className={u.kv}>
-            <Row
-              ok={status.paypal_configured}
-              label="PayPal API"
-              good="Orders, captures and dispute actions use the PayPal sandbox."
-              bad="Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET. Orders and disputes will fail until then."
-            />
-            <Row
-              ok={status.paypal_button_configured}
-              label="PayPal button"
-              good="Buyers pay with the real PayPal sandbox checkout."
-              bad="Set NEXT_PUBLIC_PAYPAL_CLIENT_ID so buyers can pay."
-            />
-            <Row
-              ok={status.webhooks_configured}
-              label="Webhooks"
-              good="Dispute updates arrive as soon as PayPal sends them."
-              bad="Optional. Without PAYPAL_WEBHOOK_ID, use Poll disputes to fetch updates."
-            />
-            <Row
-              ok={status.llm_configured}
-              label="AI model"
-              good={`Drafting, shopping and dispute analysis use ${status.llm_provider}${status.llm_model ? ` (${status.llm_model})` : ''}.`}
-              bad="Set LLM_PROVIDER and LLM_API_KEY. The agent and the analyst cannot run until then."
-            />
-          </dl>
-        </Card>
-      )}
+      <PageHeader title="Settings" subtitle="Your store, its team, and your own account." />
+      <div role="tablist" aria-label="Settings sections" className={u.row} style={{ gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        {TABS.map((t) => (
+          <a
+            key={t.id}
+            role="tab"
+            id={`tab-${t.id}`}
+            aria-selected={tab === t.id}
+            aria-controls={`panel-${t.id}`}
+            href={`#${t.id}`}
+            className={`${u.btn} ${tab === t.id ? '' : u.btnSecondary}`}
+          >
+            {t.label}
+          </a>
+        ))}
+      </div>
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} style={{ display: 'grid', gap: '1rem' }}>
+        {tab === 'store' && <StoreSettingsCard />}
+        {tab === 'connections' && <ConnectionsCard />}
+        {tab === 'team' && <TeamCard />}
+        {tab === 'security' && (
+          <>
+            <ProfileCard />
+            <PasswordCard />
+            <SessionsCard />
+          </>
+        )}
+        {tab === 'data' && <DataCard />}
+      </div>
     </>
   );
 }

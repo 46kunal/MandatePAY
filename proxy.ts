@@ -11,11 +11,12 @@ export function proxy(req: NextRequest) {
   if (pathname === '/merchant/login') return NextResponse.next();
   if (getSessionCookie(req)) return NextResponse.next();
 
-  const login = new URL(pathname.startsWith('/merchant') ? '/merchant/login' : '/login', req.url);
+  const team = pathname.startsWith('/merchant') || pathname.startsWith('/admin');
+  const login = new URL(team ? '/merchant/login' : '/login', req.url);
   login.searchParams.set('next', pathname + search);
   return NextResponse.redirect(login);
 }
 
 export const config = {
-  matcher: ['/buyer/:path*', '/merchant/:path*'],
+  matcher: ['/buyer/:path*', '/merchant/:path*', '/admin/:path*'],
 };

@@ -254,6 +254,59 @@ export type OrderSummary = z.infer<typeof OrderSummary>;
 
 export const ListOrdersResponse = z.object({ orders: z.array(OrderSummary) });
 
+// ---------- accounts, team, admin, audit (Phase 2) ----------
+
+export const RoleName = z.enum(['buyer', 'staff', 'owner', 'admin']);
+
+/** One person's account as the store team and admins see it. Never includes password data. */
+export const AccountSummary = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: RoleName,
+  disabled: z.boolean(),
+  created_at: z.string(),
+});
+export type AccountSummary = z.infer<typeof AccountSummary>;
+
+export const ListTeamResponse = z.object({ members: z.array(AccountSummary) });
+/** Give an existing account a role. The person signs up at /login first. */
+export const SetTeamRoleRequest = z.object({ email: z.string().email(), role: RoleName }).strict();
+
+export const ListUsersResponse = z.object({ users: z.array(AccountSummary) });
+export const UpdateUserRequest = z
+  .object({ role: RoleName.optional(), disabled: z.boolean().optional() })
+  .strict()
+  .refine((v) => v.role !== undefined || v.disabled !== undefined, 'Send role or disabled.');
+
+export const AuditRecord = z.object({
+  id: z.string(),
+  at: z.string(),
+  actor_email: z.string().nullable(),
+  action: z.string(),
+  target_type: z.string().nullable(),
+  target_id: z.string().nullable(),
+  details: z.record(z.string(), z.unknown()).nullable(),
+});
+export const ListAuditResponse = z.object({ entries: z.array(AuditRecord) });
+
+export const HealthCheck = z.object({ name: z.string(), ok: z.boolean(), detail: z.string() });
+export const SystemHealth = z.object({ checked_at: z.string(), checks: z.array(HealthCheck) });
+
+/** A buyer's own mandate, for their account page. */
+export const MyMandate = z.object({
+  mandate_id: z.string(),
+  request_text: z.string().nullable(),
+  max_total: Money,
+  status: z.enum(['active', 'expired', 'revoked']),
+  created_at: z.string(),
+  expires_at: z.string(),
+  revoked_at: z.string().nullable(),
+  orders: z.number().int(),
+});
+export type MyMandate = z.infer<typeof MyMandate>;
+export const ListMyMandatesResponse = z.object({ mandates: z.array(MyMandate) });
+
 // ---------- store settings ----------
 
 /** Settings the store owner edits in the app. Secrets are not settings: they stay in environment variables. */

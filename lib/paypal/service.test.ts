@@ -111,6 +111,15 @@ describe('placeOrder', () => {
     assert.equal(t.orders.get('ORDER1')!.cartId, r.cartId);
   });
 
+  it('a revoked mandate places no order: 410, nothing sent to PayPal', async () => {
+    const t = await setup(constraints);
+    t.mandates.set(t.mandateId, { ...t.mandates.get(t.mandateId)!, revokedAt: new Date() });
+    const r = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });
+    assert.ok(!r.ok && r.httpStatus === 410 && r.error === 'mandate_revoked');
+    assert.equal(t.paypal.created.length, 0);
+    assert.equal(t.carts.size, 0);
+  });
+
   it('a second checkout click for the same cart reuses the open order instead of creating another', async () => {
     const t = await setup(constraints);
     const first = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });

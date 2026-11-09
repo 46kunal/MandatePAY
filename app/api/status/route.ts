@@ -1,4 +1,6 @@
 import { getConfig } from '@/lib/config';
+import { desc, eq } from 'drizzle-orm';
+import { db, schema } from '@/db/client';
 import { getSettings } from '@/lib/settings';
 import { requirePermission } from '@/lib/auth/guard';
 
@@ -18,5 +20,16 @@ export async function GET(req: Request) {
     llm_model: c.LLM_MODEL?.trim() || null,
     llm_configured: Boolean(c.LLM_PROVIDER?.trim() && c.LLM_API_KEY?.trim()),
     merchant_name: (await getSettings()).store_name,
+    last_webhook_at: await lastWebhookAt(),
   });
+}
+
+async function lastWebhookAt(): Promise<string | null> {
+  const [last] = await db
+    .select({ at: schema.events.receivedAt })
+    .from(schema.events)
+    .where(eq(schema.events.source, 'webhook'))
+    .orderBy(desc(schema.events.receivedAt))
+    .limit(1);
+  return last ? last.at.toISOString() : null;
 }
