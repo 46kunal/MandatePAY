@@ -1,0 +1,16 @@
+# Keep the build context small and never bake secrets or local state into an image.
+node_modules
+.next
+.git
+.github
+.env
+.env.*
+!.env.example
+.keys
+*.pem
+*.log
+coverage
+docs
+eval
+Dockerfile
+.dockerignore

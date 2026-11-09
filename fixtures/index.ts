@@ -10,7 +10,7 @@ const USD = 'USD';
 
 export const mandateConstraints: Constraints = {
   max_total: { value: '110.00', currency: USD },
-  categories: ['shoes'],
+  categories: ['trainers'],
   max_quantity: 1,
   required_attributes: { color: 'white', size: '10' },
   deadline: '2026-11-20T23:59:59Z',
@@ -37,10 +37,27 @@ export const cartAllowed: Cart = {
     {
       sku: 'TR-WHT-10',
       name: 'Aero Trainers',
-      category: 'shoes',
+      category: 'trainers',
       quantity: 1,
       unit_price: '89.00',
       attributes: { color: 'white', size: '10' },
+    },
+  ],
+};
+
+/** Listing has no size, so the guard cannot confirm size 10 ("unsure" -> buyer approval). Used by the agent-error case. */
+export const cartNoSize: Cart = {
+  currency: USD,
+  merchant: 'Sole Trader Ltd',
+  delivery_eta: '2026-11-15T12:00:00Z',
+  items: [
+    {
+      sku: 'TR-WHT-ANY',
+      name: 'Aero Trainers (size not listed)',
+      category: 'trainers',
+      quantity: 1,
+      unit_price: '89.00',
+      attributes: { color: 'white' },
     },
   ],
 };
@@ -53,7 +70,7 @@ export const cartBlocked: Cart = {
     {
       sku: 'TR-BLK-9',
       name: 'Aero Trainers',
-      category: 'shoes',
+      category: 'trainers',
       quantity: 1,
       unit_price: '119.00',
       attributes: { color: 'black', size: '9' },
@@ -69,7 +86,7 @@ export const cartNeedsApproval: Cart = {
     {
       sku: 'TR-WHT-10-PRO',
       name: 'Aero Trainers Pro',
-      category: 'shoes',
+      category: 'trainers',
       quantity: 1,
       unit_price: '105.00',
       attributes: { color: 'white', size: '10' },
@@ -85,11 +102,29 @@ export const guardAllow: GuardResult = {
   currency: USD,
   checks: [
     { rule: 'max_total', status: 'pass', detail: 'Total 89.00 USD is within the 110.00 USD limit.' },
-    { rule: 'categories', status: 'pass', detail: 'Category "shoes" is allowed.' },
+    { rule: 'categories', status: 'pass', detail: 'Category "trainers" is allowed.' },
     { rule: 'max_quantity', status: 'pass', detail: 'Quantity 1 is within the limit of 1.' },
     { rule: 'required_attributes', status: 'pass', detail: 'color=white and size=10 match the mandate.' },
     { rule: 'deadline', status: 'pass', detail: 'Delivery on Nov 15 is before the Nov 20 deadline.' },
     { rule: 'require_approval_over', status: 'pass', detail: 'Total is under the 100.00 approval threshold.' },
+  ],
+};
+
+export const guardUnsure: GuardResult = {
+  verdict: 'escalate',
+  total: '89.00',
+  currency: USD,
+  checks: [
+    { rule: 'max_total', status: 'pass', detail: 'Total 89.00 USD is within the 110.00 USD limit.' },
+    { rule: 'categories', status: 'pass', detail: 'Category "trainers" is allowed.' },
+    { rule: 'max_quantity', status: 'pass', detail: 'Quantity 1 is within the limit of 1.' },
+    {
+      rule: 'required_attributes',
+      status: 'unsure',
+      detail: 'Cannot confirm required attributes: Aero Trainers (size not listed) has no size.',
+    },
+    { rule: 'deadline', status: 'pass', detail: 'Delivery on Nov 15 is before the Nov 20 deadline.' },
+    { rule: 'approval_threshold', status: 'pass', detail: 'Total 89.00 is within the auto-approve limit of 100.00.' },
   ],
 };
 
@@ -99,7 +134,7 @@ export const guardBlock: GuardResult = {
   currency: USD,
   checks: [
     { rule: 'max_total', status: 'fail', detail: 'Total 119.00 USD exceeds the 110.00 USD limit.' },
-    { rule: 'categories', status: 'pass', detail: 'Category "shoes" is allowed.' },
+    { rule: 'categories', status: 'pass', detail: 'Category "trainers" is allowed.' },
     { rule: 'max_quantity', status: 'pass', detail: 'Quantity 1 is within the limit of 1.' },
     {
       rule: 'required_attributes',
@@ -117,7 +152,7 @@ export const guardEscalate: GuardResult = {
   currency: USD,
   checks: [
     { rule: 'max_total', status: 'pass', detail: 'Total 105.00 USD is within the 110.00 USD limit.' },
-    { rule: 'categories', status: 'pass', detail: 'Category "shoes" is allowed.' },
+    { rule: 'categories', status: 'pass', detail: 'Category "trainers" is allowed.' },
     { rule: 'max_quantity', status: 'pass', detail: 'Quantity 1 is within the limit of 1.' },
     { rule: 'required_attributes', status: 'pass', detail: 'color=white and size=10 match the mandate.' },
     { rule: 'deadline', status: 'pass', detail: 'Delivery on Nov 16 is before the Nov 20 deadline.' },
@@ -141,22 +176,25 @@ export const verdictMerchantFault: Verdict = {
   reasoning:
     'The buyer asked for white, size 10. The cart matched the mandate, but the merchant shipped black, size 9. The merchant is at fault, so a full refund is fair.',
   evidence_points: [
-    { claim: 'Mandate required color=white', source: 'mandates.constraints.required_attributes.color' },
-    { claim: 'Cart ordered color=white', source: 'carts.cart.items[0].attributes.color' },
-    { claim: 'Buyer reports a black item arrived', source: 'cases.raw_dispute.messages[0]' },
+    { claim: 'Mandate required color=white', source: 'mandate.constraints.required_attributes.color' },
+    { claim: 'Cart ordered color=white', source: 'cart.items[0].attributes.color' },
+    { claim: 'Buyer reports a black item arrived', source: 'dispute.messages[0].text' },
   ],
 };
 
 export const verdictAgentError: Verdict = {
   fault: 'agent',
-  action: 'ACCEPT_CLAIM',
-  confidence: 0.88,
+  action: 'MAKE_OFFER',
+  offer_type: 'REFUND_WITH_RETURN',
+  offer_amount: '89.00',
+  confidence: 0.84,
   needs_human: true,
   reasoning:
-    'The agent bought black trainers although the mandate required white. The merchant delivered what was ordered, but the cart violated the mandate, so the loss belongs to the agent side.',
+    'The listing never stated a size, so the guard could not confirm the mandate\'s size 10 requirement. The merchant sent what was listed. The agent bought without confirming the size, so a refund with return is a fair split.',
   evidence_points: [
-    { claim: 'Mandate required color=white', source: 'mandates.constraints.required_attributes.color' },
-    { claim: 'Cart contained color=black', source: 'carts.cart.items[0].attributes.color' },
+    { claim: 'The mandate required size 10.', source: 'mandate.constraints.required_attributes.size' },
+    { claim: 'The cart listing has no size attribute.', source: 'cart.items[0].attributes' },
+    { claim: 'The buyer received size 9.', source: 'dispute.messages[0].text' },
   ],
 };
 
@@ -168,8 +206,8 @@ export const verdictBuyerRegret: Verdict = {
   reasoning:
     'The cart matched the mandate exactly and the item was delivered as listed. The buyer simply changed their mind. The merchant should defend with the signed mandate.',
   evidence_points: [
-    { claim: 'Cart matched every mandate rule', source: 'carts.guard.verdict' },
-    { claim: 'Carrier shows item delivered', source: 'cases.raw_dispute.tracking.status' },
+    { claim: 'Cart matched every mandate rule', source: 'guard.verdict' },
+    { claim: 'Carrier shows item delivered', source: 'dispute.tracking.status' },
   ],
 };
 
@@ -181,8 +219,23 @@ export const verdictWrongProduct: Verdict = {
   reasoning:
     'The cart is inside the mandate, but the buyer says the product is the wrong model. The mandate only constrains colour and size, so fault cannot be decided without a person.',
   evidence_points: [
-    { claim: 'Mandate does not name a model', source: 'mandates.constraints' },
-    { claim: 'Buyer says model is wrong', source: 'cases.raw_dispute.messages[0]' },
+    { claim: 'Mandate does not name a model', source: 'mandate.constraints' },
+    { claim: 'Buyer says model is wrong', source: 'dispute.messages[0].text' },
+  ],
+};
+
+/** Used when analysing the pending case, so Analyse works in demo mode. */
+export const verdictNotReceived: Verdict = {
+  fault: 'merchant',
+  action: 'MAKE_OFFER',
+  offer_type: 'REFUND',
+  offer_amount: '89.00',
+  confidence: 0.85,
+  needs_human: false,
+  reasoning: 'No delivery is recorded for this order and the buyer says nothing arrived, so a refund is the fair outcome.',
+  evidence_points: [
+    { claim: 'The buyer says the item never arrived.', source: 'dispute.reason' },
+    { claim: 'The cart matched the mandate, so the order itself was valid.', source: 'mandate.constraints.max_total.value' },
   ],
 };
 
@@ -216,7 +269,7 @@ export const cases: CaseRecord[] = [
     paypal_order_id: 'ORD-1002',
     mandate_id: mandate.mandate_id,
     reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED',
-    amount: { value: '119.00', currency: USD },
+    amount: { value: '89.00', currency: USD },
     verdict: verdictAgentError,
     analysis_status: 'awaiting_human',
   },
@@ -255,34 +308,46 @@ export const cases: CaseRecord[] = [
   },
 ];
 
-/** Response of GET /api/cases/:id: CaseRecord plus mandate, cart and order (see contracts/api.md). */
-export type CaseDetail = CaseRecord & {
-  mandate: typeof mandate | null;
-  cart: Cart | null;
-  order: { paypal_order_id: string; capture_id: string | null; status: string; receipt_hash: string | null } | null;
-};
+/** Response of GET /api/cases/:id. Same type A's route returns, so fixtures cannot drift from the real shape. */
+export type { CaseDetail } from '../lib/paypal/cases';
+import type { CaseDetail } from '../lib/paypal/cases';
 
-const cartForCase: Record<string, Cart> = {
-  'PP-D-1001': cartAllowed,
-  'PP-D-1002': cartBlocked,
-  'PP-D-1003': cartAllowed,
-  'PP-D-1004': cartNeedsApproval,
-  'PP-D-1005': cartAllowed,
+const cartForCase: Record<string, { cart: Cart; guard: GuardResult; approvedBy: 'agent' | 'buyer' }> = {
+  'PP-D-1001': { cart: cartAllowed, guard: guardAllow, approvedBy: 'agent' },
+  'PP-D-1002': { cart: cartNoSize, guard: guardUnsure, approvedBy: 'buyer' },
+  'PP-D-1003': { cart: cartAllowed, guard: guardAllow, approvedBy: 'agent' },
+  'PP-D-1004': { cart: cartNeedsApproval, guard: guardEscalate, approvedBy: 'buyer' },
+  'PP-D-1005': { cart: cartAllowed, guard: guardAllow, approvedBy: 'agent' },
 };
 
 export function caseDetail(id: string): CaseDetail | undefined {
   const record = cases.find((c) => c.dispute_id === id);
   if (!record) return undefined;
+  const link = cartForCase[id];
   return {
     ...record,
-    mandate,
-    cart: cartForCase[id] ?? null,
+    mandate: {
+      mandate_id: mandate.mandate_id,
+      buyer_ref: mandate.buyer_ref,
+      constraints: mandate.constraints,
+      expires_at: mandate.expires_at,
+    },
+    cart: link
+      ? {
+          cart_id: 'cart_' + id.toLowerCase(),
+          cart: link.cart,
+          guard: link.guard,
+          approved_by: link.approvedBy,
+          total_minor: Math.round(Number(link.guard.total) * 100),
+        }
+      : null,
     order: record.paypal_order_id
       ? {
           paypal_order_id: record.paypal_order_id,
           capture_id: record.capture_id,
           status: 'COMPLETED',
           receipt_hash: 'sha256:fixture' + id.toLowerCase(),
+          captured_at: '2026-11-05T09:30:00Z',
         }
       : null,
   };

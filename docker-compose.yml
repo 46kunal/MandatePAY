@@ -1,9 +1,13 @@
-# Local Postgres for development. Everything stays on your machine.
+# Local stack. Everything stays on your machine.
+#
+#   docker compose up --build     starts Postgres and the app on http://localhost:3000
+#   npm run db:up                 starts only Postgres (for `npm run dev` on the host)
+#
 # Host port 5434 avoids clashes with other local Postgres instances.
 # These credentials are for local development only.
 #
-# Later (owner: C): add an `app` service here so a judge can run the whole
-# project with `docker compose up`.
+# The app runs in demo mode: migrations are applied and the demo disputes are loaded on every start, so no
+# PayPal credentials or LLM key are needed. To use PayPal sandbox, put the keys in .env (see .env.example).
 services:
   db:
     image: postgres:16
@@ -22,5 +26,38 @@ services:
       timeout: 3s
       retries: 20
 
+  app:
+    build:
+      context: .
+      args:
+        # Baked into the browser bundle. Leave empty to use the simulated PayPal button.
+        NEXT_PUBLIC_PAYPAL_CLIENT_ID: ${NEXT_PUBLIC_PAYPAL_CLIENT_ID:-}
+    container_name: mandatepay-app
+    depends_on:
+      db:
+        condition: service_healthy
+    # Optional: PayPal / LLM keys from your local .env. Values below win over the file.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://mandatepay:mandatepay@db:5432/mandatepay
+      APP_BASE_URL: http://localhost:3000
+      DEMO_MODE: "true"
+      SEED_ON_START: "true"
+      KEY_DIR: /app/.keys
+    ports:
+      - "3000:3000"
+    volumes:
+      # Keeps the mandate signing keys across restarts so stored mandates still verify.
+      - mandatepay-keys:/app/.keys
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
 volumes:
   mandatepay-pgdata:
+  mandatepay-keys:
