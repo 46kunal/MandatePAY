@@ -11,7 +11,7 @@ import { verifyOpenMandate, type KeyOptions } from './jws';
 
 export type CheckCartOutcome =
   | { ok: true; guard: GuardResult; constraints: Constraints; mandateId: string }
-  | { ok: false; status: 404 | 410 | 422; error: 'mandate_not_found' | 'mandate_expired' | 'mandate_invalid'; message: string };
+  | { ok: false; status: 404 | 410 | 422; error: 'mandate_not_found' | 'mandate_expired' | 'mandate_invalid' | 'mandate_revoked'; message: string };
 
 export interface CheckCartOptions extends KeyOptions {
   /** Unix seconds, injectable for tests. */
@@ -49,5 +49,6 @@ export async function checkCartById(mandateId: string, cart: Cart, opts: CheckCa
   const [{ eq }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
   const [row] = await db.select().from(schema.mandates).where(eq(schema.mandates.mandateId, mandateId)).limit(1);
   if (!row) return { ok: false, status: 404, error: 'mandate_not_found', message: `No mandate with id ${mandateId}.` };
+  if (row.revokedAt) return { ok: false, status: 410, error: 'mandate_revoked', message: 'The buyer revoked this mandate. Sign a new one to keep shopping.' };
   return checkCart(row.jws, cart, opts);
 }

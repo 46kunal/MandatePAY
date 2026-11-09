@@ -17,6 +17,8 @@ import { cartTotalMinor } from './orders';
 export interface MandateRow {
   mandateId: string;
   jws: string;
+  /** Set when the buyer revoked the mandate: no new orders. */
+  revokedAt?: Date | null;
 }
 
 export interface CartRow {
@@ -101,6 +103,9 @@ export async function placeOrder(
   const mandate = await store.getMandate(input.mandateId);
   if (!mandate) {
     return { ok: false, httpStatus: 404, error: 'mandate_not_found', message: `No mandate with id ${input.mandateId}.` };
+  }
+  if (mandate.revokedAt) {
+    return { ok: false, httpStatus: 410, error: 'mandate_revoked', message: 'The buyer revoked this mandate. Sign a new one to keep shopping.' };
   }
 
   // Constraints come from the signed token, never from the database column.

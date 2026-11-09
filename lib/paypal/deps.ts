@@ -51,7 +51,7 @@ export function drizzleStore(): LedgerStore {
     async getMandate(mandateId) {
       const { eq, db, schema } = await load();
       const [row] = await db.select().from(schema.mandates).where(eq(schema.mandates.mandateId, mandateId)).limit(1);
-      return row ? { mandateId: row.mandateId, jws: row.jws } : undefined;
+      return row ? { mandateId: row.mandateId, jws: row.jws, revokedAt: row.revokedAt } : undefined;
     },
     async getCart(cartId) {
       const { eq, db, schema } = await load();

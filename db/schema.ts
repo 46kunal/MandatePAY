@@ -17,6 +17,7 @@ export const users = pgTable('users', {
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
   role: text('role').notNull().default('buyer'),
+  disabledAt: ts('disabled_at'), // set by an admin: the person cannot sign in and existing sessions stop working
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
@@ -91,6 +92,7 @@ export const mandates = pgTable('mandates', {
   constraints: jsonb('constraints').$type<Constraints>().notNull(),
   jws: text('jws').notNull(), // signed OpenMandatePayload
   expiresAt: ts('expires_at').notNull(),
+  revokedAt: ts('revoked_at'), // set when the buyer withdraws it: no new carts or orders after this
   createdAt: ts('created_at').notNull().defaultNow(),
 });
 
@@ -189,3 +191,22 @@ export const settings = pgTable('settings', {
   minConfidence: real('min_confidence'),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
+
+/**
+ * Who changed what, and when. Written for settings, roles, account status, mandate revocations and dispute actions.
+ * Append-only: nothing updates or deletes rows. actor_email is copied so the entry still reads right if the user changes.
+ */
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: text('id').primaryKey(),
+    at: ts('at').notNull().defaultNow(),
+    actorId: text('actor_id'), // null for the system (webhooks, scripts)
+    actorEmail: text('actor_email'),
+    action: text('action').notNull(), // e.g. settings.update, user.role, user.disable, mandate.revoke, case.act
+    targetType: text('target_type'),
+    targetId: text('target_id'),
+    details: jsonb('details').$type<Record<string, unknown>>(),
+  },
+  (t) => [index('audit_log_at_idx').on(t.at)],
+);

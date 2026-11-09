@@ -1,5 +1,6 @@
 import { UpdateStoreSettingsRequest } from '@/contracts/schemas';
 import { apiError } from '@/lib/http';
+import { audit } from '@/lib/audit';
 import { getSettings, updateSettings } from '@/lib/settings';
 import { requirePermission } from '@/lib/auth/guard';
 
@@ -20,5 +21,7 @@ export async function PATCH(req: Request) {
   if (!authz.ok) return authz.response;
   const body = UpdateStoreSettingsRequest.safeParse(await req.json().catch(() => null));
   if (!body.success) return apiError(400, 'invalid_request', 'Invalid settings', body.error.issues);
-  return Response.json(await updateSettings(body.data));
+  const saved = await updateSettings(body.data);
+  await audit(authz.user, { action: 'settings.update', targetType: 'settings', targetId: 'store', details: { changed: body.data } });
+  return Response.json(saved);
 }

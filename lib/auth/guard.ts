@@ -33,7 +33,8 @@ export async function sessionUser(headers: Headers): Promise<SessionUser | null>
   const { auth } = await import('./server');
   const s = await auth.api.getSession({ headers });
   if (!s?.user) return null;
-  const u = s.user as { id: string; email: string; name: string; role?: string | null };
+  const u = s.user as { id: string; email: string; name: string; role?: string | null; disabledAt?: Date | string | null };
+  if (u.disabledAt) return null; // disabled after this session started
   return { id: u.id, email: u.email, name: u.name, role: u.role ?? 'buyer' };
 }
 

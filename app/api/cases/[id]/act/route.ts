@@ -4,6 +4,7 @@ import { PayPalConfigError } from '@/lib/paypal';
 import { actOnCase } from '@/lib/paypal/caseActions';
 import { toCaseRecord } from '@/lib/paypal/cases';
 import { defaultActDeps } from '@/lib/paypal/deps';
+import { audit } from '@/lib/audit';
 import { authorize, requirePermission } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
@@ -40,6 +41,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       actedBy: authz.user.id,
     });
     if (!result.ok) return apiError(result.httpStatus, result.error, result.message, result.details);
+    await audit(authz.user, {
+      action: 'case.act',
+      targetType: 'case',
+      targetId: id,
+      details: { action: result.action, human_approved: parsed.data.human_approved, override: parsed.data.override ?? null },
+    });
     return Response.json(toCaseRecord(result.row));
   } catch (err) {
     if (err instanceof PayPalConfigError) return apiError(500, 'paypal_not_configured', err.message);

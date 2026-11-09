@@ -29,6 +29,20 @@
       "when": 1794256729456,
       "tag": "0003_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794258613619,
+      "tag": "0004_phase2",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794258629832,
+      "tag": "0005_audit_revoke",
+      "breakpoints": true
     }
   ]
 }
