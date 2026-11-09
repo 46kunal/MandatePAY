@@ -27,6 +27,15 @@ function memoryStore() {
     getOrder: async (id) => orders.get(id),
     insertCart: async (r) => void carts.set(r.cartId, r),
     insertOrder: async (r) => void orders.set(r.paypalOrderId, r),
+    findOpenOrder: async (q) => {
+      const hit = [...orders.values()]
+        .reverse()
+        .find((o) => {
+          const c = carts.get(o.cartId);
+          return o.mandateId === q.mandateId && !o.captureId && c?.cartHash === q.cartHash && c.approvedBy === q.approvedBy;
+        });
+      return hit && { paypalOrderId: hit.paypalOrderId, approveUrl: hit.approveUrl, cartId: hit.cartId };
+    },
     markCaptured: async (id, f) => {
       const o = orders.get(id);
       if (!o || o.captureId) return false;
@@ -100,6 +109,32 @@ describe('placeOrder', () => {
     assert.equal(cart.totalMinor, 5000);
     assert.equal(cart.cartHash, hashCart(goodCart));
     assert.equal(t.orders.get('ORDER1')!.cartId, r.cartId);
+  });
+
+  it('a second checkout click for the same cart reuses the open order instead of creating another', async () => {
+    const t = await setup(constraints);
+    const first = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });
+    const again = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });
+    assert.ok(first.ok && again.ok && first.status === 'created' && again.status === 'created');
+    assert.equal(again.paypalOrderId, first.paypalOrderId);
+    assert.equal(again.cartId, first.cartId);
+    assert.equal(t.paypal.created.length, 1);
+    assert.equal(t.orders.size, 1);
+  });
+
+  it('a changed cart or a captured order gets a new order', async () => {
+    const t = await setup(constraints);
+    const first = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });
+    const twoPairs: Cart = { ...goodCart, items: [{ ...goodCart.items[0], quantity: 2 }] };
+    const changed = await placeOrder(t.deps, { mandateId: t.mandateId, cart: twoPairs, buyerApproved: false });
+    assert.ok(first.ok && changed.ok && first.status === 'created' && changed.status === 'created');
+    assert.notEqual(changed.paypalOrderId, first.paypalOrderId);
+
+    await captureStoredOrder(t.deps, first.paypalOrderId);
+    const afterPaid = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });
+    assert.ok(afterPaid.ok && afterPaid.status === 'created');
+    assert.notEqual(afterPaid.paypalOrderId, first.paypalOrderId);
+    assert.equal(t.paypal.created.length, 3);
   });
 
   it('blocks a cart that violates the mandate: 422, recorded, never sent to PayPal', async () => {

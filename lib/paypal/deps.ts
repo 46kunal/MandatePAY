@@ -20,11 +20,34 @@ import type { CartRow, LedgerStore, OrderDeps, OrderRow } from './service';
 /** Drizzle-backed ledger. The DB client is imported lazily so unit tests never need DATABASE_URL. */
 export function drizzleStore(): LedgerStore {
   const load = async () => {
-    const [{ and, eq, isNull }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
-    return { and, eq, isNull, db, schema };
+    const [{ and, desc, eq, gte, isNull }, { db, schema }] = await Promise.all([
+      import('drizzle-orm'),
+      import('../../db/client'),
+    ]);
+    return { and, desc, eq, gte, isNull, db, schema };
   };
 
   return {
+    async findOpenOrder(q) {
+      const { and, desc, eq, gte, isNull, db, schema } = await load();
+      const { orders, carts } = schema;
+      const [row] = await db
+        .select({ paypalOrderId: orders.paypalOrderId, approveUrl: orders.approveUrl, cartId: orders.cartId })
+        .from(orders)
+        .innerJoin(carts, eq(carts.cartId, orders.cartId))
+        .where(
+          and(
+            eq(orders.mandateId, q.mandateId),
+            eq(carts.cartHash, q.cartHash),
+            eq(carts.approvedBy, q.approvedBy),
+            isNull(orders.captureId),
+            gte(orders.createdAt, q.since),
+          ),
+        )
+        .orderBy(desc(orders.createdAt))
+        .limit(1);
+      return row;
+    },
     async getMandate(mandateId) {
       const { eq, db, schema } = await load();
       const [row] = await db.select().from(schema.mandates).where(eq(schema.mandates.mandateId, mandateId)).limit(1);

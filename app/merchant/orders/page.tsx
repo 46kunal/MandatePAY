@@ -11,6 +11,13 @@ import { shortHash } from '../../_ui/parse';
 import u from '../../_ui/ui.module.css';
 import m from '../merchant.module.css';
 
+/** An unpaid order older than this can no longer be approved by the buyer: it is an abandoned checkout. */
+const ABANDONED_AFTER_MS = 3 * 60 * 60 * 1000;
+
+function isAbandoned(o: OrderSummary, now: number): boolean {
+  return !o.capture_id && o.status !== 'APPROVED' && now - Date.parse(o.created_at) > ABANDONED_AFTER_MS;
+}
+
 /** PayPal order status in words a merchant uses. */
 function paymentLabel(status: string): { text: string; tone: 'good' | 'warn' | 'neutral' } {
   switch (status) {
@@ -31,7 +38,8 @@ function paymentLabel(status: string): { text: string; tone: 'good' | 'warn' | '
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [onlyPaid, setOnlyPaid] = useState(false);
+  const [showAbandoned, setShowAbandoned] = useState(false);
+  const [now] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     setError(null);
@@ -46,7 +54,8 @@ export default function OrdersPage() {
     void load();
   }, [load]);
 
-  const rows = orders?.filter((o) => !onlyPaid || o.status === 'COMPLETED') ?? null;
+  const abandoned = orders?.filter((o) => isAbandoned(o, now)).length ?? 0;
+  const rows = orders?.filter((o) => showAbandoned || !isAbandoned(o, now)) ?? null;
   const paidCount = orders?.filter((o) => o.status === 'COMPLETED').length ?? 0;
 
   return (
@@ -77,16 +86,23 @@ export default function OrdersPage() {
       {rows && orders && orders.length > 0 && (
         <Card
           flush
-          title={`${orders.length} order${orders.length === 1 ? '' : 's'} · ${paidCount} paid`}
+          title={`${orders.length - abandoned} order${orders.length - abandoned === 1 ? '' : 's'} · ${paidCount} paid`}
           actions={
-            <label className={u.muted} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-              <input type="checkbox" checked={onlyPaid} onChange={(e) => setOnlyPaid(e.target.checked)} />
-              Paid only
-            </label>
+            abandoned > 0 ? (
+              <label className={u.muted} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <input type="checkbox" checked={showAbandoned} onChange={(e) => setShowAbandoned(e.target.checked)} />
+                Show {abandoned} abandoned checkout{abandoned === 1 ? '' : 's'}
+              </label>
+            ) : undefined
           }
         >
           <div className={u.tableWrap}>
-            <table className={u.table}>
+            {rows.length === 0 && (
+              <div style={{ padding: '1rem' }}>
+                <EmptyState title="No current orders">Only abandoned checkouts so far. Tick the box above to see them.</EmptyState>
+              </div>
+            )}
+            <table className={u.table} hidden={rows.length === 0}>
               <thead>
                 <tr>
                   <th scope="col">Order</th>
@@ -101,7 +117,7 @@ export default function OrdersPage() {
               </thead>
               <tbody>
                 {rows.map((o) => {
-                  const p = paymentLabel(o.status);
+                  const p = isAbandoned(o, now) ? { text: 'Abandoned', tone: 'neutral' as const } : paymentLabel(o.status);
                   return (
                     <tr key={o.paypal_order_id}>
                       <td className={u.mono} title={o.capture_id ? `Capture ${o.capture_id}` : undefined}>
