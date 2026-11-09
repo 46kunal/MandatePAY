@@ -1,7 +1,7 @@
 'use client';
-// OWNER: C. Buyer view: request box -> mandate card + Confirm -> cart preview (pass/fail per guard rule).
-// Uses apiFetch, which falls back to fixtures when a route answers 501 (see fixtures/api.ts).
-// PayPal checkout (C3) lives in ./Checkout.tsx, shown below the guard result.
+// OWNER: C. Buyer view: request -> mandate -> product recommendations -> cart and mandate check -> checkout.
+// Uses apiFetch, which falls back to sample responses only when the backend cannot answer (see fixtures/api.ts).
+// The product list is a demo catalogue (fixtures), not real PayPal listings, and is labelled that way.
 import { useState } from 'react';
 import type {
   Cart,
@@ -13,7 +13,7 @@ import type {
 import type { z } from 'zod';
 import { ApiClientError, apiFetch } from '@/fixtures/api';
 import { cartAllowed, cartBlocked, cartNeedsApproval } from '@/fixtures';
-import { Badge, Shell } from '../_ui/Shell';
+import { Badge, Card, Notice, PageHeader, ResultMark } from '../_ui/Ui';
 import { CHECK_RESULT, formatDay, formatMoney, ruleLabel, titleCase } from '../_ui/labels';
 import u from '../_ui/ui.module.css';
 import Checkout from './Checkout';
@@ -24,11 +24,12 @@ type Created = z.infer<typeof CreateMandateResponse>;
 
 const BUYER_REF = 'buyer_demo';
 const EXAMPLE = 'Buy me white trainers, size 10, under 110 USD, delivered by Nov 20.';
+const STEPS = ['Request', 'Mandate', 'Products', 'Review', 'Checkout'];
 
-const CART_OPTIONS: { key: string; label: string; cart: Cart }[] = [
-  { key: 'allowed', label: 'Matches the mandate', cart: cartAllowed },
-  { key: 'approval', label: 'Needs my approval', cart: cartNeedsApproval },
-  { key: 'blocked', label: 'Violates the mandate', cart: cartBlocked },
+const PRODUCTS: { key: string; cart: Cart }[] = [
+  { key: 'a', cart: cartAllowed },
+  { key: 'b', cart: cartNeedsApproval },
+  { key: 'c', cart: cartBlocked },
 ];
 
 function errMsg(e: unknown): string {
@@ -36,28 +37,20 @@ function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong';
 }
 
-const money = formatMoney;
-
-/** Numbered step marker that turns into a tick once the step is done. */
-function StepNum({ n, done }: { n: number; done: boolean }) {
-  return (
-    <span className={`${s.num} ${done ? s.numDone : ''}`} aria-label={done ? `Step ${n} done` : `Step ${n}`}>
-      {done ? '✓' : n}
-    </span>
-  );
-}
-
 export default function BuyerPage() {
   const [text, setText] = useState(EXAMPLE);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [mandate, setMandate] = useState<Created | null>(null);
-  const [cartKey, setCartKey] = useState(CART_OPTIONS[0].key);
+  const [selected, setSelected] = useState<string | null>(null);
   const [guard, setGuard] = useState<GuardResult | null>(null);
   const [busy, setBusy] = useState<'draft' | 'confirm' | 'check' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [usingFixtures, setUsingFixtures] = useState(false);
+  const [paid, setPaid] = useState(false);
 
-  const cart = CART_OPTIONS.find((c) => c.key === cartKey)!.cart;
+  const cart = PRODUCTS.find((p) => p.key === selected)?.cart ?? null;
+  // A blocked cart cannot be checked out, so the progress stays on "Review" until the buyer picks something else.
+  const current = paid ? 5 : !draft ? 0 : !mandate ? 1 : !selected ? 2 : !guard || guard.verdict === 'block' ? 3 : 4;
 
   async function run<T>(kind: NonNullable<typeof busy>, fn: () => Promise<{ data: T; fromFixture: boolean }>) {
     setBusy(kind);
@@ -79,7 +72,9 @@ export default function BuyerPage() {
     if (data) {
       setDraft(data);
       setMandate(null);
+      setSelected(null);
       setGuard(null);
+      setPaid(false);
     }
   }
 
@@ -90,222 +85,245 @@ export default function BuyerPage() {
     );
     if (data) {
       setMandate(data);
+      setSelected(null);
       setGuard(null);
     }
   }
 
-  async function onCheck(key = cartKey) {
+  /** Adding to the cart checks it against the mandate straight away, so the result is never out of date. */
+  async function addToCart(key: string) {
     if (!mandate) return;
-    const picked = CART_OPTIONS.find((c) => c.key === key)!.cart;
+    const picked = PRODUCTS.find((p) => p.key === key)!.cart;
+    setSelected(key);
+    setGuard(null);
+    setPaid(false);
     const data = await run('check', () =>
       apiFetch<GuardResult>('/api/carts/check', { body: { mandate_id: mandate.mandate_id, cart: picked } }),
     );
     if (data) setGuard(data);
   }
 
-  function pickCart(key: string) {
-    setCartKey(key);
+  function removeFromCart() {
+    setSelected(null);
     setGuard(null);
+    setPaid(false);
   }
 
   return (
-    <Shell active="buyer">
-      <div className={u.pageHead}>
-        <div>
-          <h1 className={u.h1}>Buy with an AI agent</h1>
-          <p className={u.sub}>You set the limits. Every purchase is checked against them before PayPal is charged.</p>
-        </div>
-      </div>
+    <>
+      <PageHeader
+        title="Buy with an AI agent"
+        subtitle="You set the limits. Every purchase is checked against them before PayPal is charged."
+      />
 
-      {usingFixtures && (
-        <div className={s.banner} role="status">
-          Sample data: the server is not available for some steps, so example responses are shown.
-        </div>
+      <ol className={s.stepper} aria-label="Progress">
+        {STEPS.map((label, i) => {
+          const done = i < current;
+          const cls = done ? s.stepDone : i === current ? s.stepCurrent : '';
+          return (
+            <li key={label} className={`${s.step} ${cls}`} aria-current={i === current ? 'step' : undefined}>
+              <span className={s.stepNum}>{done ? '✓' : i + 1}</span>
+              <span>{label}</span>
+            </li>
+          );
+        })}
+      </ol>
+
+      {usingFixtures && <Notice tone="warn">Sample data: the server could not answer some steps, so example responses are shown.</Notice>}
+      {error && (
+        <Notice tone="bad" alert>
+          {error}
+        </Notice>
       )}
 
       {/* 1. Request */}
-      <section className={s.step}>
-        <h2 className={s.stepTitle}>
-          <StepNum n={1} done={!!draft} /> Tell your agent what to buy
-        </h2>
-        <p className={s.hint}>Write it the way you would tell a person. We turn it into limits you can review.</p>
+      <Card id="request" title="1. What do you want to buy?" subtitle="Write it the way you would tell a person. We turn it into limits you can review.">
+        <label className={u.srOnly} htmlFor="request-text">
+          Purchase request
+        </label>
         <textarea
+          id="request-text"
           className={s.textarea}
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={1000}
-          aria-label="Purchase request"
         />
-        <div className={s.row}>
+        <div className={u.row} style={{ marginTop: '0.75rem' }}>
           <button className={u.btn} onClick={onDraft} disabled={busy !== null || text.trim() === ''}>
-            {busy === 'draft' ? 'Drafting…' : draft ? 'Draft again' : 'Draft mandate'}
+            {busy === 'draft' ? 'Working…' : draft ? 'Update mandate' : 'Create mandate'}
           </button>
-          <span className={s.muted}>{text.length}/1000</span>
+          <span className={`${u.muted} ${s.count}`}>{text.length}/1000</span>
         </div>
-      </section>
+      </Card>
 
-      {error && (
-        <div className={s.error} role="alert">
-          {error}
-        </div>
-      )}
-
-      {/* 2. Mandate card */}
+      {/* 2. Mandate */}
       {draft && (
-        <section className={s.step}>
-          <h2 className={s.stepTitle}>
-            <StepNum n={2} done={!!mandate} /> Review your mandate
-          </h2>
-          <p className={s.hint}>These are your limits. Once you confirm, they are signed and nothing outside them can be bought.</p>
-          <MandateCard constraints={draft.constraints} />
+        <Card
+          id="mandate"
+          title="2. Review your mandate"
+          subtitle="These are your limits. Once you confirm, they are signed and nothing outside them can be bought."
+          actions={mandate ? <Badge tone="good">✓ Signed</Badge> : undefined}
+        >
+          <MandateSummary constraints={draft.constraints} />
           {draft.warnings.length > 0 && (
-            <ul className={s.warnings}>
-              {draft.warnings.map((w) => (
-                <li key={w}>{w}</li>
-              ))}
-            </ul>
+            <div style={{ marginTop: '0.9rem' }}>
+              <Notice tone="warn">
+                <strong>Check these assumptions:</strong>
+                <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.1rem' }}>
+                  {draft.warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+              </Notice>
+            </div>
           )}
-          <div className={s.row}>
+          <div className={u.row} style={{ marginTop: '0.9rem' }}>
             {mandate ? (
-              <>
-                <Badge tone="good">✓ Mandate signed</Badge>
-                <span className={s.muted}>Confirmed · {mandate.mandate_id}</span>
-              </>
+              <span className={u.muted}>
+                Confirmed as {mandate.mandate_id} · valid until {formatDay(mandate.expires_at)}
+              </span>
             ) : (
               <button className={u.btn} onClick={onConfirm} disabled={busy !== null}>
-                {busy === 'confirm' ? 'Signing…' : 'Confirm & sign mandate'}
+                {busy === 'confirm' ? 'Signing…' : 'Confirm and sign mandate'}
               </button>
             )}
-            {mandate && <span className={s.muted}>Valid until {formatDay(mandate.expires_at)}</span>}
           </div>
-        </section>
+        </Card>
       )}
 
-      {/* 3. Cart preview */}
+      {/* 3. Products */}
       {mandate && (
-        <section className={s.step}>
-          <h2 className={s.stepTitle}>
-            <StepNum n={3} done={false} /> Cart your agent wants to buy
-          </h2>
-          <p className={s.hint}>Pick what your agent found. It is checked against your limits before PayPal is charged.</p>
-          <div className={s.chips} role="group" aria-label="Sample agent cart">
-            {CART_OPTIONS.map((o) => (
-              <button
-                key={o.key}
-                className={`${s.chip} ${o.key === cartKey ? s.chipOn : ''}`}
-                onClick={() => pickCart(o.key)}
-                aria-pressed={o.key === cartKey}
-              >
-                {o.label}
-              </button>
-            ))}
+        <Card
+          id="products"
+          title="3. Choose a product"
+          subtitle="Demo catalogue: sample products for this demo, not real PayPal listings. Adding one checks it against your mandate."
+        >
+          <div className={s.products}>
+            {PRODUCTS.map((p) => {
+              const item = p.cart.items[0];
+              const on = selected === p.key;
+              return (
+                <div key={p.key} className={`${s.product} ${on ? s.productOn : ''}`}>
+                  <div className={s.productName}>{item.name}</div>
+                  <div className={u.muted}>{p.cart.merchant}</div>
+                  <div className={s.price}>{formatMoney(item.unit_price, p.cart.currency)}</div>
+                  <div className={s.chips}>
+                    {Object.entries(item.attributes ?? {}).map(([k, v]) => (
+                      <span key={k} className={s.chip}>
+                        {titleCase(k)}: {v}
+                      </span>
+                    ))}
+                  </div>
+                  <div className={u.muted}>{p.cart.delivery_eta ? `Delivery by ${formatDay(p.cart.delivery_eta)}` : 'No delivery estimate'}</div>
+                  <div className={s.productFoot}>
+                    <button
+                      className={`${u.btn} ${on ? u.btnSecondary : ''}`}
+                      onClick={() => addToCart(p.key)}
+                      disabled={busy !== null || on}
+                      aria-label={`${on ? 'In cart' : 'Add to cart'}: ${item.name}, ${formatMoney(item.unit_price, p.cart.currency)}`}
+                    >
+                      {on ? 'In your cart' : 'Add to cart'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <CartView cart={cart} />
-          <div className={s.row}>
-            <button className={guard ? `${u.btn} ${u.btnGhost}` : u.btn} onClick={() => onCheck()} disabled={busy !== null}>
-              {busy === 'check' ? 'Checking…' : 'Check against mandate'}
-            </button>
-          </div>
+        </Card>
+      )}
+
+      {/* 4. Cart and mandate check, 5. Checkout */}
+      {mandate && cart && (
+        <Card id="cart" title="4. Your cart and mandate check">
+          {cart.items.map((i) => (
+            <div key={i.sku} className={s.cartItem}>
+              <div>
+                <strong>{i.name}</strong> × {i.quantity}
+                <div className={u.muted}>
+                  {Object.entries(i.attributes ?? {}).map(([k, v]) => `${titleCase(k)}: ${v}`).join(' · ')}
+                </div>
+                <div className={u.muted}>{cart.merchant}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className={s.price}>{formatMoney(i.unit_price, cart.currency)}</div>
+                <button className={`${u.btn} ${u.btnSecondary}`} style={{ marginTop: '0.4rem' }} onClick={removeFromCart} disabled={busy !== null}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {busy === 'check' && !guard && <p className={u.muted}>Checking this cart against your mandate…</p>}
           {guard && <GuardView guard={guard} />}
           {guard && (
             <Checkout
-              key={`${mandate.mandate_id}:${cartKey}`}
+              key={`${mandate.mandate_id}:${selected}`}
               mandateId={mandate.mandate_id}
               cart={cart}
               guard={guard}
               onFixture={() => setUsingFixtures(true)}
+              onPaid={() => setPaid(true)}
             />
           )}
-        </section>
+        </Card>
       )}
-    </Shell>
+    </>
   );
 }
 
-function MandateCard({ constraints: c }: { constraints: Constraints }) {
+function MandateSummary({ constraints: c }: { constraints: Constraints }) {
+  const attrs = Object.entries(c.required_attributes ?? {});
   return (
-    <dl className={s.grid}>
-      <div>
-        <dt>Max total</dt>
-        <dd>{money(c.max_total.value, c.max_total.currency)}</dd>
-      </div>
-      <div>
-        <dt>Categories</dt>
+    <>
+      <dl className={u.kv}>
+        <dt>Budget</dt>
+        <dd>Up to {formatMoney(c.max_total.value, c.max_total.currency)}</dd>
+        <dt>Product type</dt>
         <dd>{c.categories?.length ? c.categories.join(', ') : 'Any'}</dd>
-      </div>
-      <div>
-        <dt>Max quantity</dt>
-        <dd>{c.max_quantity ?? 'Any'}</dd>
-      </div>
-      <div>
-        <dt>Required details</dt>
-        <dd>
-          {c.required_attributes && Object.keys(c.required_attributes).length
-            ? Object.entries(c.required_attributes)
-                .map(([k, v]) => `${titleCase(k)}: ${v}`)
-                .join(' · ')
-            : 'None'}
-        </dd>
-      </div>
-      <div>
-        <dt>Deliver by</dt>
+        <dt>Size and attributes</dt>
+        <dd>{attrs.length ? attrs.map(([k, v]) => `${titleCase(k)}: ${v}`).join(' · ') : 'None specified'}</dd>
+        <dt>Quantity</dt>
+        <dd>{c.max_quantity !== undefined ? `At most ${c.max_quantity}` : 'Any'}</dd>
+        <dt>Delivery deadline</dt>
         <dd>{c.deadline ? formatDay(c.deadline) : 'No deadline'}</dd>
-      </div>
-      <div>
-        <dt>Ask me first over</dt>
-        <dd>{c.require_approval_over ? money(c.require_approval_over, c.max_total.currency) : 'Never'}</dd>
-      </div>
-    </dl>
+        <dt>Approval needed</dt>
+        <dd>{c.require_approval_over ? `Above ${formatMoney(c.require_approval_over, c.max_total.currency)}` : 'Never'}</dd>
+      </dl>
+      {c.request_text && <p className={s.quote}>You said: &ldquo;{c.request_text}&rdquo;</p>}
+    </>
   );
 }
 
-function CartView({ cart }: { cart: Cart }) {
-  return (
-    <div className={s.cart}>
-      {cart.items.map((i) => (
-        <div key={i.sku} className={s.cartItem}>
-          <div>
-            <strong>{i.name}</strong> × {i.quantity}
-            <div className={s.muted}>
-              {i.attributes ? Object.entries(i.attributes).map(([k, v]) => `${titleCase(k)}: ${v}`).join(' · ') : ''}
-            </div>
-          </div>
-          <div className={s.price}>{money(i.unit_price, cart.currency)}</div>
-        </div>
-      ))}
-      <div className={s.muted}>
-        {cart.merchant ?? 'Unknown merchant'}
-        {cart.delivery_eta ? ` · delivery by ${formatDay(cart.delivery_eta)}` : ''}
-      </div>
-    </div>
-  );
-}
-
-const VERDICT_TEXT: Record<GuardResult['verdict'], { cls: string; text: string }> = {
-  allow: { cls: s.verdictAllow, text: 'Allowed: every rule passed.' },
-  block: { cls: s.verdictBlock, text: 'Blocked: this cart breaks your mandate. No order will be created.' },
-  escalate: { cls: s.verdictEscalate, text: 'Needs your approval before it can be bought.' },
+const VERDICT_TEXT: Record<GuardResult['verdict'], { cls: string; text: string; mark: 'pass' | 'fail' | 'escalate' }> = {
+  allow: { cls: s.verdictAllow, text: 'Every rule passed. This cart matches your mandate.', mark: 'pass' },
+  block: { cls: s.verdictBlock, text: 'Blocked. This cart breaks your mandate, so no order will be created.', mark: 'fail' },
+  escalate: { cls: s.verdictEscalate, text: 'Nothing broke your mandate, but it needs your approval before it can be bought.', mark: 'escalate' },
 };
 
 function GuardView({ guard }: { guard: GuardResult }) {
   const v = VERDICT_TEXT[guard.verdict];
   return (
     <div>
-      <div className={`${s.verdict} ${v.cls}`}>
-        {v.text} <span className={s.muted}>Total {money(guard.total, guard.currency)}</span>
+      <div className={`${s.verdict} ${v.cls}`} role="status">
+        <ResultMark status={v.mark} />
+        <span>
+          {v.text} <span style={{ fontWeight: 400 }}>Total {formatMoney(guard.total, guard.currency)}.</span>
+        </span>
       </div>
       <ul className={s.checks}>
-        {guard.checks.map((c) => (
-          <li key={c.rule} className={s.check}>
-            <span className={s.badgeCol}>
-              <Badge tone={CHECK_RESULT[c.status].tone}>{CHECK_RESULT[c.status].label}</Badge>
-            </span>
-            <div>
-              <div className={s.rule}>{ruleLabel(c.rule)}</div>
-              <div className={s.muted}>{c.detail}</div>
-            </div>
-          </li>
-        ))}
+        {guard.checks.map((c) => {
+          const res = CHECK_RESULT[c.status];
+          return (
+            <li key={c.rule} className={s.check}>
+              <ResultMark status={c.status} />
+              <div>
+                <div className={s.checkName}>{ruleLabel(c.rule)}</div>
+                <div className={u.muted}>{c.detail}</div>
+              </div>
+              <Badge tone={res.tone}>{res.label}</Badge>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

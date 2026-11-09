@@ -10,6 +10,7 @@ import type { Cart, CaptureOrderResponse, GuardResult, PlaceOrderResponse } from
 import type { z } from 'zod';
 import { ApiClientError, apiFetch } from '@/fixtures/api';
 import { formatMoney } from '../_ui/labels';
+import { Notice } from '../_ui/Ui';
 import u from '../_ui/ui.module.css';
 import s from './buyer.module.css';
 
@@ -23,7 +24,7 @@ class NeedsApprovalError extends Error {}
 function errMsg(e: unknown): string {
   if (e instanceof NeedsApprovalError) return e.message;
   if (e instanceof ApiClientError) {
-    if (e.body.error === 'guard_blocked') return 'The mandate guard blocked this cart, so no PayPal order was created.';
+    if (e.body.error === 'guard_blocked') return 'The mandate check blocked this cart, so no PayPal order was created.';
     if (e.body.error === 'paypal_not_configured') return 'PayPal is not configured on the server.';
     return e.body.message ?? e.body.error ?? `Request failed (${e.status})`;
   }
@@ -35,12 +36,14 @@ export default function Checkout({
   cart,
   guard,
   onFixture,
+  onPaid,
 }: {
   mandateId: string;
   cart: Cart;
   guard: GuardResult;
-  /** Called when a fixture answered instead of the server, so the page can show its demo banner. */
+  /** Called when a fixture answered instead of the server, so the page can show its sample-data notice. */
   onFixture: () => void;
+  onPaid: () => void;
 }) {
   // Simulation is only honest when the server runs in demo mode. With real PayPal credentials and no public
   // client id there is no way to get the buyer's approval, so say what to configure instead of failing at capture.
@@ -84,7 +87,9 @@ export default function Checkout({
     setError(null);
     try {
       const placed = await place();
-      setPaid(await capture(placed.paypal_order_id));
+      const done = await capture(placed.paypal_order_id);
+      setPaid(done);
+      onPaid();
     } catch (e) {
       setError(errMsg(e));
     } finally {
@@ -94,36 +99,38 @@ export default function Checkout({
 
   if (guard.verdict === 'block') {
     return (
-      <div className={`${s.verdict} ${s.verdictBlock}`} role="status">
-        Checkout is unavailable: the cart breaks your mandate, so no PayPal order will be created.
+      <div className={s.checkout}>
+        <Notice tone="bad">Checkout is unavailable: the cart breaks your mandate, so no PayPal order will be created.</Notice>
       </div>
     );
   }
 
   if (paid) {
     return (
-      <div className={`${s.verdict} ${s.verdictAllow}`} role="status">
-        Payment {paid.status.toLowerCase()}.
-        <div className={s.muted}>
-          Order {paid.paypal_order_id} · capture {paid.capture_id}
-        </div>
+      <div className={s.checkout}>
+        <Notice tone="good">
+          <strong>Payment {paid.status.toLowerCase()}.</strong>
+          <div className={u.muted}>
+            Order {paid.paypal_order_id} · capture {paid.capture_id}
+          </div>
+        </Notice>
       </div>
     );
   }
 
   if (needsApproval) {
     return (
-      <div className={s.approval} role="alert">
-        <strong>Needs your approval</strong>
-        <p className={s.muted}>
-          This cart is allowed by your mandate but needs your explicit OK:{' '}
-          {guard.checks
-            .filter((c) => c.status === 'escalate' || c.status === 'unsure')
-            .map((c) => c.detail)
-            .join(' ') || 'the server asked for confirmation.'}{' '}
-          Total {formatMoney(guard.total, guard.currency)}.
-        </p>
-        <div className={s.row}>
+      <div className={s.checkout}>
+        <div className={s.approval} role="alert">
+          <strong>Your approval is needed</strong>
+          <p>
+            This cart fits your mandate, but you asked to approve larger purchases yourself:{' '}
+            {guard.checks
+              .filter((c) => c.status === 'escalate' || c.status === 'unsure')
+              .map((c) => c.detail)
+              .join(' ') || 'the server asked for confirmation.'}{' '}
+            Total {formatMoney(guard.total, guard.currency)}.
+          </p>
           <button className={u.btn} onClick={() => setApproved(true)}>
             I approve this purchase
           </button>
@@ -135,9 +142,9 @@ export default function Checkout({
   return (
     <div className={s.checkout}>
       {error && (
-        <div className={s.error} role="alert">
+        <Notice tone="bad" alert>
           {error}
-        </div>
+        </Notice>
       )}
       {CLIENT_ID ? (
         <PayPalScriptProvider
@@ -160,6 +167,7 @@ export default function Checkout({
             onApprove={async (data) => {
               try {
                 setPaid(await capture(data.orderID));
+                onPaid();
               } catch (e) {
                 setError(errMsg(e));
               }
@@ -177,14 +185,12 @@ export default function Checkout({
         <p className={s.muted}>Loading payment options…</p>
       ) : (
         <>
-          <p className={s.muted}>
+          <p className={u.muted} style={{ marginTop: 0 }}>
             PayPal is simulated in demo mode, so no real money moves.
           </p>
-          <div className={s.row}>
-            <button className={u.btn} onClick={simulate} disabled={busy}>
-              {busy ? 'Paying…' : `Pay ${formatMoney(guard.total, guard.currency)} with PayPal`}
-            </button>
-          </div>
+          <button className={u.btn} onClick={simulate} disabled={busy}>
+            {busy ? 'Paying…' : `Pay ${formatMoney(guard.total, guard.currency)} with PayPal`}
+          </button>
         </>
       )}
     </div>
