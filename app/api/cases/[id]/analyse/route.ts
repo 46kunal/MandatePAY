@@ -6,6 +6,7 @@ import { getSettings } from '@/lib/settings';
 import { apiError } from '@/lib/http';
 import { toDisputeSummary, type RawDispute } from '@/lib/paypal';
 import type { Constraints } from '@/contracts/schemas';
+import { requirePermission } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 // Calls the AI model: up to 60 s per attempt plus one fallback attempt.
@@ -13,7 +14,9 @@ export const maxDuration = 150;
 
 // OWNER: B. POST -> Verdict, saved on the case. Input: DisputeSummary + mandate + cart + tracking.
 // The analyst may only choose actions listed in DisputeSummary.allowed_actions (enforced in lib/analyst).
-export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const authz = await requirePermission(req, 'cases:analyse');
+  if (!authz.ok) return authz.response;
   const { id } = await ctx.params;
 
   const [theCase] = await db.select().from(schema.cases).where(eq(schema.cases.disputeId, id)).limit(1);

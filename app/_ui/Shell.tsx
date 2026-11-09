@@ -1,9 +1,40 @@
 'use client';
 // OWNER: C. Page frames: BuyerShell (simple top bar) and MerchantShell (sidebar).
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { authClient, useSession } from '@/lib/auth/client';
+import { isMerchantRole } from '@/lib/auth/roles';
+import { Notice } from './Ui';
 import u from './ui.module.css';
+
+const ROLE_LABEL: Record<string, string> = { buyer: 'Buyer', staff: 'Staff', owner: 'Owner', admin: 'Admin' };
+
+/** Who is signed in, with Sign out. */
+function UserBox({ after }: { after: string }) {
+  const { data } = useSession();
+  const router = useRouter();
+  if (!data?.user) return null;
+  const role = (data.user as { role?: string }).role ?? 'buyer';
+  return (
+    <div className={u.userBox}>
+      <span>
+        <span className={u.userName}>{data.user.name}</span> <span className={u.muted}>· {ROLE_LABEL[role] ?? role}</span>
+      </span>
+      <button
+        type="button"
+        className={u.linkButton}
+        onClick={async () => {
+          await authClient.signOut();
+          router.replace(after);
+          router.refresh();
+        }}
+      >
+        Sign out
+      </button>
+    </div>
+  );
+}
 
 function Brand() {
   return (
@@ -22,12 +53,25 @@ export function BuyerShell({ children }: { children: ReactNode }) {
       <header className={u.topbar}>
         <div className={u.topbarInner}>
           <Brand />
-          <Link href="/merchant" className={u.topLink}>
-            Merchant dashboard →
-          </Link>
+          <BuyerTopRight />
         </div>
       </header>
       <main className={u.contentNarrow}>{children}</main>
+    </div>
+  );
+}
+
+function BuyerTopRight() {
+  const { data } = useSession();
+  const role = (data?.user as { role?: string } | undefined)?.role;
+  return (
+    <div className={u.userBox}>
+      {isMerchantRole(role) && (
+        <Link href="/merchant" className={u.topLink}>
+          Merchant dashboard →
+        </Link>
+      )}
+      <UserBox after="/login" />
     </div>
   );
 }
@@ -44,6 +88,11 @@ const NAV = [
 
 export function MerchantShell({ children }: { children: ReactNode }) {
   const path = usePathname() ?? '';
+  const { data, isPending } = useSession();
+  // The sign-in page has no sidebar.
+  if (path === '/merchant/login') return <div className={u.root}>{children}</div>;
+  const role = (data?.user as { role?: string } | undefined)?.role;
+  const blocked = !isPending && data?.user && !isMerchantRole(role);
   return (
     <div className={u.root}>
       <div className={u.app}>
@@ -63,12 +112,24 @@ export function MerchantShell({ children }: { children: ReactNode }) {
               })}
             </ul>
           </nav>
-          <div className={u.navFoot}>
-            Shopping as a buyer? <Link href="/buyer">Open the buyer view</Link>
+          <div className={u.navFoot} style={{ display: 'grid', gap: '0.5rem' }}>
+            <UserBox after="/merchant/login" />
+            <span>
+              Shopping as a buyer? <Link href="/buyer">Open the buyer view</Link>
+            </span>
           </div>
         </aside>
         <div className={u.main}>
-              <main className={u.content}>{children}</main>
+              <main className={u.content}>
+                {blocked ? (
+                  <Notice tone="warn">
+                    This area is for the store team. You are signed in with a buyer account.{' '}
+                    <Link href="/buyer">Go to your shopping page</Link>
+                  </Notice>
+                ) : (
+                  children
+                )}
+              </main>
         </div>
       </div>
     </div>

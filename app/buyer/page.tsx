@@ -24,7 +24,6 @@ type Draft = z.infer<typeof DraftMandateResponse>;
 type Created = z.infer<typeof CreateMandateResponse>;
 type Shopped = z.infer<typeof AgentShopResponse>;
 
-const BUYER_REF = 'buyer_web';
 const STEPS = ['Request', 'Mandate', 'Agent', 'Review', 'Checkout'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -102,7 +101,7 @@ export default function BuyerPage() {
   async function onConfirm() {
     if (!draft) return;
     const data = await run('confirm', () =>
-      apiFetch<Created>('/api/mandates', { body: { buyer_ref: BUYER_REF, constraints: draft.constraints } }),
+      apiFetch<Created>('/api/mandates', { body: { constraints: draft.constraints } }),
     );
     if (data) {
       setMandate(data);

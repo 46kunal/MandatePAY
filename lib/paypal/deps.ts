@@ -164,6 +164,7 @@ export function drizzleActStore(): ActStore {
           actionTaken: f.action,
           outcome: f.outcome,
           humanApprovedAt: f.humanApproved ? now : null,
+          actedBy: f.actedBy ?? null,
           updatedAt: now,
         })
         // Conditional update: the second of two concurrent requests matches nothing and gets a 409.

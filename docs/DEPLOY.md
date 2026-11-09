@@ -55,12 +55,24 @@ This writes `.keys/hosting.env` (gitignored) and prints only the key ids. Copy i
    | `MANDATE_BUYER_PRIVATE_KEY`, `MANDATE_AGENT_PRIVATE_KEY` | From `.keys/hosting.env` |
    | `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL` | As in your `.env` |
    | `PAYPAL_WEBHOOK_ID` | From step 4 |
+   | `BETTER_AUTH_SECRET` | A new random value per environment (see `.env.example`); never reuse the local one |
 
    Store name and the approval and review limits are set in the app (Settings > Store and rules), not here.
 3. Deploy.
 
 Without the two key variables the app refuses to sign or verify mandates on Vercel, with an error naming the
 missing variable. That is deliberate: a key made up per server instance would break every signature.
+
+## 3b. First store owner
+
+Public sign-up only creates buyers. Create the owner (and an admin if you want one) against the hosted database:
+
+```bash
+DATABASE_URL="<neon production url>" npm run auth:create-user -- --email you@example.com --name "Your Name" --role owner
+```
+
+The password goes to `.keys/new-user-<email>.txt` (or set `NEW_USER_PASSWORD` first). Sign in at
+`/merchant/login`, then delete the file. The same command with an existing email only changes the role.
 
 ## 4. Webhook for the hosted URL
 

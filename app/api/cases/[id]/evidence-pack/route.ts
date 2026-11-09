@@ -1,6 +1,7 @@
 import { apiError } from '@/lib/http';
 import { getCaseDetail } from '@/lib/paypal/cases';
 import { buildEvidenceModel, renderEvidencePdf } from '@/lib/paypal/evidencePack';
+import { requirePermission } from '@/lib/auth/guard';
 
 export const runtime = 'nodejs';
 // Builds the evidence PDF and calls PayPal.
@@ -10,6 +11,8 @@ export const dynamic = 'force-dynamic';
 // OWNER: A. GET -> application/pdf: the dispute's evidence pack (payment record, signed mandate, cart, guard checks, analysis).
 // 404 unknown case. Add ?download=1 to force a file download instead of showing it in the browser.
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const authz = await requirePermission(req, 'cases:read');
+  if (!authz.ok) return authz.response;
   const { id } = await ctx.params;
   const detail = await getCaseDetail(id);
   if (!detail) return apiError(404, 'case_not_found', `No case with id ${id}.`);

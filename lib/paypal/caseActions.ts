@@ -14,6 +14,8 @@ import { fromMinor, toMinor } from './orders';
 
 export interface ActInput {
   humanApproved: boolean;
+  /** The signed-in user sending the action, recorded on the case. */
+  actedBy?: string;
   override?: { action: ActionType; offer_type?: OfferType; offer_amount?: string };
 }
 
@@ -31,7 +33,7 @@ export interface ActStore {
    */
   markActed(
     disputeId: string,
-    fields: { action: ActionType; outcome: string; humanApproved: boolean },
+    fields: { action: ActionType; outcome: string; humanApproved: boolean; actedBy?: string },
   ): Promise<CaseRow | undefined>;
 }
 
@@ -162,6 +164,7 @@ export async function actOnCase(deps: ActDeps, disputeId: string, input: ActInpu
     action,
     outcome: action === 'NO_ACTION' ? 'No action taken' : `${action} submitted to PayPal`,
     humanApproved: input.humanApproved,
+    actedBy: input.actedBy,
   });
   if (!updated) return fail(409, 'already_acted', `Case ${disputeId} was already acted on.`);
   return { ok: true, row: updated, action };
