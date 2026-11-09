@@ -49,9 +49,14 @@ export default function EvidencePage() {
         subtitle={id}
         actions={
           detail && (
-            <button className={`${u.btn} ${u.noPrint}`} onClick={() => window.print()}>
-              Print or save as PDF
-            </button>
+            <div className={`${u.row} ${u.noPrint}`}>
+              <a href={`/api/cases/${encodeURIComponent(id)}/evidence-pack?download=1`} className={u.btn} style={{ textDecoration: 'none' }}>
+                Download PDF
+              </a>
+              <button className={`${u.btn} ${u.btnSecondary}`} onClick={() => window.print()}>
+                Print this page
+              </button>
+            </div>
           )
         }
       />
