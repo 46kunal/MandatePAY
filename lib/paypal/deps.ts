@@ -91,11 +91,15 @@ export function drizzleDisputeStore(): DisputeStore {
     async upsertCase(row) {
       const { db, schema } = await load();
       // On conflict only the PayPal-derived fields change; verdict, analysis_status and action stay as they were.
-      const { disputeId: _id, ...updatable } = row;
+      const { disputeId: _id, outcome, ...updatable } = row;
       await db
         .insert(schema.cases)
         .values(row)
-        .onConflictDoUpdate({ target: schema.cases.disputeId, set: { ...updatable, updatedAt: new Date() } });
+        .onConflictDoUpdate({
+          target: schema.cases.disputeId,
+          // A null outcome (dispute still open) must not erase the outcome recorded when we acted.
+          set: { ...updatable, ...(outcome !== null ? { outcome } : {}), updatedAt: new Date() },
+        });
     },
     async findOrderByCapture(captureId) {
       const { eq, db, schema } = await load();

@@ -52,4 +52,18 @@ describe('real sandbox dispute shape', () => {
     assert.equal(row.amountMinor, 8900);
     assert.equal(toCaseRecord({ ...row, amountMinor: row.amountMinor, verdict: null, analysisStatus: 'pending', actionTaken: null, outcome: null, createdAt: new Date(0), updatedAt: new Date(0) }).stage, 'INQUIRY');
   });
+
+  it('WAITING_FOR_SELLER_RESPONSE: the sandbox uses underscore link rels and offer_types in allowed_response_options', () => {
+    const s = toDisputeSummary({
+      ...real,
+      status: 'WAITING_FOR_SELLER_RESPONSE',
+      links: ['self', 'accept_claim', 'send_message', 'escalate', 'make_offer'].map((rel) => ({ rel, href: 'x', method: 'POST' })),
+      allowed_response_options: {
+        accept_claim: { accept_claim_types: ['PARTIAL_REFUND', 'REFUND_WITH_RETURN', 'REFUND'] },
+        make_offer: { offer_types: ['REFUND', 'REFUND_WITH_RETURN'] },
+      },
+    });
+    assert.deepEqual([...s.allowed_actions].sort(), ['ACCEPT_CLAIM', 'MAKE_OFFER', 'NO_ACTION', 'SEND_MESSAGE']);
+    assert.deepEqual(s.offer_types, ['REFUND', 'REFUND_WITH_RETURN']);
+  });
 });

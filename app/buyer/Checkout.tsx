@@ -4,7 +4,7 @@
 //  - capture: POST /api/orders/:id/capture after the buyer approves in the PayPal popup
 // With NEXT_PUBLIC_PAYPAL_CLIENT_ID set it renders the real PayPal buttons (sandbox). Without it, it shows a
 // "simulate" button that runs the same two API calls, so the demo works with no PayPal credentials.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
 import type { Cart, CaptureOrderResponse, GuardResult, PlaceOrderResponse } from '@/contracts/schemas';
 import type { z } from 'zod';
@@ -42,6 +42,16 @@ export default function Checkout({
   /** Called when a fixture answered instead of the server, so the page can show its demo banner. */
   onFixture: () => void;
 }) {
+  // Simulation is only honest when the server runs in demo mode. With real PayPal credentials and no public
+  // client id there is no way to get the buyer's approval, so say what to configure instead of failing at capture.
+  const [demoMode, setDemoMode] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (CLIENT_ID) return;
+    fetch('/api/demo/status')
+      .then((r) => r.json())
+      .then((d: { demo?: boolean }) => setDemoMode(Boolean(d.demo)))
+      .catch(() => setDemoMode(false));
+  }, []);
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +168,13 @@ export default function Checkout({
             onError={(e) => setError((prev) => prev ?? errMsg(e))}
           />
         </PayPalScriptProvider>
+      ) : demoMode === false ? (
+        <div className={s.error} role="alert">
+          The PayPal button is not configured. Set NEXT_PUBLIC_PAYPAL_CLIENT_ID in .env (same value as PAYPAL_CLIENT_ID) and
+          restart the server, or start the app with DEMO_MODE=true and no PayPal credentials to simulate payment.
+        </div>
+      ) : demoMode === null ? (
+        <p className={s.muted}>Loading payment options…</p>
       ) : (
         <>
           <p className={s.muted}>
