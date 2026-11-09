@@ -37,7 +37,7 @@ Nothing in the app is canned. To use it:
 |---|---|---|---|---|
 | Claude (`LLM_PROVIDER=anthropic`) | not yet run | not yet run | not yet run | not yet run |
 | Grok (`LLM_PROVIDER=grok`) | not yet run | not yet run | not yet run | not yet run |
-| Gemini 3.1 Flash-Lite (`LLM_PROVIDER=gemini`, free tier, run 2026-11-09) | 68% (17/25) | 52% (13/25) | 100% (7/7) | **36% (9/25)**, 3 of the 25 errored on provider timeouts or overload |
+| Gemini 3.1 Flash-Lite (`LLM_PROVIDER=gemini`, free tier, run 2026-11-09, with the fault-to-action policy in the prompt) | 84% (21/25) | 92% (23/25) | 100% (8/8) | **84% (21/25)**. Before the policy: 68% / 52% / 100% / 36% |
 
 These are real-model numbers on 25 hand-labelled cases; there is no offline analyst to compare against. Run `npm run eval` (needs `LLM_PROVIDER` and `LLM_API_KEY` in `.env`; set `EVAL_DELAY_MS=4000` on a free tier) and replace a row. The prompt-injection guardrail (flagged text always needs a human) is plain code and does not depend on the model.
 

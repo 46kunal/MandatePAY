@@ -4,7 +4,16 @@ import { checkCart, computeReceiptHash, createClosedMandate, hashCart, verifyClo
 import { getPayPalClient } from './client';
 import type { DisputeStore, PollDeps } from './disputeService';
 import type { ActDeps, ActStore } from './caseActions';
-import { acceptClaim, listDisputes, makeOffer, provideEvidence, sendMessage, showDispute, type RawDispute } from './disputes';
+import {
+  acceptClaim,
+  listDisputes,
+  makeOffer,
+  provideEvidence,
+  sendMessage,
+  showDispute,
+  type EvidenceFile,
+  type RawDispute,
+} from './disputes';
 import { captureOrder, createOrder } from './orders';
 import type { CartRow, LedgerStore, OrderDeps, OrderRow } from './service';
 
@@ -147,12 +156,26 @@ export function defaultActDeps(): ActDeps {
   return {
     store: drizzleActStore(),
     actions: {
-      provideEvidence: (id, notes) => provideEvidence(client, id, notes),
+      provideEvidence: (id, notes, files) => provideEvidence(client, id, notes, files),
       makeOffer: (id, offer) => makeOffer(client, id, offer),
       acceptClaim: (id, note) => acceptClaim(client, id, note),
       sendMessage: (id, message) => sendMessage(client, id, message),
     },
+    evidenceFiles: evidencePackFiles,
   };
+}
+
+/** The evidence pack PDF (same document as GET /api/cases/[id]/evidence-pack), attached to PROVIDE_EVIDENCE. */
+async function evidencePackFiles(disputeId: string): Promise<EvidenceFile[]> {
+  const [{ getCaseDetail }, { buildEvidenceModel, renderEvidencePdf }] = await Promise.all([
+    import('./cases'),
+    import('./evidencePack'),
+  ]);
+  const detail = await getCaseDetail(disputeId);
+  if (!detail) return [];
+  const pdf = await renderEvidencePdf(buildEvidenceModel(detail));
+  const safe = disputeId.replace(/[^A-Za-z0-9_-]/g, '_');
+  return [{ filename: `evidence-${safe}.pdf`, contentType: 'application/pdf', bytes: new Uint8Array(pdf) }];
 }
 
 export function defaultPollDeps(): PollDeps {

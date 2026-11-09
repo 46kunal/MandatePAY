@@ -116,12 +116,32 @@ export function sendMessage(client: PayPalClient, disputeId: string, message: st
   });
 }
 
-export function provideEvidence(client: PayPalClient, disputeId: string, notes: string) {
-  return client.request(path(disputeId, 'provide-evidence'), {
-    method: 'POST',
-    body: { evidences: [{ evidence_type: 'OTHER', notes }] },
-    requestId: `evidence-${disputeId}-${fingerprint(notes)}`,
-  });
+/** A file sent with provide-evidence. PayPal accepts PDF, JPG, GIF and PNG up to 10 MB each. */
+export interface EvidenceFile {
+  filename: string;
+  contentType: string;
+  bytes: Uint8Array<ArrayBuffer>;
+}
+
+/**
+ * Notes plus optional files. With files PayPal wants multipart/form-data: an `input` part holding the JSON and
+ * one part per file (`file1`, `file2`, ...), each listed by name in `documents`.
+ */
+export function provideEvidence(client: PayPalClient, disputeId: string, notes: string, files: EvidenceFile[] = []) {
+  const evidence = {
+    evidence_type: 'OTHER',
+    notes,
+    ...(files.length ? { documents: files.map((f) => ({ name: f.filename })) } : {}),
+  };
+  const input = { evidences: [evidence] };
+  const requestId = `evidence-${disputeId}-${fingerprint(notes + files.map((f) => f.filename).join(','))}`;
+  if (!files.length) {
+    return client.request(path(disputeId, 'provide-evidence'), { method: 'POST', body: input, requestId });
+  }
+  const form = new FormData();
+  form.append('input', new Blob([JSON.stringify(input)], { type: 'application/json' }));
+  files.forEach((f, i) => form.append(`file${i + 1}`, new Blob([f.bytes], { type: f.contentType }), f.filename));
+  return client.request(path(disputeId, 'provide-evidence'), { method: 'POST', form, requestId });
 }
 
 export function makeOffer(

@@ -42,9 +42,11 @@ export function paypalConfigFromEnv(): PayPalConfig {
 }
 
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH';
+  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   /** JSON body for POST/PATCH. */
   body?: unknown;
+  /** Multipart body (file uploads). Mutually exclusive with `body`; fetch sets the boundary header. */
+  form?: FormData;
   query?: Record<string, string | number | undefined>;
   /**
    * Sent as PayPal-Request-Id so a retried POST cannot create a second order or capture.
@@ -103,13 +105,13 @@ export class PayPalClient {
     for (let attempt = 0; ; attempt++) {
       const token = await this.getAccessToken(attempt > 0);
       const headers: Record<string, string> = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
-      if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+      if (opts.body !== undefined && !opts.form) headers['Content-Type'] = 'application/json';
       if (requestId) headers['PayPal-Request-Id'] = requestId;
 
       const res = await this.send(url.toString(), {
         method,
         headers,
-        body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+        body: opts.form ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
       });
       if (res.status === 401 && attempt === 0) continue;
 
