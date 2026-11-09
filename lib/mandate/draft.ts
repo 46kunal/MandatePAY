@@ -44,7 +44,9 @@ Today's date is ${new Date().toISOString().slice(0, 10)}. A deadline without a y
   );
 
   const warnings = [...draft.warnings];
-  if (!/\d/.test(requestText)) {
+  if (!(Number(draft.constraints.max_total.value) > 0)) {
+    warnings.push('No budget was given. Add one to your request (for example "under 30 USD"); a mandate needs a budget.');
+  } else if (!/\d/.test(requestText)) {
     warnings.push('Your request has no number in it, so the budget below was inferred. Check it carefully.');
   }
   if (!draft.constraints.deadline) warnings.push('No delivery deadline was set.');

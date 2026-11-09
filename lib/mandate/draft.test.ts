@@ -52,6 +52,13 @@ describe('draftMandate', () => {
     assert.ok(warnings.some((w) => /category/i.test(w)));
   });
 
+  it('a request without a budget gets one clear warning instead of an inferred one', async () => {
+    const model = answering({ constraints: { max_total: { value: '0.00', currency: 'USD' } }, warnings: [] });
+    const { warnings } = await draftMandate('tshirt black colour', { provider: model });
+    assert.ok(warnings.some((w) => /No budget was given/.test(w)));
+    assert.ok(!warnings.some((w) => /no number/i.test(w)));
+  });
+
   it('rejects a model answer that breaks the contract', async () => {
     const model = answering({ constraints: { max_total: { value: '110', currency: 'dollars' } }, warnings: [] });
     await assert.rejects(draftMandate('shoes under 110', { provider: model }));
