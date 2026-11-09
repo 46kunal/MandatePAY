@@ -27,14 +27,22 @@ const summary = toDisputeSummary(await showDispute(client, disputeId)); // input
 - **Disputes:** `toDisputeSummary` builds `DisputeSummary`. `allowed_actions` comes from PayPal's HATEOAS links (plus
   `allowed_response_options` as a fallback); `NO_ACTION` is always allowed.
 
-## Not yet verified against the sandbox
+## Verified against the sandbox (2026-11-09)
 
-The dispute field names follow PayPal's docs but have not been checked against a real sandbox dispute. Day 2 task:
-confirm `disputed_transactions[].seller_transaction_id` equals `orders.capture_id`, and record which links appear at
-each stage.
+A real buyer dispute (`PP-R-...`, reason `MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED`) on a captured USD 89.00 order:
+
+- `disputed_transactions[0].seller_transaction_id` **equals `orders.capture_id`**. `buyer_transaction_id` does not.
+  The same object also carries `custom` (our mandate id) and `invoice_number` (our cart id), usable as a fallback link.
+- `dispute_amount`, `reason`, `status`, `dispute_life_cycle_stage` (`INQUIRY`), `messages[].posted_by/content/time_posted`
+  match the mapper. Extra fields seen: `dispute_state`, `dispute_channel` (`INTERNAL`), `offer.buyer_requested_amount`,
+  `refund_details.allowed_refund_amount`, `evidences[]` (the buyer's text is also here), `fund_movements`.
+- A new dispute can take a few minutes to appear in `GET /v1/customer/disputes`; poll again.
+- At `INQUIRY` / `UNDER_REVIEW` / `UNDER_PAYPAL_REVIEW` the response has **only a `self` link and no
+  `allowed_response_options`**, so `deriveAllowedActions` correctly yields `['NO_ACTION']` and `POST /api/cases/:id/act`
+  returns 422 for any PayPal call. Links for actionable stages (for example `WAITING_FOR_SELLER_RESPONSE`) have not been seen yet.
 
 ## Tests
 
 ```bash
-npx tsx --test lib/paypal/paypal.test.ts
+npm test   # all lib/**/*.test.ts
 ```

@@ -35,7 +35,7 @@ export function buildScenarios(nowSec: number): Scenario[] {
   const deadline = new Date((nowSec + 14 * DAY) * 1000).toISOString();
   const eta = new Date((nowSec + 5 * DAY) * 1000).toISOString();
   const trainersMandate = (text: string): Constraints => ({
-    max_total: { value: '110.00', currency: 'GBP' },
+    max_total: { value: '110.00', currency: 'USD' },
     categories: ['shoes'],
     max_quantity: 1,
     required_attributes: { color: 'white', size: '10' },
@@ -44,7 +44,7 @@ export function buildScenarios(nowSec: number): Scenario[] {
     request_text: text,
   });
   const cart = (sku: string, name: string, price: string, attributes: Record<string, string>): Cart => ({
-    currency: 'GBP',
+    currency: 'USD',
     merchant: 'Sole Trader Ltd',
     delivery_eta: eta,
     items: [{ sku, name, category: 'shoes', quantity: 1, unit_price: price, attributes }],
@@ -54,8 +54,8 @@ export function buildScenarios(nowSec: number): Scenario[] {
     {
       key: 'merchant_fault',
       title: 'Merchant at fault',
-      requestText: 'Buy me white trainers, size 10, under 110 GBP.',
-      constraints: trainersMandate('Buy me white trainers, size 10, under 110 GBP.'),
+      requestText: 'Buy me white trainers, size 10, under 110 USD.',
+      constraints: trainersMandate('Buy me white trainers, size 10, under 110 USD.'),
       cart: cart('TR-WHT-10', 'Aero Running Trainers', '89.00', { color: 'white', size: '10' }),
       approvedBy: 'agent',
       reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED',
@@ -80,8 +80,8 @@ export function buildScenarios(nowSec: number): Scenario[] {
     {
       key: 'agent_error',
       title: 'Agent error',
-      requestText: 'Get me white trainers in size 10 for under 110 GBP, ask me if you are unsure.',
-      constraints: trainersMandate('Get me white trainers in size 10 for under 110 GBP, ask me if you are unsure.'),
+      requestText: 'Get me white trainers in size 10 for under 110 USD, ask me if you are unsure.',
+      constraints: trainersMandate('Get me white trainers in size 10 for under 110 USD, ask me if you are unsure.'),
       // The listing has no size, so the guard cannot confirm size 10 ("unsure"). The agent should have checked.
       cart: cart('TR-WHT-ANY', 'Aero Trainers (size not listed)', '89.00', { color: 'white' }),
       approvedBy: 'buyer',
@@ -107,8 +107,8 @@ export function buildScenarios(nowSec: number): Scenario[] {
     {
       key: 'buyer_regret',
       title: 'Buyer regret',
-      requestText: 'Buy me white trainers, size 10, under 110 GBP.',
-      constraints: trainersMandate('Buy me white trainers, size 10, under 110 GBP.'),
+      requestText: 'Buy me white trainers, size 10, under 110 USD.',
+      constraints: trainersMandate('Buy me white trainers, size 10, under 110 USD.'),
       cart: cart('TR-WHT-10', 'Aero Running Trainers', '89.00', { color: 'white', size: '10' }),
       approvedBy: 'agent',
       reason: 'UNAUTHORISED',
@@ -131,8 +131,8 @@ export function buildScenarios(nowSec: number): Scenario[] {
     {
       key: 'wrong_product',
       title: 'Within mandate, wrong product',
-      requestText: 'Buy me white trainers, size 10, under 110 GBP.',
-      constraints: trainersMandate('Buy me white trainers, size 10, under 110 GBP.'),
+      requestText: 'Buy me white trainers, size 10, under 110 USD.',
+      constraints: trainersMandate('Buy me white trainers, size 10, under 110 USD.'),
       // Fits every rule, but the agent chose slippers, not running trainers.
       cart: cart('SL-WHT-10', 'Aero Indoor Slippers', '95.00', { color: 'white', size: '10' }),
       approvedBy: 'agent',

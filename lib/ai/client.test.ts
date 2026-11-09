@@ -10,7 +10,7 @@ import { AnthropicProvider, generateJson, LlmError, resolveProvider } from './in
 import type { LlmProvider, ProviderCall } from './types';
 
 const validConstraints = {
-  max_total: { value: '50.00', currency: 'GBP' },
+  max_total: { value: '50.00', currency: 'USD' },
   categories: ['shoes'],
 };
 
@@ -129,7 +129,7 @@ describe('generateJson with LLM_PROVIDER=mock', () => {
 
 describe('generateJson validation and retry', () => {
   it('retries once with the validation errors fed back, then succeeds', async () => {
-    const provider = scripted([{ max_total: { value: '50', currency: 'GBP' } }, validConstraints]);
+    const provider = scripted([{ max_total: { value: '50', currency: 'USD' } }, validConstraints]);
     const result = await generateJson({ ...draftTask, schema: Constraints }, provider);
 
     assert.deepEqual(result, validConstraints);

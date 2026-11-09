@@ -31,7 +31,7 @@ const dispute = (over: Partial<RawDispute> = {}): RawDispute => ({
   reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED',
   status: 'WAITING_FOR_SELLER_RESPONSE',
   dispute_life_cycle_stage: 'INQUIRY',
-  dispute_amount: { currency_code: 'GBP', value: '93.25' },
+  dispute_amount: { currency_code: 'USD', value: '93.25' },
   disputed_transactions: [{ seller_transaction_id: 'CAP1' }],
   update_time: '2026-11-07T10:00:00Z',
   ...over,
@@ -49,7 +49,7 @@ describe('ingestDispute', () => {
     assert.equal(c.mandateId, 'mnd_1');
     assert.equal(c.captureId, 'CAP1');
     assert.equal(c.amountMinor, 9325);
-    assert.equal(c.currency, 'GBP');
+    assert.equal(c.currency, 'USD');
     assert.equal(c.stage, 'INQUIRY');
     assert.equal(m.events.get(disputeEventId(dispute()))!.processed, true);
   });
@@ -144,7 +144,7 @@ describe('toCaseRecord', () => {
       stage: 'INQUIRY',
       status: 'OPEN',
       amountMinor: 9325,
-      currency: 'GBP',
+      currency: 'USD',
       verdict: null,
       analysisStatus: 'pending',
       actionTaken: null,
@@ -152,7 +152,7 @@ describe('toCaseRecord', () => {
       createdAt: new Date('2026-11-07T10:00:00Z'),
       updatedAt: new Date('2026-11-07T11:00:00Z'),
     });
-    assert.deepEqual(rec.amount, { value: '93.25', currency: 'GBP' });
+    assert.deepEqual(rec.amount, { value: '93.25', currency: 'USD' });
     assert.equal(rec.created_at, '2026-11-07T10:00:00.000Z');
     assert.equal(rec.verdict, null);
   });

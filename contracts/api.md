@@ -16,7 +16,7 @@ Errors always use `ApiError` (`{ error, message?, details? }`). Amounts are stri
 | GET `/api/cases` | A | none | `CaseRecord[]` | none |
 | GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order | 404 |
 | POST `/api/cases/:id/analyse` | B | none | `Verdict` (saved on case) | 404, 502 LLM failed |
-| POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 403 needs human approval, 409 already acted, 502 PayPal |
+| POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal |
 | POST `/api/demo/reset` | C | none | `{ ok }` | 403 outside demo mode |
 
 ## Rules

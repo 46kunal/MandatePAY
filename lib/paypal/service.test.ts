@@ -69,19 +69,19 @@ async function setup(constraints: Constraints, opts: { exp?: number } = {}) {
 }
 
 const constraints: Constraints = {
-  max_total: { value: '120.00', currency: 'GBP' },
+  max_total: { value: '120.00', currency: 'USD' },
   required_attributes: { color: 'white' },
 };
 const goodCart: Cart = {
-  currency: 'GBP',
+  currency: 'USD',
   items: [{ sku: 'S1', name: 'White trainers', quantity: 1, unit_price: '50.00', attributes: { color: 'white' } }],
 };
 const wrongColourCart: Cart = {
-  currency: 'GBP',
+  currency: 'USD',
   items: [{ sku: 'S1', name: 'Black trainers', quantity: 1, unit_price: '50.00', attributes: { color: 'black' } }],
 };
 const overThresholdCart: Cart = {
-  currency: 'GBP',
+  currency: 'USD',
   items: [{ sku: 'S1', name: 'White trainers', quantity: 1, unit_price: '110.00', attributes: { color: 'white' } }],
 };
 

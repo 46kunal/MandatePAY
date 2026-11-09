@@ -34,7 +34,7 @@ const DEFAULT_OFFERS: OfferType[] = ['REFUND', 'REFUND_WITH_RETURN'];
 
 function toInput(c: EvalCase): AnalystInput {
   const cart: Cart = {
-    currency: 'GBP',
+    currency: 'USD',
     merchant: c.cart.merchant,
     items: c.cart.items.map((i, n) => ({ sku: `sku${n + 1}`, quantity: 1, ...i })),
   };
@@ -44,7 +44,7 @@ function toInput(c: EvalCase): AnalystInput {
       reason: c.reason,
       stage: 'INQUIRY',
       status: 'WAITING_FOR_SELLER_RESPONSE',
-      amount: { value: c.amount, currency: 'GBP' },
+      amount: { value: c.amount, currency: 'USD' },
       allowed_actions: c.allowed_actions ?? ALL_ACTIONS,
       offer_types: c.offer_types ?? DEFAULT_OFFERS,
       messages: c.messages ?? [],

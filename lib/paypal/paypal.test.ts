@@ -69,7 +69,7 @@ const config = {
 };
 
 const cart: Cart = {
-  currency: 'GBP',
+  currency: 'USD',
   items: [
     { sku: 'SKU-1', name: 'White trainers', quantity: 2, unit_price: '45.10', attributes: { color: 'white' } },
     { sku: 'SKU-2', name: 'Laces', quantity: 1, unit_price: '3.05' },
@@ -252,7 +252,7 @@ describe('disputes mapping', () => {
     reason: 'MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED',
     status: 'WAITING_FOR_SELLER_RESPONSE',
     dispute_life_cycle_stage: 'INQUIRY',
-    dispute_amount: { currency_code: 'GBP', value: '93.25' },
+    dispute_amount: { currency_code: 'USD', value: '93.25' },
     disputed_transactions: [{ seller_transaction_id: 'CAP1' }],
     messages: [{ posted_by: 'BUYER', content: 'Wrong colour', time_posted: '2026-11-05T10:00:00Z' }],
     allowed_response_options: { make_offer: { offer_types: ['REFUND', 'REFUND_WITH_RETURN', 'NOT_A_REAL_TYPE'] } },
@@ -284,7 +284,7 @@ describe('disputes mapping', () => {
     const s = toDisputeSummary(raw);
     assert.equal(s.dispute_id, 'PP-D-1');
     assert.equal(s.stage, 'INQUIRY');
-    assert.deepEqual(s.amount, { value: '93.25', currency: 'GBP' });
+    assert.deepEqual(s.amount, { value: '93.25', currency: 'USD' });
     assert.equal(s.seller_transaction_id, 'CAP1');
     assert.deepEqual(s.messages, [{ from: 'BUYER', text: 'Wrong colour', at: '2026-11-05T10:00:00Z' }]);
   });
@@ -308,13 +308,13 @@ describe('disputes calls', () => {
   it('sends a make-offer body in PayPal shape with a stable request id', async () => {
     const f = fakeFetch(() => ({ json: {} }));
     const client = new PayPalClient(config, { fetch: f.impl });
-    await makeOffer(client, 'PP-D-1', { note: 'Sorry', offerType: 'REFUND', amount: { value: '10.00', currency: 'GBP' } });
+    await makeOffer(client, 'PP-D-1', { note: 'Sorry', offerType: 'REFUND', amount: { value: '10.00', currency: 'USD' } });
     const c = f.apiCalls()[0];
     assert.ok(c.url.endsWith('/v1/customer/disputes/PP-D-1/make-offer'));
     assert.deepEqual(JSON.parse(c.body!), {
       note: 'Sorry',
       offer_type: 'REFUND',
-      offer_amount: { currency_code: 'GBP', value: '10.00' },
+      offer_amount: { currency_code: 'USD', value: '10.00' },
     });
     assert.equal(c.headers['PayPal-Request-Id'], 'offer-PP-D-1-REFUND-10.00');
   });
