@@ -14,7 +14,7 @@ import { AnthropicProvider } from './anthropic';
 import { GeminiProvider } from './gemini';
 import { GrokProvider } from './grok';
 import { MockProvider } from './mock';
-import { LlmError, type LlmProvider, type LlmRequest } from './types';
+import { isTransientLlmError, LlmError, type LlmProvider, type LlmRequest } from './types';
 
 type Env = Record<string, string | undefined>;
 
@@ -41,7 +41,7 @@ export function resolveProvider(env: Env = process.env): LlmProvider {
     }
     case 'gemini': {
       if (!apiKey) throw new LlmError('config', 'LLM_PROVIDER=gemini needs LLM_API_KEY (or use LLM_PROVIDER=mock).');
-      return new GeminiProvider({ apiKey, model: clean(env.LLM_MODEL) });
+      return new GeminiProvider({ apiKey, model: clean(env.LLM_MODEL), fallbackModel: env.LLM_FALLBACK_MODEL?.trim() });
     }
     case 'grok': {
       if (!apiKey) throw new LlmError('config', 'LLM_PROVIDER=grok needs LLM_API_KEY (or use LLM_PROVIDER=mock).');
@@ -63,11 +63,28 @@ export interface GenerateJsonOptions<T> extends LlmRequest {
   maxRetries?: number;
 }
 
-/** Ask the model for JSON matching `schema`. Retries once with the validation errors fed back. */
+/**
+ * Ask the model for JSON matching `schema`. Retries once with the validation errors fed back.
+ *
+ * If the real model is temporarily unavailable (timeout, overload, rate limit) and the call site has a mock answer,
+ * the mock answers instead so the app keeps working, and a warning is logged. Set LLM_FALLBACK_TO_MOCK=false to
+ * get the error instead. Configuration errors and bad keys are never hidden.
+ */
 export async function generateJson<T>(
   opts: GenerateJsonOptions<T>,
   provider: LlmProvider = resolveProvider(),
 ): Promise<T> {
+  try {
+    return await generateJsonWith(opts, provider);
+  } catch (err) {
+    const fallbackAllowed = process.env.LLM_FALLBACK_TO_MOCK?.trim().toLowerCase() !== 'false';
+    if (!fallbackAllowed || provider.deterministic || !opts.mock || !isTransientLlmError(err)) throw err;
+    console.warn(`[llm] ${provider.name} unavailable for "${opts.task}" (${(err as Error).message.slice(0, 80)}); using the offline mock answer`);
+    return generateJsonWith(opts, new MockProvider());
+  }
+}
+
+async function generateJsonWith<T>(opts: GenerateJsonOptions<T>, provider: LlmProvider): Promise<T> {
   const retries = provider.deterministic ? 0 : (opts.maxRetries ?? 1);
   let user = opts.user;
   let lastError = new LlmError('schema_mismatch', 'No answer was produced');

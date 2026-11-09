@@ -25,6 +25,13 @@ export class LlmError extends Error {
   }
 }
 
+/** Timeouts, network errors, overload (5xx) and rate limits (429) are temporary; bad requests and bad keys are not. */
+export function isTransientLlmError(err: unknown): boolean {
+  if (!(err instanceof LlmError) || err.code !== 'provider_error') return false;
+  if (err.status === undefined) return /timed out|network/i.test(err.message);
+  return err.status === 429 || err.status >= 500;
+}
+
 /** What a call site supplies: which task this is and the prompts. */
 export interface LlmRequest {
   /** Short stable snake_case name, e.g. "draft_mandate". Used as the tool name and for mock lookups. */
