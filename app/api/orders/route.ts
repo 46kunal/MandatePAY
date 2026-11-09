@@ -1,11 +1,19 @@
-import { PlaceOrderRequest, type PlaceOrderResponse } from '@/contracts/schemas';
+import { PlaceOrderRequest, type ListOrdersResponse, type PlaceOrderResponse } from '@/contracts/schemas';
 import { apiError } from '@/lib/http';
 import { PayPalConfigError, PayPalError } from '@/lib/paypal';
 import { defaultDeps } from '@/lib/paypal/deps';
+import { listOrders } from '@/lib/paypal/orderList';
 import { placeOrder } from '@/lib/paypal/service';
 import type { z } from 'zod';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+// OWNER: A. GET -> ListOrdersResponse: every order placed here, newest first, with its total and any dispute id.
+export async function GET() {
+  const body: z.infer<typeof ListOrdersResponse> = { orders: await listOrders() };
+  return Response.json(body);
+}
 
 // OWNER: A. POST { mandate_id, cart, buyer_approved } -> PlaceOrderResponse.
 // Runs B's guard on the signed mandate, closes the mandate over this cart, then creates the PayPal order with

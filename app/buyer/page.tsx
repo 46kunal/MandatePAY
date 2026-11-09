@@ -223,9 +223,21 @@ export default function BuyerPage() {
                 Confirmed as {mandate.mandate_id} · valid until {formatDay(mandate.expires_at)}
               </span>
             ) : (
-              <button className={u.btn} onClick={onConfirm} disabled={busy !== null}>
-                {busy === 'confirm' ? 'Signing…' : 'Confirm and sign mandate'}
-              </button>
+              <>
+                {!(Number(draft.constraints.max_total.value) > 0) && (
+                  <Notice tone="bad">
+                    Your request has no budget, and a mandate must have one. Add it to your request (for example
+                    &quot;under 30 USD&quot;) and click Update mandate.
+                  </Notice>
+                )}
+                <button
+                  className={u.btn}
+                  onClick={onConfirm}
+                  disabled={busy !== null || !(Number(draft.constraints.max_total.value) > 0)}
+                >
+                  {busy === 'confirm' ? 'Signing…' : 'Confirm and sign mandate'}
+                </button>
+              </>
             )}
           </div>
         </Card>

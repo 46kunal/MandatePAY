@@ -4,18 +4,50 @@ import { checkCart, computeReceiptHash, createClosedMandate, hashCart, verifyClo
 import { getPayPalClient } from './client';
 import type { DisputeStore, PollDeps } from './disputeService';
 import type { ActDeps, ActStore } from './caseActions';
-import { acceptClaim, listDisputes, makeOffer, provideEvidence, sendMessage, showDispute, type RawDispute } from './disputes';
+import {
+  acceptClaim,
+  listDisputes,
+  makeOffer,
+  provideEvidence,
+  sendMessage,
+  showDispute,
+  type EvidenceFile,
+  type RawDispute,
+} from './disputes';
 import { captureOrder, createOrder } from './orders';
 import type { CartRow, LedgerStore, OrderDeps, OrderRow } from './service';
 
 /** Drizzle-backed ledger. The DB client is imported lazily so unit tests never need DATABASE_URL. */
 export function drizzleStore(): LedgerStore {
   const load = async () => {
-    const [{ and, eq, isNull }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
-    return { and, eq, isNull, db, schema };
+    const [{ and, desc, eq, gte, isNull }, { db, schema }] = await Promise.all([
+      import('drizzle-orm'),
+      import('../../db/client'),
+    ]);
+    return { and, desc, eq, gte, isNull, db, schema };
   };
 
   return {
+    async findOpenOrder(q) {
+      const { and, desc, eq, gte, isNull, db, schema } = await load();
+      const { orders, carts } = schema;
+      const [row] = await db
+        .select({ paypalOrderId: orders.paypalOrderId, approveUrl: orders.approveUrl, cartId: orders.cartId })
+        .from(orders)
+        .innerJoin(carts, eq(carts.cartId, orders.cartId))
+        .where(
+          and(
+            eq(orders.mandateId, q.mandateId),
+            eq(carts.cartHash, q.cartHash),
+            eq(carts.approvedBy, q.approvedBy),
+            isNull(orders.captureId),
+            gte(orders.createdAt, q.since),
+          ),
+        )
+        .orderBy(desc(orders.createdAt))
+        .limit(1);
+      return row;
+    },
     async getMandate(mandateId) {
       const { eq, db, schema } = await load();
       const [row] = await db.select().from(schema.mandates).where(eq(schema.mandates.mandateId, mandateId)).limit(1);
@@ -147,12 +179,26 @@ export function defaultActDeps(): ActDeps {
   return {
     store: drizzleActStore(),
     actions: {
-      provideEvidence: (id, notes) => provideEvidence(client, id, notes),
+      provideEvidence: (id, notes, files) => provideEvidence(client, id, notes, files),
       makeOffer: (id, offer) => makeOffer(client, id, offer),
       acceptClaim: (id, note) => acceptClaim(client, id, note),
       sendMessage: (id, message) => sendMessage(client, id, message),
     },
+    evidenceFiles: evidencePackFiles,
   };
+}
+
+/** The evidence pack PDF (same document as GET /api/cases/[id]/evidence-pack), attached to PROVIDE_EVIDENCE. */
+async function evidencePackFiles(disputeId: string): Promise<EvidenceFile[]> {
+  const [{ getCaseDetail }, { buildEvidenceModel, renderEvidencePdf }] = await Promise.all([
+    import('./cases'),
+    import('./evidencePack'),
+  ]);
+  const detail = await getCaseDetail(disputeId);
+  if (!detail) return [];
+  const pdf = await renderEvidencePdf(buildEvidenceModel(detail));
+  const safe = disputeId.replace(/[^A-Za-z0-9_-]/g, '_');
+  return [{ filename: `evidence-${safe}.pdf`, contentType: 'application/pdf', bytes: new Uint8Array(pdf) }];
 }
 
 export function defaultPollDeps(): PollDeps {

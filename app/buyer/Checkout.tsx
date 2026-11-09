@@ -141,7 +141,21 @@ export default function Checkout({
                 setError(errMsg(e));
               }
             }}
-            onCancel={() => setError('Payment was cancelled. You have not been charged.')}
+            onCancel={async (data) => {
+              // The popup can close before PayPal reports the approval (embedded browsers, a closed tab).
+              // Try the capture anyway: PayPal only allows it if the buyer really approved, otherwise nothing is charged.
+              const orderId = typeof data?.orderID === 'string' ? data.orderID : '';
+              if (orderId) {
+                try {
+                  setPaid(await capture(orderId));
+                  onPaid();
+                  return;
+                } catch {
+                  /* not approved: fall through */
+                }
+              }
+              setError('Payment was cancelled. You have not been charged.');
+            }}
             onError={(e) => setError((prev) => prev ?? errMsg(e))}
           />
         </PayPalScriptProvider>

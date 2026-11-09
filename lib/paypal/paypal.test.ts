@@ -19,6 +19,7 @@ import {
   fromMinor,
   listDisputes,
   makeOffer,
+  provideEvidence,
   toDisputeSummary,
   toMinor,
   verifyWebhookSignature,
@@ -324,6 +325,36 @@ describe('disputes calls', () => {
     const client = new PayPalClient(config, { fetch: f.impl });
     await acceptClaim(client, 'PP-D-1', 'ok');
     assert.equal(f.apiCalls()[0].headers['PayPal-Request-Id'], 'accept-PP-D-1');
+  });
+
+  it('provide-evidence without files sends plain JSON', async () => {
+    const f = fakeFetch(() => ({ json: {} }));
+    const client = new PayPalClient(config, { fetch: f.impl });
+    await provideEvidence(client, 'PP-D-1', 'Delivered on time.');
+    const c = f.apiCalls()[0];
+    assert.equal(c.headers['Content-Type'], 'application/json');
+    assert.deepEqual(JSON.parse(c.body!), { evidences: [{ evidence_type: 'OTHER', notes: 'Delivered on time.' }] });
+  });
+
+  it('provide-evidence with a PDF sends multipart: an input JSON part and file1, listed in documents', async () => {
+    const f = fakeFetch(() => ({ json: {} }));
+    const client = new PayPalClient(config, { fetch: f.impl });
+    const bytes = new TextEncoder().encode('%PDF-1.4 test');
+    await provideEvidence(client, 'PP-D-1', 'See the evidence pack.', [
+      { filename: 'evidence-PP-D-1.pdf', contentType: 'application/pdf', bytes },
+    ]);
+    const c = f.apiCalls()[0];
+    const form = c.body as unknown as FormData;
+    assert.ok(form instanceof FormData);
+    assert.equal(c.headers['Content-Type'], undefined); // fetch adds the multipart boundary itself
+    const input = JSON.parse(await (form.get('input') as Blob).text());
+    assert.deepEqual(input.evidences[0].documents, [{ name: 'evidence-PP-D-1.pdf' }]);
+    assert.equal(input.evidences[0].notes, 'See the evidence pack.');
+    const file = form.get('file1') as File;
+    assert.equal(file.name, 'evidence-PP-D-1.pdf');
+    assert.equal(file.type, 'application/pdf');
+    assert.equal(await file.text(), '%PDF-1.4 test');
+    assert.match(c.headers['PayPal-Request-Id'], /^evidence-PP-D-1-/);
   });
 });
 

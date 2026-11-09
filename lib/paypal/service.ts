@@ -47,6 +47,13 @@ export interface LedgerStore {
   getOrder(paypalOrderId: string): Promise<OrderRow | undefined>;
   insertCart(row: CartRow): Promise<void>;
   insertOrder(row: OrderRow): Promise<void>;
+  /**
+   * An uncaptured order for the same mandate, cart contents and approver, created after `since`. Lets a repeated
+   * checkout click reuse the order instead of opening another one. Optional: without it every click creates an order.
+   */
+  findOpenOrder?(q: { mandateId: string; cartHash: string; approvedBy: 'buyer' | 'agent'; since: Date }): Promise<
+    { paypalOrderId: string; approveUrl: string | null; cartId: string } | undefined
+  >;
   /** Sets capture fields only if the order has no capture yet. Returns false when it already had one. */
   markCaptured(
     paypalOrderId: string,
@@ -73,7 +80,11 @@ export interface OrderDeps {
   createOrder: (input: CreateOrderInput) => Promise<CreatedOrder>;
   captureOrder: (paypalOrderId: string) => Promise<CapturedOrder>;
   newCartId?: () => string;
+  now?: () => Date;
 }
+
+/** An unpaid order is reused for this long. PayPal lets the buyer approve it for about three hours. */
+export const OPEN_ORDER_REUSE_MS = 3 * 60 * 60 * 1000;
 
 // ---------- place order ----------
 
@@ -129,6 +140,18 @@ export async function placeOrder(
   }
 
   const approvedBy = input.buyerApproved ? 'buyer' : 'agent';
+
+  // A second click for the same cart reuses the open order rather than creating another one at PayPal.
+  const open = await store.findOpenOrder?.({
+    mandateId: mandate.mandateId,
+    cartHash: base.cartHash,
+    approvedBy,
+    since: new Date((deps.now?.() ?? new Date()).getTime() - OPEN_ORDER_REUSE_MS),
+  });
+  if (open?.approveUrl) {
+    return { ok: true, status: 'created', paypalOrderId: open.paypalOrderId, approveUrl: open.approveUrl, cartId: open.cartId, guard };
+  }
+
   const closed = await deps.createClosedMandate({
     mandateId: mandate.mandateId,
     openMandateJws: mandate.jws,

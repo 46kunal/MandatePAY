@@ -8,7 +8,7 @@
  */
 import type { ActionType, Money, OfferType, Verdict } from '../../contracts/schemas';
 import type { CaseRow } from './cases';
-import { toDisputeSummary, type RawDispute } from './disputes';
+import { toDisputeSummary, type EvidenceFile, type RawDispute } from './disputes';
 import { PayPalError } from './errors';
 import { fromMinor, toMinor } from './orders';
 
@@ -36,7 +36,7 @@ export interface ActStore {
 }
 
 export interface DisputeActions {
-  provideEvidence(disputeId: string, notes: string): Promise<unknown>;
+  provideEvidence(disputeId: string, notes: string, files?: EvidenceFile[]): Promise<unknown>;
   makeOffer(disputeId: string, offer: { note: string; offerType: OfferType; amount: Money }): Promise<unknown>;
   acceptClaim(disputeId: string, note: string): Promise<unknown>;
   sendMessage(disputeId: string, message: string): Promise<unknown>;
@@ -45,6 +45,8 @@ export interface DisputeActions {
 export interface ActDeps {
   store: ActStore;
   actions: DisputeActions;
+  /** Files attached to PROVIDE_EVIDENCE (the evidence pack PDF). Optional: without it only notes are sent. */
+  evidenceFiles?(disputeId: string): Promise<EvidenceFile[]>;
 }
 
 export type ActResult =
@@ -106,7 +108,12 @@ export async function actOnCase(deps: ActDeps, disputeId: string, input: ActInpu
   let send: () => Promise<unknown>;
   switch (action) {
     case 'PROVIDE_EVIDENCE':
-      send = () => deps.actions.provideEvidence(disputeId, buildNote(verdict, 'Evidence from the merchant.'));
+      send = async () =>
+        deps.actions.provideEvidence(
+          disputeId,
+          buildNote(verdict, 'Evidence from the merchant.'),
+          deps.evidenceFiles ? await deps.evidenceFiles(disputeId) : [],
+        );
       break;
     case 'SEND_MESSAGE':
       send = () => deps.actions.sendMessage(disputeId, buildNote(verdict, 'Message from the merchant.'));

@@ -84,6 +84,25 @@ describe('actOnCase: happy paths', () => {
     }
   });
 
+  it('attaches the evidence pack files to PROVIDE_EVIDENCE', async () => {
+    const s = setup();
+    const pdf = { filename: 'evidence-PP-D-1.pdf', contentType: 'application/pdf', bytes: new Uint8Array([37, 80, 68, 70]) };
+    const asked: string[] = [];
+    s.deps.evidenceFiles = async (id) => (asked.push(id), [pdf]);
+    const r = await actOnCase(s.deps, 'PP-D-1', { humanApproved: false });
+    assert.equal(r.ok, true);
+    assert.deepEqual(asked, ['PP-D-1']);
+    assert.deepEqual(s.calls[0].args[2], [pdf]);
+  });
+
+  it('does not build the evidence pack for other actions', async () => {
+    const s = setup({ row: { verdict: verdict({ action: 'MAKE_OFFER', offer_type: 'REFUND', offer_amount: '20.00' }) } });
+    let built = false;
+    s.deps.evidenceFiles = async () => ((built = true), []);
+    await actOnCase(s.deps, 'PP-D-1', { humanApproved: false });
+    assert.equal(built, false);
+  });
+
   it('makes an offer with the dispute currency', async () => {
     const s = setup({ row: { verdict: verdict({ action: 'MAKE_OFFER', offer_type: 'REFUND', offer_amount: '20.00' }) } });
     const r = await actOnCase(s.deps, 'PP-D-1', { humanApproved: false });

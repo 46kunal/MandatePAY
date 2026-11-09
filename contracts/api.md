@@ -9,15 +9,16 @@ Errors always use `ApiError` (`{ error, message?, details? }`). Amounts are stri
 | POST `/api/mandates/draft` | B | `DraftMandateRequest` | `DraftMandateResponse` | 400 invalid, 502 LLM failed |
 | POST `/api/mandates` | B | `CreateMandateRequest` | `CreateMandateResponse` | 400 invalid constraints |
 | POST `/api/carts/check` | B | `CartCheckRequest` | `CartCheckResponse` (`GuardResult`) | 404 mandate, 410 expired |
+| GET `/api/orders` | A | none | `ListOrdersResponse` (newest first, with any dispute id) | none |
 | POST `/api/orders` | A | `PlaceOrderRequest` | `PlaceOrderResponse` (`created` or `needs_approval`) | 422 `guard_blocked`, 502 PayPal |
 | POST `/api/orders/:id/capture` | A | none | `CaptureOrderResponse` | 404 order, 409 already captured, 502 PayPal |
 | POST `/api/webhooks/paypal` | A | PayPal event | `200` fast | 400 bad signature |
-| POST `/api/disputes/poll` | A | none | `PollDisputesResponse` | 502 PayPal |
+| POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal |
 | GET `/api/cases` | A | none | `CaseRecord[]` | none |
 | GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order | 404 |
 | POST `/api/cases/:id/analyse` | B | none | `Verdict` (saved on case) | 404, 502 LLM failed |
 | GET `/api/cases/:id/evidence-pack` | A | none | `application/pdf` | 404 |
-| POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal |
+| POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal. PROVIDE_EVIDENCE also uploads the evidence pack PDF (multipart, `file1`). |
 | GET `/api/products` | A | `?active=1` optional | `Product[]` | none |
 | POST `/api/products` | A | `ProductInput` | `Product` (201) | 400 invalid, 409 duplicate SKU |
 | PATCH `/api/products/:id` | A | `UpdateProductRequest` | `Product` | 400, 404, 409 duplicate SKU |

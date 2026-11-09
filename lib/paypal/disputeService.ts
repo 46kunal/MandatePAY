@@ -131,3 +131,10 @@ export async function pollDisputes(deps: PollDeps): Promise<PollResult> {
   }
   return result;
 }
+
+/** Fetch one dispute by id and ingest it. For new disputes that PayPal's list does not show yet. */
+export async function fetchDisputeById(deps: PollDeps, disputeId: string): Promise<PollResult> {
+  const raw = await deps.showDispute(disputeId);
+  const r = await ingestDispute(deps.store, raw, 'poll');
+  return { fetched: 1, newCases: r.processed && r.isNew ? 1 : 0, linked: r.processed && r.linked ? 1 : 0 };
+}
