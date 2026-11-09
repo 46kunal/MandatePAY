@@ -1,186 +1,150 @@
 'use client';
-// OWNER: C. Merchant view: case list. Rows open the case detail at /merchant/[id] (C5).
+// OWNER: C. Merchant overview: totals, what needs attention, AI-recommended actions and recent activity.
+// Everything here is computed from GET /api/cases. Nothing is invented.
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import type { CaseRecord, PollDisputesResponse } from '@/contracts/schemas';
-import type { z } from 'zod';
-import { ApiClientError, apiFetch } from '@/fixtures/api';
-import { Badge, Shell } from '../_ui/Shell';
-import { FAULT, STATUS, formatMoney, formatWhen, needsReview, reasonLabel } from '../_ui/labels';
+import { useMemo } from 'react';
+import type { CaseRecord } from '@/contracts/schemas';
+import { Badge, Card, EmptyState, Notice, PageHeader, Skeleton, StatCard } from '../_ui/Ui';
+import { ACTION, FAULT, formatMoney, formatWhen, needsReview, reasonLabel } from '../_ui/labels';
+import { useCases } from '../_ui/useCases';
 import u from '../_ui/ui.module.css';
-import s from './merchant.module.css';
+import m from './merchant.module.css';
 
-type Poll = z.infer<typeof PollDisputesResponse>;
-
-function errMsg(e: unknown): string {
-  if (e instanceof ApiClientError) return e.body.message ?? e.body.error ?? `Request failed (${e.status})`;
-  return e instanceof Error ? e.message : 'Something went wrong';
+interface Activity {
+  key: string;
+  id: string;
+  at: string;
+  text: string;
 }
 
-export default function MerchantPage() {
-  const [cases, setCases] = useState<CaseRecord[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [polling, setPolling] = useState(false);
-  const [pollMsg, setPollMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [fixtures, setFixtures] = useState(false);
-
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setLoadError(null);
-    try {
-      const r = await apiFetch<CaseRecord[]>('/api/cases', { signal });
-      if (r.fromFixture) setFixtures(true);
-      setCases([...r.data].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)));
-    } catch (e) {
-      if (signal?.aborted) return;
-      setLoadError(errMsg(e));
-    }
-  }, []);
-
-  useEffect(() => {
-    const ctl = new AbortController();
-    void load(ctl.signal);
-    return () => ctl.abort();
-  }, [load]);
-
-  async function poll() {
-    setPolling(true);
-    setPollMsg(null);
-    try {
-      const r = await apiFetch<Poll>('/api/disputes/poll', { method: 'POST' });
-      if (r.fromFixture) setFixtures(true);
-      const { fetched, new_cases, linked } = r.data;
-      setPollMsg({
-        ok: true,
-        text:
-          new_cases > 0
-            ? `Found ${new_cases} new dispute${new_cases === 1 ? '' : 's'} (${fetched} checked, ${linked} linked to an order).`
-            : `Up to date: ${fetched} dispute${fetched === 1 ? '' : 's'} checked, none new.`,
-      });
-      await load();
-    } catch (e) {
-      setPollMsg({ ok: false, text: `Could not check PayPal: ${errMsg(e)}` });
-    } finally {
-      setPolling(false);
+function activity(cases: CaseRecord[]): Activity[] {
+  const out: Activity[] = [];
+  for (const c of cases) {
+    out.push({ key: `${c.dispute_id}-open`, id: c.dispute_id, at: c.created_at, text: `Dispute opened: ${reasonLabel(c.reason)}` });
+    if (c.analysis_status === 'acted') {
+      out.push({ key: `${c.dispute_id}-act`, id: c.dispute_id, at: c.updated_at, text: `Action taken: ${ACTION[c.action_taken ?? ''] ?? c.action_taken ?? 'resolved'}` });
+    } else if (c.verdict) {
+      out.push({ key: `${c.dispute_id}-ai`, id: c.dispute_id, at: c.updated_at, text: `AI recommended: ${ACTION[c.verdict.action] ?? c.verdict.action} (${FAULT[c.verdict.fault].label})` });
     }
   }
+  return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 6);
+}
 
-  const toReview = cases?.filter(needsReview).length ?? 0;
+export default function OverviewPage() {
+  const { cases, error, fixtures, reload } = useCases();
+
+  const stats = useMemo(() => {
+    if (!cases) return null;
+    const resolved = cases.filter((c) => c.analysis_status === 'acted').length;
+    const review = cases.filter(needsReview);
+    const byAction = new Map<string, number>();
+    for (const c of cases) {
+      if (c.verdict && c.analysis_status !== 'acted') byAction.set(c.verdict.action, (byAction.get(c.verdict.action) ?? 0) + 1);
+    }
+    return { total: cases.length, pending: cases.length - resolved, resolved, review, byAction: [...byAction.entries()].sort((a, b) => b[1] - a[1]) };
+  }, [cases]);
+
+  const recent = useMemo(() => (cases ? activity(cases) : []), [cases]);
 
   return (
-    <Shell active="merchant">
-      <div className={u.pageHead}>
-        <div>
-          <h1 className={u.h1}>Disputes</h1>
-          <p className={u.sub}>Each case is checked against the buyer&apos;s signed mandate.</p>
-        </div>
-        <div className={s.actions}>
-          <button className={`${u.btn} ${u.btnGhost}`} onClick={() => load()} disabled={polling}>
-            Refresh
-          </button>
-          <button className={u.btn} onClick={poll} disabled={polling}>
-            {polling ? 'Checking PayPal…' : 'Poll disputes'}
-          </button>
-        </div>
-      </div>
+    <>
+      <PageHeader title="Overview" subtitle="Disputes on your orders and what the AI recommends for each." />
 
-      {fixtures && (
-        <div className={u.notice} role="status">
-          Sample data: the disputes service is not available, so example cases are shown.
-        </div>
-      )}
-      {pollMsg && (
-        <div className={`${u.notice} ${pollMsg.ok ? u.noticeGood : u.noticeBad}`} role="status">
-          {pollMsg.text}
-        </div>
-      )}
-
-      {cases && cases.length > 0 && (
-        <div className={s.summary}>
-          <div className={`${u.card} ${s.stat}`}>
-            <div className={s.statNum}>{cases.length}</div>
-            <div className={u.muted}>Total cases</div>
-          </div>
-          <div className={`${u.card} ${s.stat}`}>
-            <div className={s.statNum}>{toReview}</div>
-            <div className={u.muted}>Need your review</div>
-          </div>
-        </div>
-      )}
-
-      {loadError && (
-        <div className={`${u.notice} ${u.noticeBad}`} role="alert">
-          Could not load disputes: {loadError}{' '}
-          <button className={`${u.btn} ${u.btnGhost}`} onClick={() => load()}>
+      {fixtures && <Notice tone="warn">Sample data: the disputes service is not available, so example disputes are shown.</Notice>}
+      {error && (
+        <Notice tone="bad" alert>
+          Could not load disputes: {error}{' '}
+          <button className={`${u.btn} ${u.btnSecondary}`} onClick={reload}>
             Try again
           </button>
-        </div>
+        </Notice>
       )}
 
-      {!cases && !loadError && (
-        <div className={`${u.card} ${s.list}`} aria-busy="true" aria-label="Loading disputes">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className={`${u.skeleton} ${s.skelRow}`} />
-          ))}
+      {!cases && !error && (
+        <div className={m.skelStack} aria-busy="true" aria-label="Loading overview">
+          <Skeleton height={84} />
+          <Skeleton height={200} />
         </div>
       )}
 
       {cases && cases.length === 0 && (
-        <div className={`${u.card} ${u.empty}`}>
-          <h2>No disputes yet</h2>
-          <p className={u.muted}>Click &ldquo;Poll disputes&rdquo; to pull new ones from PayPal.</p>
-        </div>
+        <Card>
+          <EmptyState title="No disputes yet" action={<Link href="/merchant/disputes" className={`${u.btn}`} style={{ textDecoration: 'none' }}>Go to disputes</Link>}>
+            When a buyer disputes a payment, it appears here with an AI recommendation.
+          </EmptyState>
+        </Card>
       )}
 
-      {cases && cases.length > 0 && (
-        <ul className={`${u.card} ${s.list}`}>
-          <li className={s.head} aria-hidden="true">
-            <span>Reason</span>
-            <span>Status</span>
-            <span>Amount</span>
-            <span>AI verdict</span>
-            <span>Opened</span>
-          </li>
-          {cases.map((c) => {
-            const status = STATUS[c.analysis_status];
-            const fault = c.verdict ? FAULT[c.verdict.fault] : null;
-            return (
-              <li key={c.dispute_id}>
-                <Link
-                  href={`/merchant/${encodeURIComponent(c.dispute_id)}`}
-                  className={`${s.row} ${needsReview(c) ? s.rowReview : ''}`}
-                >
-                  <span>
-                    <span className={s.reason}>{reasonLabel(c.reason)}</span>
-                    <br />
-                    <span className={u.muted}>{c.dispute_id}</span>
-                  </span>
-                  <span>
-                    <Badge tone={status.tone}>{status.label}</Badge>
-                  </span>
-                  <span className={s.amount}>{c.amount ? formatMoney(c.amount.value, c.amount.currency) : '—'}</span>
-                  <span>
-                    {fault ? (
-                      <>
-                        <Badge tone={fault.tone}>{fault.label}</Badge>
-                        <br />
-                        <span className={u.muted}>{Math.round((c.verdict?.confidence ?? 0) * 100)}% confident</span>
-                      </>
-                    ) : (
-                      <span className={u.muted}>No verdict yet</span>
-                    )}
-                  </span>
-                  <span className={`${u.muted} ${s.opened}`}>
-                    {formatWhen(c.created_at)}
-                    <span className={s.chev} aria-hidden="true">
-                      ›
+      {stats && cases && cases.length > 0 && (
+        <>
+          <div className={u.stats}>
+            <StatCard label="Total disputes" value={stats.total} />
+            <StatCard label="Pending" value={stats.pending} hint="Not resolved yet" />
+            <StatCard label="Need your review" value={stats.review.length} hint="Waiting for a decision" />
+            <StatCard label="Resolved" value={stats.resolved} hint="Action sent to PayPal" />
+          </div>
+
+          <div className={m.grid2}>
+            <Card id="attention" title="Needs your review" subtitle="A person must approve these before anything is sent." flush>
+              {stats.review.length === 0 ? (
+                <EmptyState title="All caught up">No disputes are waiting for a decision.</EmptyState>
+              ) : (
+                <ul className={m.list}>
+                  {stats.review.map((c) => (
+                    <li key={c.dispute_id} className={m.listItem}>
+                      <Link href={`/merchant/disputes/${encodeURIComponent(c.dispute_id)}`} className={m.listLink}>
+                        <span>
+                          <span className={m.listTitle}>{reasonLabel(c.reason)}</span>
+                          <br />
+                          <span className={u.muted}>
+                            {c.dispute_id}
+                            {c.amount ? ` · ${formatMoney(c.amount.value, c.amount.currency)}` : ''}
+                          </span>
+                        </span>
+                        {c.verdict && <Badge tone={FAULT[c.verdict.fault].tone}>{FAULT[c.verdict.fault].label}</Badge>}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card id="actions" title="AI-recommended actions" subtitle="For disputes that are not resolved yet.">
+              {stats.byAction.length === 0 ? (
+                <p className={u.muted} style={{ margin: 0 }}>No open recommendations.</p>
+              ) : (
+                stats.byAction.map(([action, n]) => (
+                  <div key={action} className={m.barRow}>
+                    <span>{ACTION[action] ?? action}</span>
+                    <div className={u.meter} role="img" aria-label={`${n} of ${stats.pending}`}>
+                      <div className={u.meterFill} style={{ width: `${(n / Math.max(stats.pending, 1)) * 100}%` }} />
+                    </div>
+                    <strong>{n}</strong>
+                  </div>
+                ))
+              )}
+            </Card>
+          </div>
+
+          <Card id="recent" title="Recent dispute activity" flush>
+            <ul className={m.list}>
+              {recent.map((a) => (
+                <li key={a.key} className={m.listItem}>
+                  <Link href={`/merchant/disputes/${encodeURIComponent(a.id)}`} className={m.listLink}>
+                    <span>
+                      <span className={m.listTitle}>{a.text}</span>
+                      <br />
+                      <span className={u.muted}>{a.id}</span>
                     </span>
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                    <span className={u.muted}>{formatWhen(a.at)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </>
       )}
-    </Shell>
+    </>
   );
 }
+

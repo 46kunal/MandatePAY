@@ -1,5 +1,5 @@
 // OWNER: C. Plain-English labels and formatting shared by the buyer and merchant views.
-import type { AnalysisStatus, CaseRecord, Verdict } from '@/contracts/schemas';
+import type { ActionType, AnalysisStatus, CaseRecord, Verdict } from '@/contracts/schemas';
 
 export type Tone = 'good' | 'bad' | 'warn' | 'info' | 'neutral';
 
@@ -24,16 +24,37 @@ export function reasonLabel(code: string | null | undefined): string {
 
 export const FAULT: Record<Verdict['fault'], { label: string; tone: Tone }> = {
   merchant: { label: 'Merchant at fault', tone: 'bad' },
-  agent: { label: 'Agent error', tone: 'warn' },
+  agent: { label: 'Agent at fault', tone: 'warn' },
   buyer_regret: { label: 'Buyer regret', tone: 'info' },
-  unclear: { label: 'Unclear', tone: 'neutral' },
+  unclear: { label: 'Needs further review', tone: 'neutral' },
+};
+
+/** What each classification means for the merchant, in one plain sentence each. */
+export const OUTCOME: Record<Verdict['fault'], { headline: string; meaning: string; followUp?: string }> = {
+  merchant: {
+    headline: 'The merchant is likely at fault',
+    meaning: 'The buyer authorised the right purchase, but what arrived does not match it. A refund is the fair outcome.',
+  },
+  agent: {
+    headline: 'The shopping agent is likely at fault',
+    meaning: 'The merchant fulfilled the order as listed, but the agent bought something the buyer did not clearly authorise.',
+    followUp: 'Suggested follow-up (not automated): review the agent that placed this order.',
+  },
+  buyer_regret: {
+    headline: 'This looks like buyer regret',
+    meaning: 'The cart respected the buyer’s mandate and the order appears to have been fulfilled. Respond with the evidence.',
+  },
+  unclear: {
+    headline: 'The evidence does not settle this',
+    meaning: 'The AI could not decide fairly on the data available. A person should review the case before anything is sent.',
+  },
 };
 
 export const STATUS: Record<AnalysisStatus, { label: string; tone: Tone }> = {
-  pending: { label: 'Not analysed yet', tone: 'neutral' },
-  analysed: { label: 'Analysed', tone: 'info' },
+  pending: { label: 'Not analysed', tone: 'neutral' },
+  analysed: { label: 'Ready to review', tone: 'info' },
   awaiting_human: { label: 'Needs your review', tone: 'warn' },
-  acted: { label: 'Action taken', tone: 'good' },
+  acted: { label: 'Resolved', tone: 'good' },
   error: { label: 'Analysis failed', tone: 'bad' },
 };
 
@@ -45,11 +66,20 @@ export const ACTION: Record<string, string> = {
   NO_ACTION: 'Do nothing',
 };
 
+export const ACTION_LIST: ActionType[] = ['PROVIDE_EVIDENCE', 'MAKE_OFFER', 'ACCEPT_CLAIM', 'SEND_MESSAGE', 'NO_ACTION'];
+
+export const OFFER_LABEL: Record<string, string> = {
+  REFUND: 'Full refund',
+  REFUND_WITH_RETURN: 'Refund after the item is returned',
+  REFUND_WITH_REPLACEMENT: 'Refund with a replacement',
+  REPLACEMENT_WITHOUT_REFUND: 'Replacement only',
+};
+
 export const RULE: Record<string, string> = {
-  max_total: 'Spending limit',
+  max_total: 'Budget',
   categories: 'Product category',
   max_quantity: 'Quantity',
-  required_attributes: 'Required details',
+  required_attributes: 'Size and attributes',
   deadline: 'Delivery deadline',
   approval_threshold: 'Approval limit',
   require_approval_over: 'Approval limit',
@@ -87,11 +117,11 @@ export function needsReview(c: CaseRecord): boolean {
   return c.analysis_status === 'awaiting_human';
 }
 
-/** Guard check status -> badge, for the buyer's rule list. (The merchant diff uses Match / Mismatch instead.) */
+/** Guard check status -> label and tone. */
 export const CHECK_RESULT: Record<'pass' | 'fail' | 'unsure' | 'escalate', { label: string; tone: Tone }> = {
-  pass: { label: 'Pass', tone: 'good' },
-  fail: { label: 'Fail', tone: 'bad' },
-  unsure: { label: 'Not confirmed', tone: 'warn' },
+  pass: { label: 'Passed', tone: 'good' },
+  fail: { label: 'Failed', tone: 'bad' },
+  unsure: { label: 'Could not confirm', tone: 'warn' },
   escalate: { label: 'Needs approval', tone: 'warn' },
 };
 
@@ -105,4 +135,8 @@ export function formatDay(iso: string): string {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return iso;
   return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+}
+
+export function formatDateTime(iso?: string | null): string {
+  return iso ? new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 }
