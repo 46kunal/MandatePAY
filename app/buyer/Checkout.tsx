@@ -9,6 +9,8 @@ import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
 import type { Cart, CaptureOrderResponse, GuardResult, PlaceOrderResponse } from '@/contracts/schemas';
 import type { z } from 'zod';
 import { ApiClientError, apiFetch } from '@/fixtures/api';
+import { formatMoney } from '../_ui/labels';
+import u from '../_ui/ui.module.css';
 import s from './buyer.module.css';
 
 type Placed = z.infer<typeof PlaceOrderResponse>;
@@ -109,10 +111,10 @@ export default function Checkout({
             .filter((c) => c.status === 'escalate' || c.status === 'unsure')
             .map((c) => c.detail)
             .join(' ') || 'the server asked for confirmation.'}{' '}
-          Total {guard.total} {guard.currency}.
+          Total {formatMoney(guard.total, guard.currency)}.
         </p>
         <div className={s.row}>
-          <button className={s.btn} onClick={() => setApproved(true)}>
+          <button className={u.btn} onClick={() => setApproved(true)}>
             I approve this purchase
           </button>
         </div>
@@ -159,11 +161,11 @@ export default function Checkout({
       ) : (
         <>
           <p className={s.muted}>
-            Demo mode: no PayPal client id is set (NEXT_PUBLIC_PAYPAL_CLIENT_ID), so the PayPal button is simulated.
+            PayPal is simulated in demo mode, so no real money moves.
           </p>
           <div className={s.row}>
-            <button className={s.btn} onClick={simulate} disabled={busy}>
-              {busy ? 'Paying…' : `Pay ${guard.total} ${guard.currency} with PayPal (simulated)`}
+            <button className={u.btn} onClick={simulate} disabled={busy}>
+              {busy ? 'Paying…' : `Pay ${formatMoney(guard.total, guard.currency)} with PayPal`}
             </button>
           </div>
         </>

@@ -236,3 +236,19 @@
 .approval p {
   margin: 0.4rem 0 0;
 }
+
+.hint {
+  margin: -0.4rem 0 0.8rem;
+  color: #5b6478;
+  font-size: 0.95rem;
+}
+.numDone {
+  background: #14672b;
+}
+.badgeCol {
+  flex: 0 0 7.5rem;
+}
+.price {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

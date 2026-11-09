@@ -3,7 +3,6 @@
 // Uses apiFetch, which falls back to fixtures when a route answers 501 (see fixtures/api.ts).
 // PayPal checkout (C3) lives in ./Checkout.tsx, shown below the guard result.
 import { useState } from 'react';
-import Link from 'next/link';
 import type {
   Cart,
   Constraints,
@@ -14,6 +13,9 @@ import type {
 import type { z } from 'zod';
 import { ApiClientError, apiFetch } from '@/fixtures/api';
 import { cartAllowed, cartBlocked, cartNeedsApproval } from '@/fixtures';
+import { Badge, Shell } from '../_ui/Shell';
+import { CHECK_RESULT, formatDay, formatMoney, ruleLabel, titleCase } from '../_ui/labels';
+import u from '../_ui/ui.module.css';
 import Checkout from './Checkout';
 import s from './buyer.module.css';
 
@@ -34,8 +36,15 @@ function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : 'Something went wrong';
 }
 
-function money(v: string, c: string) {
-  return `${v} ${c}`;
+const money = formatMoney;
+
+/** Numbered step marker that turns into a tick once the step is done. */
+function StepNum({ n, done }: { n: number; done: boolean }) {
+  return (
+    <span className={`${s.num} ${done ? s.numDone : ''}`} aria-label={done ? `Step ${n} done` : `Step ${n}`}>
+      {done ? '✓' : n}
+    </span>
+  );
 }
 
 export default function BuyerPage() {
@@ -100,26 +109,26 @@ export default function BuyerPage() {
   }
 
   return (
-    <main className={s.page}>
-      <header className={s.header}>
-        <h1 className={s.title}>Buyer</h1>
-        <nav className={s.nav}>
-          <Link href="/">Home</Link>
-          <Link href="/merchant">Merchant view</Link>
-        </nav>
-      </header>
+    <Shell active="buyer">
+      <div className={u.pageHead}>
+        <div>
+          <h1 className={u.h1}>Buy with an AI agent</h1>
+          <p className={u.sub}>You set the limits. Every purchase is checked against them before PayPal is charged.</p>
+        </div>
+      </div>
 
       {usingFixtures && (
         <div className={s.banner} role="status">
-          Demo data: some API routes are not built yet, so sample responses are shown.
+          Sample data: the server is not available for some steps, so example responses are shown.
         </div>
       )}
 
       {/* 1. Request */}
       <section className={s.step}>
         <h2 className={s.stepTitle}>
-          <span className={s.num}>1</span> Tell your agent what to buy
+          <StepNum n={1} done={!!draft} /> Tell your agent what to buy
         </h2>
+        <p className={s.hint}>Write it the way you would tell a person. We turn it into limits you can review.</p>
         <textarea
           className={s.textarea}
           value={text}
@@ -128,8 +137,8 @@ export default function BuyerPage() {
           aria-label="Purchase request"
         />
         <div className={s.row}>
-          <button className={s.btn} onClick={onDraft} disabled={busy !== null || text.trim() === ''}>
-            {busy === 'draft' ? 'Drafting…' : 'Draft mandate'}
+          <button className={u.btn} onClick={onDraft} disabled={busy !== null || text.trim() === ''}>
+            {busy === 'draft' ? 'Drafting…' : draft ? 'Draft again' : 'Draft mandate'}
           </button>
           <span className={s.muted}>{text.length}/1000</span>
         </div>
@@ -145,8 +154,9 @@ export default function BuyerPage() {
       {draft && (
         <section className={s.step}>
           <h2 className={s.stepTitle}>
-            <span className={s.num}>2</span> Review your mandate
+            <StepNum n={2} done={!!mandate} /> Review your mandate
           </h2>
+          <p className={s.hint}>These are your limits. Once you confirm, they are signed and nothing outside them can be bought.</p>
           <MandateCard constraints={draft.constraints} />
           {draft.warnings.length > 0 && (
             <ul className={s.warnings}>
@@ -157,15 +167,16 @@ export default function BuyerPage() {
           )}
           <div className={s.row}>
             {mandate ? (
-              <span className={`${s.badge} ${s.pass}`}>
-                Confirmed · {mandate.mandate_id}
-              </span>
+              <>
+                <Badge tone="good">✓ Mandate signed</Badge>
+                <span className={s.muted}>Confirmed · {mandate.mandate_id}</span>
+              </>
             ) : (
-              <button className={s.btn} onClick={onConfirm} disabled={busy !== null}>
+              <button className={u.btn} onClick={onConfirm} disabled={busy !== null}>
                 {busy === 'confirm' ? 'Signing…' : 'Confirm & sign mandate'}
               </button>
             )}
-            {mandate && <span className={s.muted}>Expires {new Date(mandate.expires_at).toLocaleDateString()}</span>}
+            {mandate && <span className={s.muted}>Valid until {formatDay(mandate.expires_at)}</span>}
           </div>
         </section>
       )}
@@ -174,8 +185,9 @@ export default function BuyerPage() {
       {mandate && (
         <section className={s.step}>
           <h2 className={s.stepTitle}>
-            <span className={s.num}>3</span> Cart your agent wants to buy
+            <StepNum n={3} done={false} /> Cart your agent wants to buy
           </h2>
+          <p className={s.hint}>Pick what your agent found. It is checked against your limits before PayPal is charged.</p>
           <div className={s.chips} role="group" aria-label="Sample agent cart">
             {CART_OPTIONS.map((o) => (
               <button
@@ -190,7 +202,7 @@ export default function BuyerPage() {
           </div>
           <CartView cart={cart} />
           <div className={s.row}>
-            <button className={s.btn} onClick={() => onCheck()} disabled={busy !== null}>
+            <button className={guard ? `${u.btn} ${u.btnGhost}` : u.btn} onClick={() => onCheck()} disabled={busy !== null}>
               {busy === 'check' ? 'Checking…' : 'Check against mandate'}
             </button>
           </div>
@@ -206,7 +218,7 @@ export default function BuyerPage() {
           )}
         </section>
       )}
-    </main>
+    </Shell>
   );
 }
 
@@ -219,25 +231,25 @@ function MandateCard({ constraints: c }: { constraints: Constraints }) {
       </div>
       <div>
         <dt>Categories</dt>
-        <dd>{c.categories?.join(', ') ?? 'Any'}</dd>
+        <dd>{c.categories?.length ? c.categories.join(', ') : 'Any'}</dd>
       </div>
       <div>
         <dt>Max quantity</dt>
         <dd>{c.max_quantity ?? 'Any'}</dd>
       </div>
       <div>
-        <dt>Required attributes</dt>
+        <dt>Required details</dt>
         <dd>
-          {c.required_attributes
+          {c.required_attributes && Object.keys(c.required_attributes).length
             ? Object.entries(c.required_attributes)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(', ')
+                .map(([k, v]) => `${titleCase(k)}: ${v}`)
+                .join(' · ')
             : 'None'}
         </dd>
       </div>
       <div>
         <dt>Deliver by</dt>
-        <dd>{c.deadline ? new Date(c.deadline).toLocaleDateString() : 'No deadline'}</dd>
+        <dd>{c.deadline ? formatDay(c.deadline) : 'No deadline'}</dd>
       </div>
       <div>
         <dt>Ask me first over</dt>
@@ -255,15 +267,15 @@ function CartView({ cart }: { cart: Cart }) {
           <div>
             <strong>{i.name}</strong> × {i.quantity}
             <div className={s.muted}>
-              {i.attributes ? Object.entries(i.attributes).map(([k, v]) => `${k}: ${v}`).join(' · ') : ''}
+              {i.attributes ? Object.entries(i.attributes).map(([k, v]) => `${titleCase(k)}: ${v}`).join(' · ') : ''}
             </div>
           </div>
-          <div>{money(i.unit_price, cart.currency)}</div>
+          <div className={s.price}>{money(i.unit_price, cart.currency)}</div>
         </div>
       ))}
       <div className={s.muted}>
         {cart.merchant ?? 'Unknown merchant'}
-        {cart.delivery_eta ? ` · delivery ${new Date(cart.delivery_eta).toLocaleDateString()}` : ''}
+        {cart.delivery_eta ? ` · delivery by ${formatDay(cart.delivery_eta)}` : ''}
       </div>
     </div>
   );
@@ -285,9 +297,11 @@ function GuardView({ guard }: { guard: GuardResult }) {
       <ul className={s.checks}>
         {guard.checks.map((c) => (
           <li key={c.rule} className={s.check}>
-            <span className={`${s.badge} ${s[c.status]}`}>{c.status}</span>
+            <span className={s.badgeCol}>
+              <Badge tone={CHECK_RESULT[c.status].tone}>{CHECK_RESULT[c.status].label}</Badge>
+            </span>
             <div>
-              <div className={s.rule}>{c.rule.replace(/_/g, ' ')}</div>
+              <div className={s.rule}>{ruleLabel(c.rule)}</div>
               <div className={s.muted}>{c.detail}</div>
             </div>
           </li>

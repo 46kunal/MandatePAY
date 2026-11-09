@@ -1,12 +1,8 @@
 import { apiError } from '@/lib/http';
 import { seedDemo } from '@/scripts/seed-lib';
+import { isDemoMode } from '../_demo';
 
 export const runtime = 'nodejs';
-
-/** Demo mode is opt-in: set DEMO_MODE=true. Anything else (including unset) refuses to wipe data. */
-function isDemoMode(): boolean {
-  return process.env.DEMO_MODE?.trim().toLowerCase() === 'true';
-}
 
 // OWNER: C. POST. Reset the database to the seeded demo state (see scripts/seed.ts). 403 outside demo mode.
 export async function POST() {
