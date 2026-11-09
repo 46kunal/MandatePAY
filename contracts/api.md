@@ -9,6 +9,7 @@ Errors always use `ApiError` (`{ error, message?, details? }`). Amounts are stri
 | POST `/api/mandates/draft` | B | `DraftMandateRequest` | `DraftMandateResponse` | 400 invalid, 502 LLM failed |
 | POST `/api/mandates` | B | `CreateMandateRequest` | `CreateMandateResponse` | 400 invalid constraints |
 | POST `/api/carts/check` | B | `CartCheckRequest` | `CartCheckResponse` (`GuardResult`) | 404 mandate, 410 expired |
+| GET `/api/orders` | A | none | `ListOrdersResponse` (newest first, with any dispute id) | none |
 | POST `/api/orders` | A | `PlaceOrderRequest` | `PlaceOrderResponse` (`created` or `needs_approval`) | 422 `guard_blocked`, 502 PayPal |
 | POST `/api/orders/:id/capture` | A | none | `CaptureOrderResponse` | 404 order, 409 already captured, 502 PayPal |
 | POST `/api/webhooks/paypal` | A | PayPal event | `200` fast | 400 bad signature |

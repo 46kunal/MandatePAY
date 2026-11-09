@@ -234,6 +234,25 @@ export const CaptureOrderResponse = z.object({
   status: z.string(),
 });
 
+/** One row of GET /api/orders: an order placed through MandatePay, its payment state and any dispute on it. */
+export const OrderSummary = z.object({
+  paypal_order_id: z.string(),
+  cart_id: z.string(),
+  mandate_id: z.string(),
+  status: z.string(), // PayPal order status, e.g. PAYER_ACTION_REQUIRED, APPROVED, COMPLETED
+  total: Amount,
+  currency: z.string().length(3),
+  items: z.array(z.object({ name: z.string(), quantity: z.number().int() })),
+  capture_id: z.string().optional(),
+  receipt_hash: z.string().optional(),
+  created_at: z.string(),
+  captured_at: z.string().optional(),
+  dispute_id: z.string().optional(),
+});
+export type OrderSummary = z.infer<typeof OrderSummary>;
+
+export const ListOrdersResponse = z.object({ orders: z.array(OrderSummary) });
+
 export const PollDisputesResponse = z.object({
   fetched: z.number().int(),
   new_cases: z.number().int(),
