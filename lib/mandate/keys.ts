@@ -5,9 +5,13 @@
  *  - "buyer": signs the open mandate when the buyer confirms it.
  *  - "agent": signs a closed mandate when the cart was within limits and needed no approval.
  *
- * Keys live in KEY_DIR (default ".keys", gitignored). The private key PEM is the single
- * source of truth: the public key is derived from it, so there is no second file to drift.
- * Keys are created on first use. Sandbox/demo only: a real deployment would keep the buyer
+ * Where keys come from, in order:
+ *  1. MANDATE_BUYER_PRIVATE_KEY / MANDATE_AGENT_PRIVATE_KEY (base64 of the PKCS#8 PEM, or the PEM itself).
+ *     Used on hosts with no lasting disk (Vercel). Export the local keys with `npm run keys:export`.
+ *  2. Files in KEY_DIR (default ".keys", gitignored), created on first use. Local and Docker only.
+ * On Vercel without the env keys this fails loudly: a key generated per instance would make every
+ * signature unverifiable on the next instance.
+ * The private key PEM is the single source of truth: the public key is derived from it. Sandbox/demo only: a real deployment would keep the buyer
  * key on the buyer's device or in a KMS, not on the server.
  */
 import { createHash, createPublicKey, generateKeyPairSync } from 'node:crypto';
@@ -37,16 +41,19 @@ const cache = new Map<string, Promise<MandateKeyPair>>();
 /** Absolute key directory: explicit argument, then KEY_DIR, then ".keys". Empty strings count as unset. */
 export function resolveKeyDir(dir?: string): string {
   const chosen = dir?.trim() || process.env.KEY_DIR?.trim() || '.keys';
-  return path.resolve(chosen);
+  // Runtime-chosen directory: tell the bundler not to trace it (it would pull the whole project into the build).
+  return path.resolve(/*turbopackIgnore: true*/ chosen);
 }
 
 /** Load the key pair for a role, creating and persisting it on first use. Cached per directory and role. */
 export function getKeyPair(role: KeyRole, dir?: string): Promise<MandateKeyPair> {
+  // An explicit directory (tests) always means files; otherwise an env key wins.
+  const fromEnv = dir === undefined ? envPrivateKey(role) : undefined;
   const resolved = resolveKeyDir(dir);
-  const cacheKey = `${resolved}::${role}`;
+  const cacheKey = fromEnv !== undefined ? `env::${role}` : `${resolved}::${role}`;
   let pending = cache.get(cacheKey);
   if (!pending) {
-    pending = loadOrCreate(role, resolved);
+    pending = fromEnv !== undefined ? fromPem(role, fromEnv) : loadOrCreate(role, resolved);
     cache.set(cacheKey, pending);
     // Do not cache failures: the next call should try again.
     pending.catch(() => cache.delete(cacheKey));
@@ -57,6 +64,28 @@ export function getKeyPair(role: KeyRole, dir?: string): Promise<MandateKeyPair>
 /** Test helper: forget cached keys so the next call reads from disk again. */
 export function resetKeyCache(): void {
   cache.clear();
+}
+
+/** Env variable holding a role's private key. */
+export function keyEnvName(role: KeyRole): string {
+  return `MANDATE_${role.toUpperCase()}_PRIVATE_KEY`;
+}
+
+/** The role's private key PEM from the environment, or undefined. Accepts a PEM or base64 of a PEM. */
+export function envPrivateKey(role: KeyRole, env: Record<string, string | undefined> = process.env): string | undefined {
+  const raw = env[keyEnvName(role)]?.trim();
+  if (!raw) {
+    if (env.VERCEL === '1') {
+      throw new Error(`${keyEnvName(role)} is not set. On Vercel mandate keys must come from env (npm run keys:export).`);
+    }
+    return undefined;
+  }
+  // A PEM pasted into one line has literal "\n" sequences; turn them back into newlines.
+  const pem = raw.includes('-----BEGIN') ? raw.replace(/\\n/g, '\n') : Buffer.from(raw, 'base64').toString('utf8');
+  if (!pem.includes('-----BEGIN PRIVATE KEY-----')) {
+    throw new Error(`${keyEnvName(role)} is not a PKCS#8 private key PEM (or base64 of one).`);
+  }
+  return pem;
 }
 
 async function loadOrCreate(role: KeyRole, dir: string): Promise<MandateKeyPair> {
@@ -72,7 +101,10 @@ async function loadOrCreate(role: KeyRole, dir: string): Promise<MandateKeyPair>
     // If another process created the file first, createExclusive kept theirs: read what is really there.
     privatePem = (await readIfExists(privatePath)) ?? generated;
   }
+  return fromPem(role, privatePem);
+}
 
+async function fromPem(role: KeyRole, privatePem: string): Promise<MandateKeyPair> {
   const derived = createPublicKey(privatePem);
   const publicPem = derived.export({ type: 'spki', format: 'pem' }).toString();
   const publicDer = derived.export({ type: 'spki', format: 'der' });

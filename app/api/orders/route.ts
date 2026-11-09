@@ -7,6 +7,8 @@ import { placeOrder } from '@/lib/paypal/service';
 import type { z } from 'zod';
 
 export const runtime = 'nodejs';
+// Calls the AI model: up to 60 s per attempt plus one fallback attempt.
+export const maxDuration = 150;
 export const dynamic = 'force-dynamic';
 
 // OWNER: A. GET -> ListOrdersResponse: every order placed here, newest first, with its total and any dispute id.

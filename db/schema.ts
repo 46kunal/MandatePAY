@@ -2,7 +2,7 @@
  * Database schema (Postgres via Drizzle). OWNER: C implements and migrates; orchestrator approves changes.
  * Column shapes mirror contracts/schemas.ts. Totals are integer minor units.
  */
-import { boolean, integer, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, integer, jsonb, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
 import type { Cart, Constraints, GuardResult, Verdict } from '../contracts/schemas';
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });
@@ -97,4 +97,18 @@ export const events = pgTable('events', {
   payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
   processed: boolean('processed').notNull().default(false),
   receivedAt: ts('received_at').notNull().defaultNow(),
+});
+
+/**
+ * Store settings the owner can change in the app (one row, id "store"). Secrets are never stored here; they stay
+ * in environment variables. Columns left null fall back to the environment defaults (see lib/settings.ts).
+ */
+export const settings = pgTable('settings', {
+  id: text('id').primaryKey().default('store'),
+  storeName: text('store_name'),
+  supportEmail: text('support_email'),
+  approvalThresholdMinor: integer('approval_threshold_minor'),
+  humanReviewOverMinor: integer('human_review_over_minor'),
+  minConfidence: real('min_confidence'),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
 });

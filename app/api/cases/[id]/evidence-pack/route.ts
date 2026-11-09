@@ -3,6 +3,8 @@ import { getCaseDetail } from '@/lib/paypal/cases';
 import { buildEvidenceModel, renderEvidencePdf } from '@/lib/paypal/evidencePack';
 
 export const runtime = 'nodejs';
+// Builds the evidence PDF and calls PayPal.
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 // OWNER: A. GET -> application/pdf: the dispute's evidence pack (payment record, signed mandate, cart, guard checks, analysis).
