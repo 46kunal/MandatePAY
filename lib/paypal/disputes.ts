@@ -2,7 +2,7 @@
  * PayPal Disputes API (owner: A).
  *
  * Verified against a real sandbox dispute (see README): seller_transaction_id equals our orders.capture_id.
- * Links / allowed_response_options are only confirmed for the UNDER_PAYPAL_REVIEW stage (just a `self` link).
+ * Links / allowed_response_options confirmed for UNDER_PAYPAL_REVIEW (only `self`) and WAITING_FOR_SELLER_RESPONSE (underscore rels).
  */
 import { OfferType, type ActionType, type DisputeSummary, type Money } from '../../contracts/schemas';
 import type { PayPalClient } from './client';
@@ -22,6 +22,8 @@ export interface RawDispute {
   disputed_transactions?: { seller_transaction_id?: string; buyer_transaction_id?: string }[];
   messages?: { posted_by?: string; content?: string; time_posted?: string }[];
   allowed_response_options?: Record<string, unknown>;
+  /** Present once the dispute is resolved, e.g. outcome_code RESOLVED_BUYER_FAVOUR / RESOLVED_SELLER_FAVOUR. */
+  dispute_outcome?: { outcome_code?: string; amount_refunded?: { currency_code: string; value: string } };
   links?: PayPalLink[];
   update_time?: string;
   create_time?: string;
@@ -47,7 +49,8 @@ const OPTION_TO_ACTION: Record<string, ActionType> = {
 export function deriveAllowedActions(d: Pick<RawDispute, 'links' | 'allowed_response_options'>): ActionType[] {
   const found = new Set<ActionType>();
   for (const l of d.links ?? []) {
-    const a = LINK_TO_ACTION[l.rel];
+    // Docs use hyphens (make-offer) but the sandbox returns underscores (make_offer): accept both.
+    const a = LINK_TO_ACTION[l.rel.replace(/_/g, '-')];
     if (a) found.add(a);
   }
   for (const key of Object.keys(d.allowed_response_options ?? {})) {
