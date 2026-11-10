@@ -1,5 +1,6 @@
 import { analyseStoredCase } from '@/lib/analyst/runCase';
 import { requirePermission } from '@/lib/auth/guard';
+import { limited } from '@/lib/rateLimit';
 import { apiError } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -12,6 +13,8 @@ export const maxDuration = 150;
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const authz = await requirePermission(req, 'cases:analyse');
   if (!authz.ok) return authz.response;
+  const slow = limited(authz.user.id, 'ai', 15);
+  if (slow) return slow;
   const { id } = await ctx.params;
   const r = await analyseStoredCase(id);
   if (!r.ok) return apiError(r.status, r.error, r.message, r.details);

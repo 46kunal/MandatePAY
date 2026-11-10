@@ -1,5 +1,6 @@
 import { RefundOrderRequest } from '@/contracts/schemas';
 import { requirePermission } from '@/lib/auth/guard';
+import { limited } from '@/lib/rateLimit';
 import { apiError } from '@/lib/http';
 import { PayPalConfigError, PayPalError } from '@/lib/paypal';
 import { refundOrder } from '@/lib/paypal/refundOrder';
@@ -12,6 +13,8 @@ export const runtime = 'nodejs';
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const authz = await requirePermission(req, 'orders:refund');
   if (!authz.ok) return authz.response;
+  const slow = limited(authz.user.id, 'refund', 10);
+  if (slow) return slow;
   const { id } = await ctx.params;
   const body = RefundOrderRequest.safeParse(await req.json().catch(() => null));
   if (!body.success) return apiError(400, 'invalid_request', 'Expected { amount?, note?, idempotency_key }.', body.error.issues);
