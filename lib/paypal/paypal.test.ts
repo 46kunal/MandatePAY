@@ -20,6 +20,7 @@ import {
   listDisputes,
   makeOffer,
   provideEvidence,
+  sendMessage,
   toDisputeSummary,
   toMinor,
   verifyWebhookSignature,
@@ -325,6 +326,46 @@ describe('disputes calls', () => {
     const client = new PayPalClient(config, { fetch: f.impl });
     await acceptClaim(client, 'PP-D-1', 'ok');
     assert.equal(f.apiCalls()[0].headers['PayPal-Request-Id'], 'accept-PP-D-1');
+  });
+
+  it('send-message with a PDF sends multipart: message in input, the file in message_document', async () => {
+    const f = fakeFetch(() => ({ json: {} }));
+    const client = new PayPalClient(config, { fetch: f.impl });
+    const bytes = new TextEncoder().encode('%PDF-1.4 test');
+    const r = await sendMessage(client, 'PP-D-1', 'Here is the record.', [{ filename: 'evidence.pdf', contentType: 'application/pdf', bytes }]);
+    assert.deepEqual(r, { attached: true });
+    const form = f.apiCalls()[0].body as unknown as FormData;
+    assert.ok(form instanceof FormData);
+    assert.deepEqual(JSON.parse(await (form.get('input') as Blob).text()), { message: 'Here is the record.' });
+    assert.equal(((form.get('message_document') as File)).name, 'evidence.pdf');
+    assert.ok(f.apiCalls()[0].url.endsWith('/v1/customer/disputes/PP-D-1/send-message'));
+  });
+
+  it('send-message falls back to plain text when PayPal refuses the upload, so the response still goes out', async () => {
+    let n = 0;
+    const f = fakeFetch(() => (++n === 1 ? { status: 422, json: { name: 'UNPROCESSABLE_ENTITY', message: 'bad file' } } : { json: {} }));
+    const client = new PayPalClient(config, { fetch: f.impl });
+    const bytes = new TextEncoder().encode('%PDF');
+    const r = await sendMessage(client, 'PP-D-1', 'Record', [{ filename: 'e.pdf', contentType: 'application/pdf', bytes }]);
+    assert.deepEqual(r, { attached: false });
+    const calls = f.apiCalls();
+    assert.equal(calls.length, 2);
+    assert.deepEqual(JSON.parse(calls[1].body!), { message: 'Record' });
+  });
+
+  it('send-message does not hide a PayPal outage behind the text fallback', async () => {
+    const f = fakeFetch(() => ({ status: 503, json: { name: 'SERVICE_UNAVAILABLE', message: 'down' } }));
+    const client = new PayPalClient(config, { fetch: f.impl });
+    const bytes = new TextEncoder().encode('%PDF');
+    await assert.rejects(sendMessage(client, 'PP-D-1', 'Record', [{ filename: 'e.pdf', contentType: 'application/pdf', bytes }]));
+    assert.equal(f.apiCalls().length, 1);
+  });
+
+  it('send-message without files is plain JSON, as before', async () => {
+    const f = fakeFetch(() => ({ json: {} }));
+    const client = new PayPalClient(config, { fetch: f.impl });
+    assert.deepEqual(await sendMessage(client, 'PP-D-1', 'Hi'), { attached: false });
+    assert.deepEqual(JSON.parse(f.apiCalls()[0].body!), { message: 'Hi' });
   });
 
   it('provide-evidence without files sends plain JSON', async () => {

@@ -41,7 +41,11 @@ export function toCaseRecord(row: CaseRow): CaseRecord {
     amount:
       row.amountMinor !== null && row.currency ? { value: fromMinor(row.amountMinor), currency: row.currency } : null,
     verdict: (row.verdict as Verdict | null) ?? null,
-    analysis_status: row.analysisStatus as CaseRecord['analysis_status'],
+    // Deciding to do nothing answers nobody, so such a case is still open (older rows were stored as acted).
+    analysis_status:
+      row.analysisStatus === 'acted' && row.actionTaken === 'NO_ACTION'
+        ? 'analysed'
+        : (row.analysisStatus as CaseRecord['analysis_status']),
     action_taken: row.actionTaken,
     outcome: row.outcome,
     response_due: responseDue(row.rawDispute as RawDispute | null | undefined),
@@ -127,4 +131,11 @@ export async function getCaseDetail(disputeId: string): Promise<CaseDetail | und
         }
       : null,
   };
+}
+
+/** One case as the list shows it (reads the row fresh), or undefined for an unknown dispute id. */
+export async function getCaseRecord(disputeId: string): Promise<CaseRecord | undefined> {
+  const [{ eq }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
+  const [row] = await db.select().from(schema.cases).where(eq(schema.cases.disputeId, disputeId)).limit(1);
+  return row ? toCaseRecord(row) : undefined;
 }

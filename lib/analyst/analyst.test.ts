@@ -46,6 +46,21 @@ const proposal = (over: Partial<Verdict> = {}): Verdict => ({
 });
 
 describe('guardrails (enforce)', () => {
+  it('provide-evidence not offered at this stage becomes a message that carries the evidence', () => {
+    const i = input({ allowed_actions: ['ACCEPT_CLAIM', 'MAKE_OFFER', 'SEND_MESSAGE', 'NO_ACTION'], amount: { value: '50.00', currency: 'USD' } });
+    const out = enforce(proposal({ fault: 'buyer_regret', action: 'PROVIDE_EVIDENCE', offer_type: undefined, confidence: 0.95 }), i);
+    assert.equal(out.action, 'SEND_MESSAGE');
+    assert.equal(out.needs_human, false); // the same intent, just a different channel
+    assert.match(out.reasoning, /sent in a message instead/);
+  });
+
+  it('with neither evidence nor message offered, it falls back to no action and a person', () => {
+    const i = input({ allowed_actions: ['ACCEPT_CLAIM', 'NO_ACTION'], amount: { value: '50.00', currency: 'USD' } });
+    const out = enforce(proposal({ fault: 'buyer_regret', action: 'PROVIDE_EVIDENCE', offer_type: undefined, confidence: 0.95 }), i);
+    assert.equal(out.action, 'NO_ACTION');
+    assert.equal(out.needs_human, true);
+  });
+
   it('a payment by a different PayPal payer than the buyer linked always needs a person', () => {
     const i = { ...input({ amount: { value: '50.00', currency: 'USD' } }), payment: { source: 'paypal', payer_check: 'different' as const, mandate_signed_with: 'buyer_key' as const } };
     const out = enforce(proposal({ fault: 'buyer_regret', action: 'MAKE_OFFER', confidence: 0.95 }), i);

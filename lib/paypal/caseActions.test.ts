@@ -53,8 +53,8 @@ function setup(c: { row?: Partial<CaseRow>; rawDispute?: RawDispute | null } = {
     store: {
       getCase: async (id) => (found && id === found.row.disputeId ? found : undefined),
       markActed: async (_id, f) => {
-        if (row!.analysisStatus === 'acted') return undefined;
-        row = { ...row!, analysisStatus: 'acted', actionTaken: f.action, outcome: f.outcome, actedBy: f.actedBy ?? null, updatedAt: new Date('2026-11-09T11:00:00Z') };
+        if (row!.analysisStatus === 'acted' && row!.actionTaken !== 'NO_ACTION') return undefined;
+        row = { ...row!, analysisStatus: f.close === false ? 'analysed' : 'acted', actionTaken: f.action, outcome: f.outcome, actedBy: f.actedBy ?? null, updatedAt: new Date('2026-11-09T11:00:00Z') };
         return row;
       },
     },
@@ -134,8 +134,37 @@ describe('actOnCase: happy paths', () => {
     const r = await actOnCase(s.deps, 'PP-D-1', { humanApproved: false });
     assert.equal(r.ok, true);
     assert.equal(s.calls.length, 0);
-    assert.equal(s.getRow()!.analysisStatus, 'acted');
+    assert.equal(s.getRow()!.analysisStatus, 'analysed'); // answered nobody: the case stays open
     assert.equal(s.getRow()!.actionTaken, 'NO_ACTION');
+    assert.match(s.getRow()!.outcome ?? '', /No response has been sent/);
+  });
+
+  it('a no-action review can be followed by a real response (older rows were stored as acted)', async () => {
+    const s = setup({ row: { analysisStatus: 'acted', actionTaken: 'NO_ACTION', verdict: verdict({ action: 'SEND_MESSAGE' }) } });
+    const r = await actOnCase(s.deps, 'PP-D-1', approve);
+    assert.equal(r.ok, true);
+    assert.deepEqual(s.calls.map((c) => c.fn), ['sendMessage']);
+    assert.equal(s.getRow()!.analysisStatus, 'acted');
+  });
+
+  it('SEND_MESSAGE for buyer regret carries the evidence from the records, with the PDF', async () => {
+    const s = setup({ row: { verdict: verdict({ fault: 'buyer_regret', action: 'SEND_MESSAGE', reasoning: 'AI free text that must not be sent' }) } });
+    const pdf = { filename: 'evidence.pdf', contentType: 'application/pdf', bytes: new Uint8Array([37, 80, 68, 70]) as Uint8Array<ArrayBuffer> };
+    s.deps.evidenceMessage = async () => ({ text: 'Receipt hash: sha256:abc', files: [pdf] });
+    const r = await actOnCase(s.deps, 'PP-D-1', approve);
+    assert.equal(r.ok, true);
+    assert.equal(s.calls[0].fn, 'sendMessage');
+    assert.equal(s.calls[0].args[1], 'Receipt hash: sha256:abc');
+    assert.deepEqual(s.calls[0].args[2], [pdf]);
+  });
+
+  it('SEND_MESSAGE for any other fault sends the analysis notes, not the evidence message', async () => {
+    const s = setup({ row: { verdict: verdict({ fault: 'unclear', action: 'SEND_MESSAGE', reasoning: 'Please tell us more.' }) } });
+    let asked = false;
+    s.deps.evidenceMessage = async () => ((asked = true), { text: 'x', files: [] });
+    await actOnCase(s.deps, 'PP-D-1', approve);
+    assert.equal(asked, false);
+    assert.match(String(s.calls[0].args[1]), /Please tell us more/);
   });
 });
 

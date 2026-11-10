@@ -18,7 +18,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'review', label: 'Needs your review' },
   { key: 'ready', label: 'Ready to review' },
-  { key: 'resolved', label: 'Resolved' },
+  { key: 'resolved', label: 'Responded' },
 ];
 
 export default function DisputesPage() {

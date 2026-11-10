@@ -128,3 +128,33 @@ describe('auto-analysis and deadlines', async () => {
     assert.equal(responseDue(null), null);
   });
 });
+
+describe('a no-action review keeps the case open', async () => {
+  const { toCaseRecord } = await import('./paypal/cases');
+  const { paypalStatusLabel } = await import('../app/_ui/labels');
+  const row = (over: Record<string, unknown>) => ({
+    disputeId: 'PP-1', captureId: null, paypalOrderId: null, mandateId: null, reason: 'X', stage: 'INQUIRY',
+    status: 'WAITING_FOR_SELLER_RESPONSE', amountMinor: 8900, currency: 'USD', verdict: null, analysisStatus: 'acted',
+    actionTaken: 'NO_ACTION', outcome: 'No action taken', createdAt: new Date('2026-11-10T00:00:00Z'), updatedAt: new Date('2026-11-10T00:00:00Z'),
+    rawDispute: { dispute_id: 'PP-1', seller_response_due_date: '2026-11-30T11:56:57.557Z' },
+    ...over,
+  });
+
+  it('older rows stored as acted with NO_ACTION are reported as still open, with the deadline', () => {
+    const r = toCaseRecord(row({}));
+    assert.equal(r.analysis_status, 'analysed');
+    assert.deepEqual(r.response_due, { party: 'seller', at: '2026-11-30T11:56:57.557Z' });
+  });
+
+  it('a real response still closes the case on our side', () => {
+    assert.equal(toCaseRecord(row({ actionTaken: 'SEND_MESSAGE' })).analysis_status, 'acted');
+  });
+
+  it('PayPal statuses read in the store’s words', () => {
+    assert.equal(paypalStatusLabel('WAITING_FOR_SELLER_RESPONSE'), 'Waiting for the store');
+    assert.equal(paypalStatusLabel('WAITING_FOR_BUYER_RESPONSE'), 'Waiting for the buyer');
+    assert.equal(paypalStatusLabel('UNDER_REVIEW'), 'Under PayPal review');
+    assert.equal(paypalStatusLabel('RESOLVED'), 'Resolved');
+    assert.equal(paypalStatusLabel(null), 'Unknown');
+  });
+});
