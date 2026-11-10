@@ -18,6 +18,9 @@ function greeting(): string {
 }
 
 export default function BuyerHome() {
+  // Time of day depends on the visitor's clock, so it is decided in the browser only (no server mismatch).
+  const [hello, setHello] = useState('Welcome');
+  useEffect(() => setHello(greeting()), []);
   const { data } = useSession();
   const first = data?.user?.name?.trim().split(/\s+/)[0];
   const [mandates, setMandates] = useState<MyMandate[] | null>(null);
@@ -44,7 +47,7 @@ export default function BuyerHome() {
         </span>
         <div>
           <h1>
-            {greeting()}
+            {hello}
             {first ? `, ${first}` : ''}
           </h1>
           <p>Tell your agent what you need and set your limits. You can type it or say it, and you approve everything before you pay.</p>

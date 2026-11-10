@@ -210,8 +210,8 @@ export default function OrdersPage() {
                       <td>
                         <Badge tone={p.tone}>{p.text}</Badge>
                       </td>
-                      <td className={u.muted}>{formatDateTime(o.created_at)}</td>
-                      <td className={u.muted}>{formatDateTime(o.captured_at) || '—'}</td>
+                      <td className={`${u.muted} ${u.nowrap}`}>{formatDateTime(o.created_at)}</td>
+                      <td className={`${u.muted} ${u.nowrap}`}>{formatDateTime(o.captured_at) || '—'}</td>
                       <td className={u.mono} title={o.receipt_hash}>
                         {shortHash(o.receipt_hash) || '—'}
                       </td>

@@ -1,20 +1,16 @@
 /* Store overview: a welcome, what needs attention first, then the numbers and the pipeline. */
-.welcome {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.4rem;
+.head {
+  margin-bottom: 24px;
 }
-.welcome h1 {
+.head h1 {
   margin: 0;
-  font-size: 1.7rem;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
 }
-.welcome p {
-  margin: 0.25rem 0 0;
+.head p {
+  margin: 4px 0 0;
   color: var(--muted);
 }
 .kpis {
@@ -34,58 +30,30 @@
   }
 }
 .kpi {
-  display: flex;
-  gap: 0.9rem;
-  align-items: flex-start;
-  padding: 1.1rem 1.2rem;
+  padding: 20px 24px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 12px;
 }
-.kpi:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-}
-.kpiIcon {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.tBlue {
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-.tAmber {
-  background: var(--warn-bg);
-  color: var(--warn);
-}
-.tGreen {
-  background: var(--ok-bg);
-  color: var(--ok);
-}
-.tViolet {
-  background: #fbeeea;
-  color: var(--stamp);
+.tNeutral {
+  background: var(--bg-2);
+  color: var(--text-2);
 }
 .kpiLabel {
-  font-size: 0.82rem;
+  font-size: 0.875rem;
   color: var(--muted);
-  font-weight: 500;
 }
 .kpiValue {
-  font-size: 1.65rem;
-  font-weight: 700;
+  margin-top: 4px;
+  font-size: 1.75rem;
+  font-weight: 600;
   line-height: 1.2;
-  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
 .kpiHint {
-  font-size: 0.78rem;
+  margin-top: 4px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .cols {
@@ -103,7 +71,6 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   overflow: hidden;
   margin-bottom: 1.25rem;
 }
@@ -118,7 +85,7 @@
 .panelHead h2 {
   margin: 0;
   font-size: 1rem;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
 }
 .panelHead span {
   color: var(--muted);
@@ -132,8 +99,8 @@
 .todoItem {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  padding: 0.85rem 1.25rem;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
   border-bottom: 1px solid var(--border);
   color: inherit;
   text-decoration: none;
@@ -175,9 +142,9 @@
 .caught {
   display: grid;
   place-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   text-align: center;
-  padding: 2.2rem 1rem;
+  padding: 2.25rem 1rem;
   color: var(--muted);
 }
 .caught b {
@@ -194,7 +161,7 @@
   place-items: center;
 }
 .pipe {
-  padding: 1.1rem 1.25rem 1.25rem;
+  padding: 1rem 1.25rem 1.25rem;
 }
 .bar {
   display: flex;
@@ -209,13 +176,13 @@
 }
 .legend {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.5rem;
   margin-top: 1rem;
 }
 .legendRow {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   font-size: 0.92rem;
 }
 .dot {
@@ -231,13 +198,13 @@
 .timeline {
   list-style: none;
   margin: 0;
-  padding: 0.4rem 1.25rem 0.8rem;
+  padding: 0.5rem 1.25rem 0.75rem;
 }
 .tl {
   position: relative;
   display: flex;
-  gap: 0.8rem;
-  padding: 0.65rem 0;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
 }
 .tl::before {
   content: '';
@@ -257,7 +224,7 @@
   border-radius: 50%;
   background: var(--bg);
   border: 3px solid var(--accent);
-  margin-top: 0.3rem;
+  margin-top: 0.25rem;
   flex: none;
 }
 .tl a {
@@ -273,49 +240,7 @@
   font-size: 0.8rem;
   color: var(--muted);
 }
-.quick {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.5rem;
-}
-.quickLink {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: 10px;
-  color: var(--text);
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.93rem;
-}
-.quickLink svg:first-child {
-  color: var(--accent);
-}
-.quickLink svg:last-child {
-  margin-left: auto;
-  color: var(--muted-2);
-}
-.quickLink:hover {
-  background: var(--bg-2);
-}
-.quickLink:focus-visible {
-  outline: 2px solid var(--accent);
-}
-.fade {
-  animation: rise 0.45s ease both;
-}
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .fade {
-    animation: none;
-  }
-  .kpi,
   .seg {
     transition: none;
   }
