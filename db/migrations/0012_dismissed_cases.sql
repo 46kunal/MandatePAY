@@ -1,0 +1,1 @@
+ALTER TABLE "cases" ADD COLUMN "dismissed_at" timestamp with time zone;

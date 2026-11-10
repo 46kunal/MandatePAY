@@ -53,6 +53,17 @@ export default function CaseDetailPage() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [form, setForm] = useState<'edit' | 'override' | null>(null);
 
+  /** Hide this dispute from the lists (or bring it back). Nothing is sent to PayPal. */
+  async function setHidden(hide: boolean) {
+    try {
+      const r = await apiFetch<{ dismissed_at: string | null }>(`/api/cases/${encodeURIComponent(id)}/dismiss`, { body: { dismissed: hide } });
+      setDetail((cur) => (cur ? { ...cur, dismissed_at: r.data.dismissed_at } : cur));
+      setNotice({ ok: true, text: hide ? 'Dispute hidden from the lists.' : 'Dispute restored to the lists.' });
+    } catch (e) {
+      setNotice({ ok: false, text: errMsg(e) });
+    }
+  }
+
   const load = useCallback(
     async (signal?: AbortSignal) => {
       setLoadError(null);
@@ -228,6 +239,15 @@ export default function CaseDetailPage() {
         </Notice>
       )}
 
+      {detail.dismissed_at && (
+        <Notice tone="info">
+          This dispute is hidden from the lists.{' '}
+          <button type="button" className={u.linkButton} onClick={() => setHidden(false)} disabled={busy !== null}>
+            Restore it
+          </button>
+        </Notice>
+      )}
+
       <NextStepCard
         detail={detail}
         verdict={verdict}
@@ -240,6 +260,7 @@ export default function CaseDetailPage() {
           setPending(p);
         }}
         onForm={setForm}
+        onDismiss={() => setHidden(true)}
         cur={cur}
       />
 
@@ -566,6 +587,7 @@ function NextStepCard({
   onAnalyse,
   onChoose,
   onForm,
+  onDismiss,
   cur,
 }: {
   detail: CaseDetail;
@@ -576,6 +598,7 @@ function NextStepCard({
   onAnalyse: () => void;
   onChoose: (p: Pending) => void;
   onForm: (f: 'edit' | 'override' | null) => void;
+  onDismiss: () => void;
   cur: string;
 }) {
   const resolved = detail.status === 'RESOLVED';
@@ -663,6 +686,20 @@ function NextStepCard({
             })
           }
         />
+      )}
+      {!detail.dismissed_at && (
+        <p style={{ margin: '1rem 0 0', fontSize: '0.88rem' }} className={u.muted}>
+          Nothing to do with this one (an old, test or outside dispute)?{' '}
+          <button
+            type="button"
+            className={u.linkButton}
+            onClick={onDismiss}
+            disabled={busy !== null}
+            title="Hides it from the lists. Nothing is sent to PayPal and you can restore it."
+          >
+            Dismiss it
+          </button>
+        </p>
       )}
     </Card>
   );

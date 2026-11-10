@@ -1,8 +1,8 @@
 'use client';
 // OWNER: C. Disputes list: filter, scan and open a case. "Check PayPal for new disputes" calls POST /api/disputes/poll.
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import type { PollDisputesResponse } from '@/contracts/schemas';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CaseRecord, PollDisputesResponse } from '@/contracts/schemas';
 import type { z } from 'zod';
 import { apiFetch } from '@/app/_ui/api';
 import { Badge, Card, EmptyState, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
@@ -12,13 +12,14 @@ import u from '../../_ui/ui.module.css';
 import m from '../merchant.module.css';
 
 type Poll = z.infer<typeof PollDisputesResponse>;
-type Filter = 'all' | 'review' | 'ready' | 'resolved';
+type Filter = 'all' | 'review' | 'ready' | 'resolved' | 'dismissed';
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'review', label: 'Needs your review' },
   { key: 'ready', label: 'Ready to review' },
   { key: 'resolved', label: 'Responded' },
+  { key: 'dismissed', label: 'Dismissed' },
 ];
 
 export default function DisputesPage() {
@@ -28,15 +29,41 @@ export default function DisputesPage() {
   const [pollMsg, setPollMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [byId, setById] = useState('');
 
+  // Disputes a person hid (old, test or outside ones). They stay stored; Restore brings one back.
+  const [dismissed, setDismissed] = useState<CaseRecord[]>([]);
+  const loadDismissed = useCallback(async () => {
+    try {
+      setDismissed((await apiFetch<CaseRecord[]>('/api/cases?dismissed=1')).data);
+    } catch {
+      setDismissed([]);
+    }
+  }, []);
+  useEffect(() => {
+    void loadDismissed();
+  }, [loadDismissed]);
+
+  async function setHidden(id: string, hide: boolean) {
+    setPollMsg(null);
+    try {
+      await apiFetch(`/api/cases/${encodeURIComponent(id)}/dismiss`, { body: { dismissed: hide } });
+      reload();
+      void loadDismissed();
+      setPollMsg({ ok: true, text: hide ? `${id} is hidden. Find it under Dismissed if you need it back.` : `${id} is back in the list.` });
+    } catch (e) {
+      setPollMsg({ ok: false, text: errMsg(e) });
+    }
+  }
+
   const shown = useMemo(() => {
     if (!cases) return null;
+    if (filter === 'dismissed') return dismissed;
     return cases.filter((c) => {
       if (filter === 'review') return needsReview(c);
       if (filter === 'ready') return c.analysis_status === 'analysed' || c.analysis_status === 'pending';
       if (filter === 'resolved') return c.analysis_status === 'acted';
       return true;
     });
-  }, [cases, filter]);
+  }, [cases, dismissed, filter]);
 
   async function poll(disputeId?: string) {
     setPolling(true);
@@ -136,13 +163,13 @@ export default function DisputesPage() {
         </div>
       )}
 
-      {cases && cases.length === 0 && (
+      {cases && cases.length === 0 && dismissed.length === 0 && (
         <Card>
           <EmptyState title="No disputes yet">Click &ldquo;Check PayPal for new disputes&rdquo; to pull new ones in.</EmptyState>
         </Card>
       )}
 
-      {cases && cases.length > 0 && shown && (
+      {cases && (cases.length > 0 || dismissed.length > 0) && shown && (
         <>
           <div className={u.tabs} role="tablist" aria-label="Filter disputes">
             {FILTERS.map((f) => (
@@ -160,7 +187,7 @@ export default function DisputesPage() {
 
           <Card flush>
             {shown.length === 0 ? (
-              <EmptyState title="Nothing here">No disputes match this filter.</EmptyState>
+              <EmptyState title="Nothing here">{filter === 'dismissed' ? 'Nothing is dismissed.' : 'No disputes match this filter.'}</EmptyState>
             ) : (
               <div className={u.tableWrap}>
                 <table className={u.table}>
@@ -174,6 +201,9 @@ export default function DisputesPage() {
                       <th scope="col">Confidence</th>
                       <th scope="col">Deadline</th>
                       <th scope="col">Opened</th>
+                      <th scope="col">
+                        <span className={u.srOnly}>Hide or restore</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -213,6 +243,16 @@ export default function DisputesPage() {
                             })()}
                           </td>
                           <td className={u.muted}>{formatWhen(c.created_at)}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className={u.linkButton}
+                              onClick={() => setHidden(c.dispute_id, filter !== 'dismissed')}
+                              title={filter === 'dismissed' ? 'Show this dispute in the list again' : 'Hide this dispute from the lists. Nothing is sent to PayPal.'}
+                            >
+                              {filter === 'dismissed' ? 'Restore' : 'Dismiss'}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}

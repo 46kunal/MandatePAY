@@ -190,6 +190,7 @@ export const cases = pgTable('cases', {
   actionTaken: text('action_taken'),
   outcome: text('outcome'),
   humanApprovedAt: ts('human_approved_at'),
+  dismissedAt: ts('dismissed_at'), // hidden from the lists (old, test or outside disputes); who and when is in the audit log
   actedBy: text('acted_by').references(() => users.id), // who sent the action to PayPal
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),

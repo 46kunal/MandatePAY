@@ -26,6 +26,7 @@ export interface CaseRow {
   actedBy?: string | null;
   /** The stored PayPal dispute, for the response deadline. */
   rawDispute?: unknown;
+  dismissedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,15 +51,20 @@ export function toCaseRecord(row: CaseRow): CaseRecord {
     action_taken: row.actionTaken,
     outcome: row.outcome,
     response_due: responseDue(row.rawDispute as RawDispute | null | undefined),
+    dismissed_at: row.dismissedAt ? row.dismissedAt.toISOString() : null,
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
   };
 }
 
-/** Newest first. */
-export async function listCaseRecords(): Promise<CaseRecord[]> {
-  const [{ desc }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
-  const rows = await db.select().from(schema.cases).orderBy(desc(schema.cases.createdAt));
+/** Newest first. Dismissed disputes are left out unless `dismissed` is true, which returns only those. */
+export async function listCaseRecords(opts: { dismissed?: boolean } = {}): Promise<CaseRecord[]> {
+  const [{ desc, isNotNull, isNull }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
+  const rows = await db
+    .select()
+    .from(schema.cases)
+    .where(opts.dismissed ? isNotNull(schema.cases.dismissedAt) : isNull(schema.cases.dismissedAt))
+    .orderBy(desc(schema.cases.createdAt));
   return rows.map(toCaseRecord);
 }
 

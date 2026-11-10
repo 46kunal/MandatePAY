@@ -103,7 +103,7 @@ export const AUTO_ANALYSE_LIMIT = 3;
 export async function autoAnalysePending(): Promise<string[]> {
   const settings = await getSettings();
   if (!settings.auto_analyse) return [];
-  const [{ and, asc, eq, isNotNull }, { db, schema }, { audit }] = await Promise.all([
+  const [{ and, asc, eq, isNotNull, isNull }, { db, schema }, { audit }] = await Promise.all([
     import('drizzle-orm'),
     import('../../db/client'),
     import('../audit'),
@@ -111,7 +111,7 @@ export async function autoAnalysePending(): Promise<string[]> {
   const pending = await db
     .select({ disputeId: schema.cases.disputeId, analysisStatus: schema.cases.analysisStatus, mandateId: schema.cases.mandateId, rawDispute: schema.cases.rawDispute })
     .from(schema.cases)
-    .where(and(eq(schema.cases.analysisStatus, 'pending'), isNotNull(schema.cases.mandateId)))
+    .where(and(eq(schema.cases.analysisStatus, 'pending'), isNotNull(schema.cases.mandateId), isNull(schema.cases.dismissedAt)))
     .orderBy(asc(schema.cases.createdAt))
     .limit(20);
 
