@@ -221,12 +221,14 @@ export const PlaceOrderRequest = z.object({
   cart: Cart,
   /** Must only be true when the buyer clicked approve in the UI */
   buyer_approved: z.boolean().default(false),
+  /** paypal (default): approve in PayPal's window. card: the order is paid with PayPal's hosted card fields. */
+  funding: z.enum(['paypal', 'card']).default('paypal'),
 });
 export const PlaceOrderResponse = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('created'),
     paypal_order_id: z.string(),
-    approve_url: z.string().url(),
+    approve_url: z.string().url().optional(), // absent for funding "card"
     cart_id: z.string(),
     guard: GuardResult,
   }),

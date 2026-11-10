@@ -10,12 +10,15 @@ export interface CreateOrderInput {
   /** Defaults to `${appBaseUrl}/buyer?paypal=return`. */
   returnUrl?: string;
   cancelUrl?: string;
+  /** How the buyer pays: a PayPal account (the default) or a card typed into PayPal's hosted card fields. */
+  funding?: 'paypal' | 'card';
 }
 
 export interface CreatedOrder {
   paypalOrderId: string;
   status: string;
-  approveUrl: string;
+  /** Where a PayPal-account buyer approves. Card orders have none: the card fields approve them in the page. */
+  approveUrl?: string;
 }
 
 export interface CapturedOrder {
@@ -56,6 +59,9 @@ export function cartTotalMinor(cart: Cart): number {
   return cart.items.reduce((sum, i) => sum + i.quantity * toMinor(i.unit_price), 0);
 }
 
+/** Card orders ask for 3-D Secure whenever the card's bank requires it. Card data never touches our server. */
+const CARD_SOURCE = { card: { attributes: { verification: { method: 'SCA_WHEN_REQUIRED' } } } };
+
 export function buildOrderPayload(input: CreateOrderInput, appBaseUrl: string) {
   const { cart } = input;
   const total = fromMinor(cartTotalMinor(cart));
@@ -79,7 +85,7 @@ export function buildOrderPayload(input: CreateOrderInput, appBaseUrl: string) {
         })),
       },
     ],
-    payment_source: {
+    payment_source: input.funding === 'card' ? CARD_SOURCE : {
       paypal: {
         experience_context: {
           user_action: 'PAY_NOW',
@@ -99,11 +105,11 @@ export async function createOrder(client: PayPalClient, input: CreateOrderInput)
     {
       method: 'POST',
       body: buildOrderPayload(input, client.config.appBaseUrl),
-      requestId: `order-${input.cartId}`,
+      requestId: input.funding === 'card' ? `order-${input.cartId}-card` : `order-${input.cartId}`,
     },
   );
   const approveUrl = data?.links?.find((l) => l.rel === 'payer-action' || l.rel === 'approve')?.href;
-  if (!data?.id || !approveUrl) {
+  if (!data?.id || (!approveUrl && input.funding !== 'card')) {
     throw new PayPalError('PayPal order response had no id or approval link', { status: 502, details: data });
   }
   return { paypalOrderId: data.id, status: data.status ?? 'CREATED', approveUrl };

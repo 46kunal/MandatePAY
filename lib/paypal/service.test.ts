@@ -131,6 +131,16 @@ describe('placeOrder', () => {
     assert.equal(t.orders.size, 1);
   });
 
+  it('a card payment never reuses an order made for a PayPal account, and asks PayPal for a card order', async () => {
+    const t = await setup(constraints);
+    const viaPaypal = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });
+    const viaCard = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false, funding: 'card' });
+    assert.ok(viaPaypal.ok && viaCard.ok && viaPaypal.status === 'created' && viaCard.status === 'created');
+    assert.notEqual(viaCard.paypalOrderId, viaPaypal.paypalOrderId);
+    assert.equal(t.paypal.created.length, 2);
+    assert.equal(t.paypal.created[1].funding, 'card');
+  });
+
   it('a changed cart or a captured order gets a new order', async () => {
     const t = await setup(constraints);
     const first = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });

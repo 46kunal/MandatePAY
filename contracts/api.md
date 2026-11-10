@@ -45,7 +45,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/mandates` | B | `CreateMandateRequest` (`buyer_ref` optional and ignored) | `CreateMandateResponse` | 400 invalid constraints |
 | POST `/api/carts/check` | B | `CartCheckRequest` | `CartCheckResponse` (`GuardResult`) | 404 mandate, 410 expired |
 | GET `/api/orders` | A | none | `ListOrdersResponse` (newest first, with any dispute id) | none. Each order carries `refunded` and `refund_pending` when money was refunded (snapshot from PayPal) |
-| POST `/api/orders` | A | `PlaceOrderRequest` | `PlaceOrderResponse` (`created` or `needs_approval`) | 422 `guard_blocked`, 502 PayPal |
+| POST `/api/orders` | A | `PlaceOrderRequest` | `PlaceOrderResponse` (`created` or `needs_approval`) | 422 `guard_blocked`, 502 PayPal. `funding` is `paypal` (default) or `card`: a card order is created for PayPal's hosted card fields (3-D Secure when the bank asks), has no `approve_url`, never reuses a PayPal-account order, and is captured with POST `/api/orders/:id/capture` like any other |
 | POST `/api/orders/:id/capture` | A | none | `CaptureOrderResponse` | 404 order, 409 already captured, 502 PayPal |
 | POST `/api/orders/:id/refund` | A | `RefundOrderRequest` (`amount` omitted = all still refundable; `idempotency_key` makes a repeated click one refund) | `RefundOrderResponse` | 404 order, 409 `not_captured` / `fully_refunded`, 422 `refund_exceeds_remaining`, 502 PayPal. Refunds made in the PayPal dashboard count (re-read first); a linked dispute is re-read afterwards. A refund does not close a dispute |
 | POST `/api/webhooks/paypal` | A | PayPal event | `200` fast | 400 bad signature |

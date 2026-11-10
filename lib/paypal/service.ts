@@ -91,13 +91,13 @@ export const OPEN_ORDER_REUSE_MS = 3 * 60 * 60 * 1000;
 // ---------- place order ----------
 
 export type PlaceOrderResult =
-  | { ok: true; status: 'created'; paypalOrderId: string; approveUrl: string; cartId: string; guard: GuardResult }
+  | { ok: true; status: 'created'; paypalOrderId: string; approveUrl?: string; cartId: string; guard: GuardResult }
   | { ok: true; status: 'needs_approval'; guard: GuardResult }
   | { ok: false; httpStatus: 404 | 410 | 422; error: string; message: string; details?: unknown };
 
 export async function placeOrder(
   deps: OrderDeps,
-  input: { mandateId: string; cart: Cart; buyerApproved: boolean },
+  input: { mandateId: string; cart: Cart; buyerApproved: boolean; funding?: 'paypal' | 'card' },
 ): Promise<PlaceOrderResult> {
   const { store } = deps;
   const mandate = await store.getMandate(input.mandateId);
@@ -147,7 +147,8 @@ export async function placeOrder(
   const approvedBy = input.buyerApproved ? 'buyer' : 'agent';
 
   // A second click for the same cart reuses the open order rather than creating another one at PayPal.
-  const open = await store.findOpenOrder?.({
+  // (An open order was made for a PayPal account; a card payment always gets its own order.)
+  const open = input.funding === 'card' ? undefined : await store.findOpenOrder?.({
     mandateId: mandate.mandateId,
     cartHash: base.cartHash,
     approvedBy,
@@ -166,13 +167,13 @@ export async function placeOrder(
   // The cart row is written before PayPal is called: orders.cart_id references it.
   await store.insertCart({ ...base, closedMandateJws: closed.jws, approvedBy });
 
-  const order = await deps.createOrder({ mandateId: mandate.mandateId, cartId, cart: input.cart });
+  const order = await deps.createOrder({ mandateId: mandate.mandateId, cartId, cart: input.cart, funding: input.funding });
   await store.insertOrder({
     paypalOrderId: order.paypalOrderId,
     cartId,
     mandateId: mandate.mandateId,
     status: order.status,
-    approveUrl: order.approveUrl,
+    approveUrl: order.approveUrl ?? null,
     captureId: null,
     receiptHash: null,
   });
