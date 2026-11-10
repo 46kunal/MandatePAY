@@ -3,7 +3,9 @@
 // It types into the text box as the buyer speaks. The buyer reads it, can edit it, and still has to click Create mandate: voice never
 // signs or pays. Hidden when the browser has no speech recognition.
 import { useEffect, useRef, useState } from 'react';
+import { Icon } from '../_ui/Icons';
 import u from '../_ui/ui.module.css';
+import s from './buyer.module.css';
 
 interface RecognitionResult {
   isFinal: boolean;
@@ -98,13 +100,15 @@ export default function VoiceButton({ value, onChange, disabled }: { value: stri
     <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
       <button
         type="button"
-        className={`${u.btn} ${u.btnSecondary}`}
+        className={`${u.btn} ${u.btnSecondary} ${s.voiceBtn}`}
         onClick={toggle}
         disabled={disabled}
         aria-pressed={listening}
         title="Speak your request. You still check it and click Create mandate."
       >
+        <Icon name="mic" />
         {listening ? 'Stop listening' : 'Speak your request'}
+        {listening && <span className={s.recDot} aria-hidden="true" />}
       </button>
       <label className={u.srOnly} htmlFor="voice-lang">
         Voice language

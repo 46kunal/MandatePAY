@@ -25,7 +25,11 @@
   top: 0;
   z-index: 20;
   background: var(--paper);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--t-fast) var(--ease);
+}
+.navScrolled {
+  border-bottom-color: var(--border);
 }
 .navInner {
   display: flex;
@@ -63,7 +67,7 @@
   color: var(--text-2);
   text-decoration: none;
   font-size: 0.9375rem;
-  transition: color 0.15s ease;
+  transition: color var(--t-fast) var(--ease);
 }
 .navLink:hover {
   color: var(--ink);
@@ -87,7 +91,7 @@
   font-size: 0.9375rem;
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 .btn:hover {
   background: var(--accent-dark);
@@ -206,15 +210,26 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px 24px;
   margin: 0;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-.limitsOn {
-  opacity: 1;
 }
 .limit {
   display: grid;
   gap: 0;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity var(--t-enter) var(--ease), transform var(--t-enter) var(--ease);
+}
+.limitsOn .limit {
+  opacity: 1;
+  transform: none;
+}
+.limitsOn .limit:nth-child(2) {
+  transition-delay: 60ms;
+}
+.limitsOn .limit:nth-child(3) {
+  transition-delay: 120ms;
+}
+.limitsOn .limit:nth-child(4) {
+  transition-delay: 180ms;
 }
 .limit dt {
   font-size: 0.8125rem;
@@ -240,7 +255,7 @@
   background: rgba(255, 253, 249, 0.9);
   opacity: 0;
   transform: rotate(-8deg) scale(1.6);
-  transition: opacity 0.12s ease, transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: opacity 120ms var(--ease), transform 300ms var(--ease);
   pointer-events: none;
 }
 .stampOn {
@@ -248,9 +263,16 @@
   transform: rotate(-8deg) scale(1);
 }
 .cartCheck {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--t-enter) var(--ease) 150ms, transform var(--t-enter) var(--ease) 150ms;
   margin-top: 32px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+.cartOn {
+  opacity: 1;
+  transform: none;
 }
 .cartRow {
   display: flex;
@@ -267,6 +289,21 @@
   gap: 4px;
   font-size: 0.875rem;
   color: var(--ok);
+}
+.checks li {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--t-enter) var(--ease), transform var(--t-enter) var(--ease);
+}
+.checksOn li {
+  opacity: 1;
+  transform: none;
+}
+.checksOn li:nth-child(2) {
+  transition-delay: 90ms;
+}
+.checksOn li:nth-child(3) {
+  transition-delay: 180ms;
 }
 .checks li::before {
   content: '\2713';
@@ -353,8 +390,7 @@
   }
 }
 .step {
-  padding-top: 16px;
-  border-top: 1px solid var(--ink);
+  padding-top: 0;
 }
 .stepNum {
   display: block;
@@ -483,7 +519,6 @@
   overflow: hidden;
 }
 .meterFill {
-  width: 85%;
   height: 100%;
   background: var(--accent);
 }
@@ -520,7 +555,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg);
-  transition: border-color 0.15s ease;
+  transition: border-color var(--t-fast) var(--ease);
 }
 .card:hover {
   border-color: var(--muted-2);
@@ -618,29 +653,110 @@
   font-size: 0.875rem;
 }
 
-/* ---------- entrance: a small fade as a section arrives, once ---------- */
+/* ---------- entrances: played once, a small rise, siblings 50ms apart ---------- */
+@keyframes enterUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.heroIn {
+  animation: enterUp var(--t-enter) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 80ms);
+}
 .reveal {
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+  transition: opacity var(--t-enter) var(--ease), transform var(--t-enter) var(--ease);
+  transition-delay: calc(var(--i, 0) * 50ms);
 }
 .revealOn {
   opacity: 1;
   transform: none;
 }
+/* the rule above each step draws once as the step arrives */
+.stepLine {
+  display: block;
+  height: 1px;
+  margin-bottom: 16px;
+  background: var(--ink);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 600ms var(--ease);
+  transition-delay: calc(var(--i, 0) * 50ms + 100ms);
+}
+.revealOn .stepLine {
+  transform: none;
+}
+/* the record lights up link by link, once */
+.recordItem {
+  transition: background-color var(--t-enter) var(--ease);
+}
+.recordOn {
+  background: var(--accent-bg);
+}
+.recordNum {
+  transition: color var(--t-enter) var(--ease);
+}
+.recordItem:not(.recordOn) .recordNum {
+  color: var(--muted-2);
+}
+/* the confidence bar fills once, by transform, when the card arrives */
+.meterFill {
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 900ms var(--ease) 200ms;
+}
+.revealOn .meterFill {
+  transform: scaleX(0.85);
+}
+.proof li {
+  opacity: 0;
+  transition: opacity var(--t-enter) var(--ease);
+}
+.revealOn .proof li {
+  opacity: 1;
+}
+.revealOn .proof li:nth-child(1) {
+  transition-delay: 500ms;
+}
+.revealOn .proof li:nth-child(2) {
+  transition-delay: 600ms;
+}
+.revealOn .proof li:nth-child(3) {
+  transition-delay: 700ms;
+}
 
 @media (prefers-reduced-motion: reduce) {
+  .heroIn {
+    animation: none;
+  }
   .reveal,
-  .limits,
-  .stamp {
+  .limit,
+  .checks li,
+  .proof li,
+  .stepLine,
+  .meterFill,
+  .stamp,
+  .recordItem,
+  .nav {
     transition: none;
   }
-  .reveal {
+  .reveal,
+  .limit,
+  .checks li,
+  .proof li,
+  .cartCheck {
     opacity: 1;
     transform: none;
+    transition: none;
   }
-  .limits {
-    opacity: 1;
+  .stepLine {
+    transform: none;
+  }
+  .meterFill {
+    transform: scaleX(0.85);
   }
   .stamp {
     opacity: 0.92;

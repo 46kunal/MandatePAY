@@ -164,6 +164,8 @@
   padding: 1rem 1.25rem 1.25rem;
 }
 .bar {
+  transform-origin: 0 50%;
+  animation: grow 600ms var(--ease) 200ms both;
   display: flex;
   height: 12px;
   border-radius: 999px;
@@ -172,7 +174,6 @@
 }
 .seg {
   min-width: 4px;
-  transition: flex-grow 0.6s ease;
 }
 .legend {
   display: grid;
@@ -243,5 +244,16 @@
 @media (prefers-reduced-motion: reduce) {
   .seg {
     transition: none;
+  }
+}
+
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
   }
 }
