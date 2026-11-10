@@ -1,8 +1,22 @@
 # MandatePay
 
-Every AI purchase on PayPal comes with proof of what the buyer asked for. A signed mandate (AP2-style, not interoperable) is stored in the PayPal order, a cart guard checks the cart against it, and an AI case analyst uses it to resolve PayPal disputes fairly.
+**Let an AI shop for you, and keep proof of what you asked.** A signed mandate is stored with the PayPal order, a cart guard
+checks every cart against it, and an AI case analyst uses it to resolve PayPal disputes fairly, with a person approving every
+response.
 
 Built for the PayPal "Build What's Next with PayPal and AI" hackathon. Sandbox only.
+
+|  |  |
+|---|---|
+| **Live app** | https://mandate-pay.vercel.app |
+| **For judges** | [docs/JUDGES.md](docs/JUDGES.md): a five-minute test path, how it meets the requirements, honest limits |
+| **How it works** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the flow, every PayPal API we use, every AI feature, the trust model |
+| **Submission text** | [docs/DEVPOST.md](docs/DEVPOST.md) |
+| **API reference** | [contracts/api.md](contracts/api.md): every route, with its schema in `contracts/schemas.ts` |
+
+**PayPal:** Orders v2, Smart Buttons and Card Fields (3-D Secure), refunds, the Customer Disputes API (message, evidence,
+offer, accept), verified webhooks, Log in with PayPal. **AI:** mandate drafting, a shopping agent, AI-assisted cart checks and
+a dispute analyst with code guardrails, scored on 28 labelled disputes.
 
 ## Quick start
 
@@ -51,8 +65,8 @@ The app only talks to PayPal's sandbox host. Migrations run on every deploy (`ve
 
 | Analyst | Fault | Action | needs_human | Overall |
 |---|---|---|---|---|
-| Claude (`LLM_PROVIDER=anthropic`) | not yet run | not yet run | not yet run | not yet run |
-| Grok (`LLM_PROVIDER=grok`) | not yet run | not yet run | not yet run | not yet run |
+| Claude (`LLM_PROVIDER=anthropic`) | provider built and unit-tested, not benchmarked | | | |
+| Grok (`LLM_PROVIDER=grok`) | provider built and unit-tested, not benchmarked | | | |
 | Gemini 3.1 Flash-Lite (`LLM_PROVIDER=gemini`, free tier, run 2026-11-10, 28 cases) | 82% (23/28) | 86% (24/28) | 89% (8/9) | **79% (22/28)**. Earlier: 68% / 52% / 100% / 36% before the fault-to-action policy (25 cases); a prompt change that biased the model toward send-message scored 68% overall and was reverted |
 
 These are real-model numbers on 28 hand-labelled cases; they move by a few points from run to run; there is no offline analyst to compare against. Run `npm run eval` (needs `LLM_PROVIDER` and `LLM_API_KEY` in `.env`; set `EVAL_DELAY_MS=4000` on a free tier) and replace a row. The prompt-injection guardrail (flagged text always needs a human) is plain code and does not depend on the model.
@@ -63,17 +77,8 @@ These are real-model numbers on 28 hand-labelled cases; they move by a few point
 - `db/` Drizzle schema and client
 - `lib/` server modules (see `lib/README.md`)
 - `app/` Next.js UI and API routes
-- `docs/` roles and PayPal sandbox setup
+- `docs/` judges' guide, architecture, Devpost text, deployment, roles and PayPal sandbox setup
 - `eval/` analyst evaluation set
-
-## Orchestrator Day 1 checklist
-
-- [ ] Create the public GitHub repo, push, confirm LICENSE (MIT) shows
-- [ ] Turn on branch protection for `main`
-- [ ] Create the PayPal sandbox app, share credentials privately
-- [ ] Run `npm run bootstrap`, commit `package.json` and the lockfile
-- [ ] Invite A, B, C
-- [ ] 15-minute walkthrough of `contracts/`
 
 ## License
 
