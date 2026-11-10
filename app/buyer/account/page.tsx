@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { MyMandate } from '@/contracts/schemas';
 import { PasswordCard, PayPalCard, ProfileCard, SessionsCard } from '../../_ui/AccountPanels';
 import { apiFetch } from '../../_ui/api';
+import { MyOrdersCard } from './MyOrders';
 import { formatDateTime, formatMoney } from '../../_ui/labels';
 import { Badge, Card, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
 import u from '../../_ui/ui.module.css';
@@ -124,8 +125,9 @@ function MandatesCard() {
 export default function AccountPage() {
   return (
     <>
-      <PageHeader title="Your account" subtitle="Your mandates, your sign-in, and your data." />
+      <PageHeader title="Your account" subtitle="Your orders, your mandates, your sign-in, and your data." />
       <div style={{ display: 'grid', gap: '1rem' }}>
+        <MyOrdersCard />
         <MandatesCard />
         <PayPalCard />
         <ProfileCard />

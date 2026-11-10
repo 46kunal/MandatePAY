@@ -419,3 +419,133 @@ export const ActOnCaseRequest = z.object({
   /** The person saw that the buyer was already refunded and still wants to offer or accept (else 409 already_refunded). */
   confirm_refunded: z.boolean().default(false),
 });
+
+// ---------- buyer problem reports (before a PayPal dispute) ----------
+
+export const ProblemKind = z.enum(['agent_mistake', 'not_received', 'damaged', 'other']);
+export type ProblemKind = z.infer<typeof ProblemKind>;
+
+/**
+ * Computed from the stored records when the report is made, never from the buyer's text.
+ * agent_mistake = the cart guard did not pass every check at checkout (an item or price the mandate did not clearly
+ * cover went through), so the agent bought outside what was signed. suggestion is what the store should do.
+ */
+export const ReportAssessment = z.object({
+  agent_mistake: z.boolean(),
+  suggestion: z.enum(['refund', 'review']),
+  summary: z.string(),
+  checks: z.array(GuardCheck), // the guard checks that did not pass (empty when all passed)
+});
+export type ReportAssessment = z.infer<typeof ReportAssessment>;
+
+export const ReportStatus = z.enum(['open', 'refunded', 'closed']);
+export type ReportStatus = z.infer<typeof ReportStatus>;
+
+export const ProblemReport = z.object({
+  report_id: z.string(),
+  paypal_order_id: z.string(),
+  kind: ProblemKind,
+  message: z.string(),
+  assessment: ReportAssessment,
+  status: ReportStatus,
+  reply: z.string().nullable(),
+  refund: Money.nullable(),
+  created_at: z.string(),
+  resolved_at: z.string().nullable(),
+  /** Merchant views only */
+  buyer_email: z.string().optional(),
+  order_total: Money.optional(),
+  items: z.array(z.string()).optional(),
+});
+export type ProblemReport = z.infer<typeof ProblemReport>;
+
+export const CreateReportRequest = z
+  .object({
+    kind: ProblemKind,
+    message: z.string().trim().min(5).max(1000),
+  })
+  .strict();
+
+/** refund: send money back through PayPal (amount omitted = all still refundable). close: reply only. */
+export const ResolveReportRequest = z
+  .object({
+    outcome: z.enum(['refund', 'close']),
+    reply: z.string().trim().min(2).max(1000),
+    amount: Amount.optional(),
+    idempotency_key: z.string().regex(/^[A-Za-z0-9-]{8,64}$/),
+  })
+  .strict();
+
+/** One of the buyer's own paid orders, for "Report a problem". */
+export const MyOrder = z.object({
+  paypal_order_id: z.string(),
+  items: z.array(z.string()),
+  total: Money,
+  status: z.string(),
+  paid_at: z.string().nullable(),
+  refunded: Amount.nullable(),
+  report: ProblemReport.nullable(), // the latest report on this order
+});
+export type MyOrder = z.infer<typeof MyOrder>;
+
+// ---------- results (demo page) ----------
+
+export const ResultsResponse = z.object({
+  generated_at: z.string(),
+  disputes: z.object({
+    total: z.number().int(),
+    analysed: z.number().int(), // the AI gave a recommendation
+    responded: z.number().int(), // a response was sent to PayPal
+    resolved: z.number().int(), // PayPal closed it
+    store_won: z.number().int(),
+    buyer_won: z.number().int(),
+  }),
+  people: z.object({
+    responses: z.number().int(), // responses sent through MandatePay
+    followed_ai: z.number().int(), // sent what the AI recommended
+    changed_ai: z.number().int(), // a person chose something else
+    approved_by_person: z.number().int(), // the AI asked for a person and one approved
+  }),
+  speed: z.object({
+    median_minutes_to_response: z.number().nullable(), // dispute arrived -> response sent
+    est_minutes_saved: z.number(), // analysed disputes x manual minutes per dispute (an estimate)
+    manual_minutes_per_dispute: z.number(), // the assumption behind est_minutes_saved
+  }),
+  guard: z.object({
+    carts_checked: z.number().int(),
+    allowed: z.number().int(),
+    needed_approval: z.number().int(),
+    blocked: z.number().int(),
+    blocked_value: Money.nullable(), // money the guard stopped from being spent outside a mandate
+    orders_paid: z.number().int(),
+  }),
+  reports: z.object({
+    total: z.number().int(),
+    open: z.number().int(),
+    refunded: z.number().int(), // settled with a refund, no PayPal dispute needed
+    closed: z.number().int(),
+    agent_mistakes: z.number().int(),
+  }),
+  refunds: z.object({ count: z.number().int(), total: Money.nullable() }),
+  /** The analyst on the labelled test set (eval/results.json, written by npm run eval) */
+  eval: z
+    .object({
+      run_at: z.string(),
+      provider: z.string(),
+      cases: z.number().int(),
+      fault: z.number(),
+      action: z.number(),
+      needs_human: z.number(),
+      overall: z.number(),
+    })
+    .nullable(),
+});
+export type ResultsResponse = z.infer<typeof ResultsResponse>;
+
+export const ListMyOrdersResponse = z.object({ orders: z.array(MyOrder) });
+export const ListReportsResponse = z.object({ reports: z.array(ProblemReport) });
+export const ResolveReportResponse = z.object({
+  report_id: z.string(),
+  status: ReportStatus,
+  refund: RefundOrderResponse.optional(),
+});

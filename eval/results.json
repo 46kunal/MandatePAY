@@ -1,0 +1,9 @@
+{
+  "run_at": "2026-11-10T00:00:00.000Z",
+  "provider": "gemini",
+  "cases": 28,
+  "fault": 0.821,
+  "action": 0.857,
+  "needs_human": 0.889,
+  "overall": 0.786
+}

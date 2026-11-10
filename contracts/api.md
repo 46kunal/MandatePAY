@@ -28,10 +28,13 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/team` | `team:manage` (owner, admin). Only an admin gives or takes `admin`; nobody changes their own role; the last owner cannot be removed |
 | GET `/api/audit` | `audit:read` (owner, admin) |
 | POST `/api/orders/:id/refund` | `orders:refund` (owner, admin) |
+| GET `/api/reports`, GET `/api/results` | `cases:read` (store team) |
+| POST `/api/reports/:id/resolve` | `cases:act` to reply; a refund also needs `orders:refund` (owner, admin) |
 | GET `/api/export/orders`, `/api/export/disputes` | `orders:read:all` / `cases:read` (staff, owner, admin) |
 | GET `/api/admin/users`, PATCH `/api/admin/users/:id` | `users:manage` (admin). Disabling ends the person's sessions |
 | GET `/api/admin/health` | `system:read` (admin) |
 | GET `/api/me/mandates`, POST `/api/me/mandates/:id/revoke`, GET `/api/me/export` | `shop`, own data only |
+| GET `/api/me/orders`, POST `/api/me/orders/:id/report` | `shop`, own orders only |
 
 ## Routes
 
@@ -56,6 +59,11 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/audit?limit=` | A | none | `ListAuditResponse` (newest first, max 1000) | none |
 | GET `/api/export/orders`, `/api/export/disputes` | A | none | `text/csv` download (formulas defused) | none |
 | GET `/api/me/mandates` | A | none | `ListMyMandatesResponse` | none |
+| GET `/api/me/orders` | A | none | `ListMyOrdersResponse`: the buyer's own paid orders, newest first, each with its latest `report` | none |
+| POST `/api/me/orders/:id/report` | A | `CreateReportRequest` | `ProblemReport` (201). `assessment` is computed from the cart guard result at checkout, never from the buyer's text: `agent_mistake` when a check did not pass | 404 not the buyer's order, 409 `not_paid` / `report_open` |
+| GET `/api/reports` | A | none | `ListReportsResponse`: every report, open first, with `buyer_email`, `order_total`, `items` | none |
+| POST `/api/reports/:id/resolve` | A | `ResolveReportRequest` (`outcome` refund or close; `reply` is shown to the buyer) | `ResolveReportResponse` | 404 report, 409 `already_answered`, 403 refund without `orders:refund`, plus the refund errors of POST `/api/orders/:id/refund` |
+| GET `/api/results` | A | none | `ResultsResponse`: disputes, people and the AI (from `case.act` audit entries), speed, the cart guard, buyer reports, refunds, and the analyst's test-set scores from `eval/results.json` (written by `npm run eval`). `est_minutes_saved` is an estimate: analysed disputes x `manual_minutes_per_dispute` |
 | POST `/api/me/mandates/:id/revoke` | A | none | `MyMandate`. After this, cart checks, the agent and new orders on it answer 410 `mandate_revoked` | 404 not yours |
 | GET `/api/me/export` | A | none | JSON download of the person's account, mandates, carts and orders | none |
 | POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal. After answering, cases that are linked, not analysed yet and actionable are analysed automatically (max 3 per call) when the `auto_analyse` setting is on; the webhook does the same after a processed event |

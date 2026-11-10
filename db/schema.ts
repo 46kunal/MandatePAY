@@ -3,7 +3,7 @@
  * Column shapes mirror contracts/schemas.ts. Totals are integer minor units.
  */
 import { bigint, boolean, index, integer, jsonb, pgTable, real, text, timestamp } from 'drizzle-orm/pg-core';
-import type { Cart, Constraints, GuardResult, Verdict } from '../contracts/schemas';
+import type { Cart, Constraints, GuardResult, ReportAssessment, Verdict } from '../contracts/schemas';
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -193,6 +193,35 @@ export const cases = pgTable('cases', {
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
+
+/**
+ * A buyer's "Report a problem" on a paid order, before (or instead of) a PayPal dispute. The store answers it here:
+ * a refund through PayPal, or a reply. assessment is computed when the report is made, from the stored mandate and
+ * the cart guard result, so a clear agent mistake (the agent bought outside what was signed) is plain to see.
+ */
+export const problemReports = pgTable(
+  'problem_reports',
+  {
+    reportId: text('report_id').primaryKey(), // "rpt_<hex>"
+    paypalOrderId: text('paypal_order_id')
+      .notNull()
+      .references(() => orders.paypalOrderId),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    kind: text('kind').notNull(), // see ProblemKind
+    message: text('message').notNull(),
+    assessment: jsonb('assessment').$type<ReportAssessment>().notNull(),
+    status: text('status').notNull().default('open'), // 'open' | 'refunded' | 'closed'
+    reply: text('reply'),
+    refundId: text('refund_id'),
+    refundMinor: integer('refund_minor'),
+    resolvedBy: text('resolved_by').references(() => users.id),
+    resolvedAt: ts('resolved_at'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('problem_reports_order_idx').on(t.paypalOrderId)],
+);
 
 /** Raw webhook / poll events, stored once by event id so processing is idempotent. */
 export const events = pgTable('events', {
