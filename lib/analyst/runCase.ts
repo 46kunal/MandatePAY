@@ -11,6 +11,7 @@ import { payerCheck } from '../auth/paypalIdentity';
 import { isBuyerKid } from '../mandate/buyerKeys';
 import { openMandateSigner } from '../mandate/closed';
 import { toDisputeSummary, type RawDispute } from '../paypal/disputes';
+import { refreshOrderRefunds, refundedView } from '../paypal/refunds';
 import { getSettings } from '../settings';
 import { analyseCase } from './analyst';
 
@@ -47,7 +48,9 @@ export async function analyseStoredCase(disputeId: string): Promise<RunCaseResul
     .from(schema.users)
     .where(eq(schema.users.id, mandate.userId))
     .limit(1);
+  const refunds = order ? await refreshOrderRefunds(order.paypalOrderId, { maxAgeMs: 60_000 }) : [];
   const payment = {
+    refund: refundedView(refunds, theCase.amountMinor),
     source: order?.paymentSource ?? null,
     payer_check: payerCheck(order?.payerId, buyer?.paypalPayerId),
     mandate_signed_with: isBuyerKid(openMandateSigner(mandate.jws).kid) ? ('buyer_key' as const) : ('shared_key' as const),

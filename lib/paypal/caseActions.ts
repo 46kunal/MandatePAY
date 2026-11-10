@@ -14,6 +14,8 @@ import { fromMinor, toMinor } from './orders';
 
 export interface ActInput {
   humanApproved: boolean;
+  /** The person saw that the buyer was already refunded and still wants to offer or accept (see 409 already_refunded). */
+  confirmRefunded?: boolean;
   /** The signed-in user sending the action, recorded on the case. */
   actedBy?: string;
   override?: { action: ActionType; offer_type?: OfferType; offer_amount?: string };
@@ -23,6 +25,8 @@ export interface ActCase {
   row: CaseRow;
   /** Latest raw dispute stored by the poller / webhook. Source of allowed actions and offer types. */
   rawDispute: RawDispute | null;
+  /** Money already refunded on the payment (also outside MandatePay), read fresh from PayPal; null when none. */
+  refunded?: { value: string; currency: string; pending: boolean; covers_dispute: 'none' | 'partial' | 'full' } | null;
 }
 
 export interface ActStore {
@@ -107,6 +111,17 @@ export async function actOnCase(deps: ActDeps, disputeId: string, input: ActInpu
   const needsHuman = Boolean(override) || Boolean(verdict?.needs_human);
   if (needsHuman && !input.humanApproved) {
     return fail(403, 'human_approval_required', 'A person must approve this action (human_approved: true).');
+  }
+
+  // Refunding money the buyer already got back needs an explicit, informed yes.
+  if ((action === 'MAKE_OFFER' || action === 'ACCEPT_CLAIM') && found.refunded && !input.confirmRefunded) {
+    const r = found.refunded;
+    return fail(
+      409,
+      'already_refunded',
+      `The buyer was already refunded ${r.value} ${r.currency}${r.pending ? ' (still pending)' : ''}${r.covers_dispute === 'full' ? ', the full disputed amount' : ''}. ${action === 'ACCEPT_CLAIM' ? 'Accepting the claim' : 'This offer'} may refund them again. Confirm to send it anyway.`,
+      r,
+    );
   }
 
   // Offer details come from the override when one is used, otherwise from the verdict. They are never mixed.

@@ -79,7 +79,12 @@ export default function CaseDetailPage() {
     setNotice(null);
     try {
       const r = await apiFetch<CaseRecord>(`/api/cases/${encodeURIComponent(id)}/act`, {
-        body: { human_approved: true, ...(p.override ? { override: p.override } : {}) },
+        body: {
+          human_approved: true,
+          ...(p.override ? { override: p.override } : {}),
+          // The dialog showed the refund already made, so sending is an informed decision.
+          ...(detail?.order?.refunded && (p.action === 'MAKE_OFFER' || p.action === 'ACCEPT_CLAIM') ? { confirm_refunded: true } : {}),
+        },
       });
       setDetail((cur) => (cur ? { ...cur, ...r.data } : cur));
       setPending(null);
@@ -90,6 +95,7 @@ export default function CaseDetailPage() {
       let text = errMsg(e);
       if (e instanceof ApiClientError) {
         if (e.body.error === 'already_acted') text = 'This case was already handled.';
+        else if (e.body.error === 'already_refunded') text = e.body.message ?? 'The buyer was already refunded on this payment.';
         else if (e.body.error === 'human_approval_required') text = 'A person must approve this action first.';
         else if (e.body.error === 'paypal_not_configured') text = 'PayPal is not configured on the server, so the action could not be sent.';
       }
@@ -222,6 +228,16 @@ export default function CaseDetailPage() {
         </Notice>
       )}
 
+      {detail.order?.refunded && (
+        <Notice tone={detail.order.refunded.covers_dispute === 'full' ? 'info' : 'warn'}>
+          {formatMoney(detail.order.refunded.value, detail.order.refunded.currency)}
+          {detail.order.refunded.pending ? ' (still pending at PayPal)' : ''} has been refunded on this payment
+          {detail.order.refunded.covers_dispute === 'full' ? ', the full disputed amount' : ', part of the disputed amount'}.
+          {detail.status && detail.status !== 'RESOLVED'
+            ? ` PayPal still shows the dispute as ${paypalStatusLabel(detail.status).toLowerCase()}: a refund made outside the dispute does not close it. Send a message saying so, or ask the buyer to close it.`
+            : ''}
+        </Notice>
+      )}
       {detail.action_taken === 'NO_ACTION' && !acted && (
         <Notice tone="warn">
           This case was reviewed and no response was sent. PayPal still shows it as{' '}
@@ -505,6 +521,14 @@ export default function CaseDetailPage() {
                   ))}
                 </ul>
               </>
+            )}
+            {detail.order?.refunded && (pending.action === 'MAKE_OFFER' || pending.action === 'ACCEPT_CLAIM') && (
+              <Notice tone="bad">
+                This buyer was already refunded {formatMoney(detail.order.refunded.value, detail.order.refunded.currency)}
+                {detail.order.refunded.pending ? ' (still pending)' : ''}
+                {detail.order.refunded.covers_dispute === 'full' ? ', the full disputed amount' : ''}.{' '}
+                {pending.action === 'ACCEPT_CLAIM' ? 'Accepting the claim' : 'This offer'} may refund them again.
+              </Notice>
             )}
             <Notice tone="warn">This is sent to PayPal as your decision. It cannot be undone.</Notice>
           </>

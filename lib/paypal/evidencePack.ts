@@ -43,6 +43,12 @@ function constraintRows(constraints: unknown): [string, string][] {
   return rows;
 }
 
+function refundedWords(r: NonNullable<CaseDetail['order']>['refunded']): string {
+  if (!r) return 'Nothing refunded';
+  const what = r.covers_dispute === 'full' ? 'the full disputed amount' : 'part of the disputed amount';
+  return `${money(r.value, r.currency)}${r.pending ? ' (pending at PayPal)' : ''}, ${what}`;
+}
+
 function paidWith(source: string | null): string {
   if (source === 'paypal') return 'PayPal account';
   if (source === 'card') return 'Card (PayPal guest checkout)';
@@ -82,6 +88,7 @@ export function buildEvidenceModel(d: CaseDetail, generatedAt: Date = new Date()
         ['Receipt hash', d.order.receipt_hash ?? 'n/a'],
         ['Paid with', paidWith(d.order.payment_source)],
         ['Payer', PAYER_WORDS[d.order.payer_check]],
+        ['Refunded', refundedWords(d.order.refunded)],
       ],
     });
   }
@@ -299,10 +306,18 @@ export function evidenceMessageText(d: CaseDetail): string {
           : '';
     lines.push(`- Payment ${d.order.paypal_order_id} was captured${d.order.captured_at ? ` on ${d.order.captured_at.slice(0, 10)}` : ''}. ${who}`.trimEnd());
     if (d.order.receipt_hash) lines.push(`- Receipt hash (ties the mandate, cart and payment together): ${d.order.receipt_hash}`);
+    if (d.order.refunded) {
+      lines.push(
+        `- The store has refunded ${money(d.order.refunded.value, d.order.refunded.currency)} on this payment` +
+          (d.order.refunded.pending ? ' (PayPal still shows it as pending).' : '.'),
+      );
+    }
   }
 
   lines.push(
-    'If something about the item is different from what was ordered, please tell us exactly what, so we can put it right.',
+    d.order?.refunded?.covers_dispute === 'full'
+      ? 'As the full amount has been refunded, we ask that this dispute be closed.'
+      : 'If something about the item is different from what was ordered, please tell us exactly what, so we can put it right.',
   );
 
   let text = lines.join('\n');

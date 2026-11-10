@@ -152,7 +152,15 @@ export function drizzleActStore(): ActStore {
     async getCase(disputeId) {
       const { eq, db, schema } = await load();
       const [row] = await db.select().from(schema.cases).where(eq(schema.cases.disputeId, disputeId)).limit(1);
-      return row ? { row, rawDispute: (row.rawDispute as RawDispute | null) ?? null } : undefined;
+      if (!row) return undefined;
+      // Refunds already made on the payment (re-read from PayPal if the snapshot is over a minute old).
+      const { refreshOrderRefunds, refundedView } = await import('./refunds');
+      const orderId = row.paypalOrderId
+        ?? (row.captureId
+          ? (await db.select({ id: schema.orders.paypalOrderId }).from(schema.orders).where(eq(schema.orders.captureId, row.captureId)).limit(1))[0]?.id
+          : undefined);
+      const refunds = orderId ? await refreshOrderRefunds(orderId, { maxAgeMs: 60_000 }) : [];
+      return { row, rawDispute: (row.rawDispute as RawDispute | null) ?? null, refunded: refundedView(refunds, row.amountMinor) };
     },
     async markActed(disputeId, f) {
       const { and, eq, ne, or, db, schema } = await load();

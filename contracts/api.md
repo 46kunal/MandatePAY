@@ -27,6 +27,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/team` | `settings:read` (staff, owner, admin) |
 | POST `/api/team` | `team:manage` (owner, admin). Only an admin gives or takes `admin`; nobody changes their own role; the last owner cannot be removed |
 | GET `/api/audit` | `audit:read` (owner, admin) |
+| POST `/api/orders/:id/refund` | `orders:refund` (owner, admin) |
 | GET `/api/export/orders`, `/api/export/disputes` | `orders:read:all` / `cases:read` (staff, owner, admin) |
 | GET `/api/admin/users`, PATCH `/api/admin/users/:id` | `users:manage` (admin). Disabling ends the person's sessions |
 | GET `/api/admin/health` | `system:read` (admin) |
@@ -40,9 +41,10 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/mandates/draft` | B | `DraftMandateRequest` | `DraftMandateResponse` | 400 invalid, 502 LLM failed |
 | POST `/api/mandates` | B | `CreateMandateRequest` (`buyer_ref` optional and ignored) | `CreateMandateResponse` | 400 invalid constraints |
 | POST `/api/carts/check` | B | `CartCheckRequest` | `CartCheckResponse` (`GuardResult`) | 404 mandate, 410 expired |
-| GET `/api/orders` | A | none | `ListOrdersResponse` (newest first, with any dispute id) | none |
+| GET `/api/orders` | A | none | `ListOrdersResponse` (newest first, with any dispute id) | none. Each order carries `refunded` and `refund_pending` when money was refunded (snapshot from PayPal) |
 | POST `/api/orders` | A | `PlaceOrderRequest` | `PlaceOrderResponse` (`created` or `needs_approval`) | 422 `guard_blocked`, 502 PayPal |
 | POST `/api/orders/:id/capture` | A | none | `CaptureOrderResponse` | 404 order, 409 already captured, 502 PayPal |
+| POST `/api/orders/:id/refund` | A | `RefundOrderRequest` (`amount` omitted = all still refundable; `idempotency_key` makes a repeated click one refund) | `RefundOrderResponse` | 404 order, 409 `not_captured` / `fully_refunded`, 422 `refund_exceeds_remaining`, 502 PayPal. Refunds made in the PayPal dashboard count (re-read first); a linked dispute is re-read afterwards. A refund does not close a dispute |
 | POST `/api/webhooks/paypal` | A | PayPal event | `200` fast | 400 bad signature |
 | GET `/api/settings` | A | none | `StoreSettings` (defaults from env until saved; `auto_analyse` defaults to true) | none |
 | PATCH `/api/settings` | A | `UpdateStoreSettingsRequest` (any subset) | `StoreSettings` | 400 invalid body |
@@ -58,10 +60,10 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/me/export` | A | none | JSON download of the person's account, mandates, carts and orders | none |
 | POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal. After answering, cases that are linked, not analysed yet and actionable are analysed automatically (max 3 per call) when the `auto_analyse` setting is on; the webhook does the same after a processed event |
 | GET `/api/cases` | A | none | `CaseRecord[]` | none |
-| GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order. `order.payment_source` is `paypal` or `card`; `order.payer_check` is `match`, `different`, `not_linked` or `unknown` (did the buyer's linked PayPal account pay) | 404 |
+| GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order. `order.payment_source` is `paypal` or `card`; `order.payer_check` is `match`, `different`, `not_linked` or `unknown` (did the buyer's linked PayPal account pay) | 404. `order.refunds` lists PayPal's refunds on the payment and `order.refunded` sums them (`covers_dispute`: none, partial, full), re-read from PayPal when older than 2 minutes |
 | POST `/api/cases/:id/analyse` | B | none | `Verdict` (saved on case). Input adds `payment` facts from the records: `payer_check` (did the buyer's linked PayPal account pay), `source`, `mandate_signed_with`. A `different` payer always needs a human | 404, 422 not linked, 502 LLM failed |
 | GET `/api/cases/:id/evidence-pack` | A | none | `application/pdf` | 404 |
-| POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal. PROVIDE_EVIDENCE also uploads the evidence pack PDF (multipart, `file1`).. SEND_MESSAGE on a buyer-regret verdict sends the evidence from the records (not the AI's free text), attaching the evidence PDF when PayPal accepts it and otherwise sending the same text alone. NO_ACTION is only a recorded review: nothing is sent and the case stays open (`analysis_status` is never `acted` for it). After a real action the dispute is re-read from PayPal, so `status` in the response is PayPal's current one |
+| POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal. PROVIDE_EVIDENCE also uploads the evidence pack PDF (multipart, `file1`).. SEND_MESSAGE on a buyer-regret verdict sends the evidence from the records (not the AI's free text), attaching the evidence PDF when PayPal accepts it and otherwise sending the same text alone. NO_ACTION is only a recorded review: nothing is sent and the case stays open (`analysis_status` is never `acted` for it). After a real action the dispute is re-read from PayPal, so `status` in the response is PayPal's current one. MAKE_OFFER or ACCEPT_CLAIM on a payment that was already refunded (also outside MandatePay) answers 409 `already_refunded` with the refund in `details`, unless the request sends `confirm_refunded: true` |
 | GET `/api/products` | A | `?active=1` optional | `Product[]` | none |
 | POST `/api/products` | A | `ProductInput` | `Product` (201) | 400 invalid, 409 duplicate SKU |
 | PATCH `/api/products/:id` | A | `UpdateProductRequest` | `Product` | 400, 404, 409 duplicate SKU |

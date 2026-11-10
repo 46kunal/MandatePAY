@@ -4,7 +4,10 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { OrderSummary } from '@/contracts/schemas';
+import { useSession } from '@/lib/auth/client';
+import { can } from '@/lib/auth/roles';
 import { apiFetch } from '../../_ui/api';
+import { Dialog } from '../../_ui/Dialog';
 import { Badge, Card, EmptyState, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
 import { formatDateTime, formatMoney } from '../../_ui/labels';
 import { shortHash } from '../../_ui/parse';
@@ -35,7 +38,23 @@ function paymentLabel(status: string): { text: string; tone: 'good' | 'warn' | '
   }
 }
 
+/** Cents arithmetic for the refund form (amounts are strings with two decimals). */
+const cents = (v: string) => Math.round(Number(v) * 100);
+const fromCents = (c: number) => (c / 100).toFixed(2);
+
+interface RefundDraft {
+  order: OrderSummary;
+  amount: string;
+  note: string;
+  key: string;
+}
+
 export default function OrdersPage() {
+  const { data: session } = useSession();
+  const canRefund = can((session?.user as { role?: string } | undefined)?.role, 'orders:refund');
+  const [refund, setRefund] = useState<RefundDraft | null>(null);
+  const [refundBusy, setRefundBusy] = useState(false);
+  const [refundMsg, setRefundMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [orders, setOrders] = useState<OrderSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAbandoned, setShowAbandoned] = useState(false);
@@ -54,6 +73,48 @@ export default function OrdersPage() {
     void load();
   }, [load]);
 
+  const remainingOf = (o: OrderSummary) => Math.max(0, cents(o.total) - (o.refunded ? cents(o.refunded) : 0));
+
+  function openRefund(o: OrderSummary) {
+    setRefundMsg(null);
+    setRefund({ order: o, amount: fromCents(remainingOf(o)), note: '', key: crypto.randomUUID() });
+  }
+
+  async function sendRefund() {
+    if (!refund) return;
+    const remaining = remainingOf(refund.order);
+    if (!/^\d+(\.\d{1,2})?$/.test(refund.amount.trim()) || cents(refund.amount) <= 0 || cents(refund.amount) > remaining) {
+      setRefundMsg({ ok: false, text: `Enter an amount between 0.01 and ${fromCents(remaining)}.` });
+      return;
+    }
+    setRefundBusy(true);
+    setRefundMsg(null);
+    try {
+      const amount = fromCents(cents(refund.amount));
+      const r = await apiFetch<{ status: string; amount: string; currency: string; remaining: string }>(
+        `/api/orders/${encodeURIComponent(refund.order.paypal_order_id)}/refund`,
+        {
+          method: 'POST',
+          body: {
+            ...(cents(amount) === remaining ? {} : { amount }),
+            ...(refund.note.trim() ? { note: refund.note.trim() } : {}),
+            idempotency_key: refund.key,
+          },
+        },
+      );
+      setRefundMsg({
+        ok: true,
+        text: `Refunded ${formatMoney(r.data.amount, r.data.currency)} (${r.data.status.toLowerCase()} at PayPal). ${formatMoney(r.data.remaining, r.data.currency)} can still be refunded.`,
+      });
+      setRefund(null);
+      void load();
+    } catch (e) {
+      setRefundMsg({ ok: false, text: (e as Error).message });
+    } finally {
+      setRefundBusy(false);
+    }
+  }
+
   const abandoned = orders?.filter((o) => isAbandoned(o, now)).length ?? 0;
   const rows = orders?.filter((o) => showAbandoned || !isAbandoned(o, now)) ?? null;
   const paidCount = orders?.filter((o) => o.status === 'COMPLETED').length ?? 0;
@@ -61,6 +122,11 @@ export default function OrdersPage() {
   return (
     <>
       <PageHeader title="Orders" subtitle="Every order placed through MandatePay, newest first, with its payment and any dispute." />
+      {refundMsg && !refund && (
+        <Notice tone={refundMsg.ok ? 'good' : 'bad'} alert={!refundMsg.ok}>
+          {refundMsg.text}
+        </Notice>
+      )}
       {error && (
         <Notice tone="bad" alert>
           Could not load orders: {error}{' '}
@@ -108,11 +174,17 @@ export default function OrdersPage() {
                   <th scope="col">Order</th>
                   <th scope="col">Items</th>
                   <th scope="col" style={{ textAlign: 'right' }}>Amount</th>
+                  <th scope="col" style={{ textAlign: 'right' }}>Refunded</th>
                   <th scope="col">Payment</th>
                   <th scope="col">Placed</th>
                   <th scope="col">Captured</th>
                   <th scope="col">Receipt hash</th>
                   <th scope="col">Dispute</th>
+                  {canRefund && (
+                    <th scope="col">
+                      <span className={u.srOnly}>Actions</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -125,6 +197,16 @@ export default function OrdersPage() {
                       </td>
                       <td>{o.items.map((i) => (i.quantity > 1 ? `${i.quantity} × ${i.name}` : i.name)).join(', ')}</td>
                       <td className={u.num}>{formatMoney(o.total, o.currency)}</td>
+                      <td className={u.num}>
+                        {o.refunded ? (
+                          <>
+                            {formatMoney(o.refunded, o.currency)}
+                            {o.refund_pending && <div className={u.muted}>pending</div>}
+                          </>
+                        ) : (
+                          <span className={u.muted}>—</span>
+                        )}
+                      </td>
                       <td>
                         <Badge tone={p.tone}>{p.text}</Badge>
                       </td>
@@ -142,6 +224,15 @@ export default function OrdersPage() {
                           <span className={u.muted}>None</span>
                         )}
                       </td>
+                      {canRefund && (
+                        <td style={{ textAlign: 'right' }}>
+                          {o.capture_id && remainingOf(o) > 0 && (
+                            <button className={`${u.btn} ${u.btnSecondary}`} type="button" onClick={() => openRefund(o)}>
+                              Refund
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -150,6 +241,67 @@ export default function OrdersPage() {
           </div>
         </Card>
       )}
+
+      <Dialog
+        open={refund !== null}
+        title="Refund through PayPal"
+        onClose={() => (refundBusy ? undefined : setRefund(null))}
+        footer={
+          <>
+            <button className={`${u.btn} ${u.btnSecondary}`} onClick={() => setRefund(null)} disabled={refundBusy}>
+              Cancel
+            </button>
+            <button className={u.btn} onClick={sendRefund} disabled={refundBusy}>
+              {refundBusy ? 'Refunding…' : `Refund ${refund ? formatMoney(refund.amount || '0', refund.order.currency) : ''}`}
+            </button>
+          </>
+        }
+      >
+        {refund && (
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <p style={{ margin: 0 }}>
+              Order <span className={u.mono}>{refund.order.paypal_order_id}</span>, paid{' '}
+              {formatMoney(refund.order.total, refund.order.currency)}
+              {refund.order.refunded ? `, already refunded ${formatMoney(refund.order.refunded, refund.order.currency)}` : ''}.
+              At most {formatMoney(fromCents(remainingOf(refund.order)), refund.order.currency)} can be refunded.
+            </p>
+            <div className={u.field}>
+              <label htmlFor="refund-amount">Amount ({refund.order.currency})</label>
+              <input
+                id="refund-amount"
+                className={u.input}
+                inputMode="decimal"
+                value={refund.amount}
+                onChange={(e) => setRefund((r) => (r ? { ...r, amount: e.target.value } : r))}
+                disabled={refundBusy}
+              />
+            </div>
+            <div className={u.field}>
+              <label htmlFor="refund-note">Note to the buyer (optional)</label>
+              <input
+                id="refund-note"
+                className={u.input}
+                maxLength={255}
+                value={refund.note}
+                onChange={(e) => setRefund((r) => (r ? { ...r, note: e.target.value } : r))}
+                disabled={refundBusy}
+              />
+            </div>
+            {refund.order.dispute_id && (
+              <Notice tone="info">
+                This order has a dispute ({refund.order.dispute_id}). A refund does not close it by itself: afterwards, tell the
+                buyer through the dispute page.
+              </Notice>
+            )}
+            {refundMsg && !refundMsg.ok && (
+              <Notice tone="bad" alert>
+                {refundMsg.text}
+              </Notice>
+            )}
+            <Notice tone="warn">The money goes back to the buyer through PayPal. It cannot be undone.</Notice>
+          </div>
+        )}
+      </Dialog>
     </>
   );
 }

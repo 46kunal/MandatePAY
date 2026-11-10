@@ -38,6 +38,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   try {
     const result = await actOnCase(defaultActDeps(), id, {
       humanApproved: parsed.data.human_approved,
+      confirmRefunded: parsed.data.confirm_refunded,
       override: parsed.data.override,
       actedBy: authz.user.id,
     });

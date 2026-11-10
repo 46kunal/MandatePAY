@@ -253,8 +253,29 @@ export const OrderSummary = z.object({
   created_at: z.string(),
   captured_at: z.string().optional(),
   dispute_id: z.string().optional(),
+  /** Total refunded on this payment (also refunds made in the PayPal dashboard), as last read from PayPal. */
+  refunded: Amount.optional(),
+  /** A refund is still pending at PayPal. */
+  refund_pending: z.boolean().optional(),
 });
 export type OrderSummary = z.infer<typeof OrderSummary>;
+
+/** Refund all (amount omitted) or part of a captured order. The key makes a repeated click safe: same key, one refund. */
+export const RefundOrderRequest = z
+  .object({
+    amount: Amount.optional(),
+    note: z.string().trim().max(255).optional(),
+    idempotency_key: z.string().regex(/^[A-Za-z0-9-]{8,64}$/),
+  })
+  .strict();
+export const RefundOrderResponse = z.object({
+  refund_id: z.string(),
+  status: z.string(), // PayPal refund status: COMPLETED, PENDING, ...
+  amount: Amount,
+  currency: z.string(),
+  refunded_total: Amount, // all refunds on the payment, this one included
+  remaining: Amount, // what can still be refunded
+});
 
 export const ListOrdersResponse = z.object({ orders: z.array(OrderSummary) });
 
@@ -395,4 +416,6 @@ export const ActOnCaseRequest = z.object({
   human_approved: z.boolean().default(false),
   /** Merchant may override the analyst's action */
   override: z.object({ action: ActionType, offer_type: OfferType.optional(), offer_amount: Amount.optional() }).optional(),
+  /** The person saw that the buyer was already refunded and still wants to offer or accept (else 409 already_refunded). */
+  confirm_refunded: z.boolean().default(false),
 });
