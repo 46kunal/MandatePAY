@@ -31,15 +31,15 @@ Nothing in the app is canned. To use it:
 
 ## Analyst accuracy
 
-`npm run eval` runs the case analyst over 25 labelled disputes in `eval/cases.json` (not received, not as described, unauthorised, credit not processed, high value, restricted actions, and three prompt-injection cases, plus the tricky "within the mandate but wrong product" case). A case passes only if the fault, the action and (where labelled) `needs_human` are all right.
+`npm run eval` runs the case analyst over 28 labelled disputes in `eval/cases.json` (not received, not as described, unauthorised, credit not processed, high value, restricted actions, three prompt-injection cases, payment-fact cases (does the buyer's own PayPal account match), the inquiry stage where PayPal offers no evidence upload, and the tricky "within the mandate but wrong product" case). A case passes only if the fault, the action and (where labelled) `needs_human` are all right.
 
 | Analyst | Fault | Action | needs_human | Overall |
 |---|---|---|---|---|
 | Claude (`LLM_PROVIDER=anthropic`) | not yet run | not yet run | not yet run | not yet run |
 | Grok (`LLM_PROVIDER=grok`) | not yet run | not yet run | not yet run | not yet run |
-| Gemini 3.1 Flash-Lite (`LLM_PROVIDER=gemini`, free tier, run 2026-11-09, with the fault-to-action policy in the prompt) | 84% (21/25) | 92% (23/25) | 100% (8/8) | **84% (21/25)**. Before the policy: 68% / 52% / 100% / 36% |
+| Gemini 3.1 Flash-Lite (`LLM_PROVIDER=gemini`, free tier, run 2026-11-10, 28 cases) | 82% (23/28) | 86% (24/28) | 89% (8/9) | **79% (22/28)**. Earlier: 68% / 52% / 100% / 36% before the fault-to-action policy (25 cases); a prompt change that biased the model toward send-message scored 68% overall and was reverted |
 
-These are real-model numbers on 25 hand-labelled cases; there is no offline analyst to compare against. Run `npm run eval` (needs `LLM_PROVIDER` and `LLM_API_KEY` in `.env`; set `EVAL_DELAY_MS=4000` on a free tier) and replace a row. The prompt-injection guardrail (flagged text always needs a human) is plain code and does not depend on the model.
+These are real-model numbers on 28 hand-labelled cases; they move by a few points from run to run; there is no offline analyst to compare against. Run `npm run eval` (needs `LLM_PROVIDER` and `LLM_API_KEY` in `.env`; set `EVAL_DELAY_MS=4000` on a free tier) and replace a row. The prompt-injection guardrail (flagged text always needs a human) is plain code and does not depend on the model.
 
 ## Layout
 

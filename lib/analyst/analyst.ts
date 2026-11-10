@@ -69,8 +69,9 @@ Choose the action from the fault (only if it is in dispute.allowed_actions):
 - agent -> MAKE_OFFER (usually REFUND_WITH_RETURN: the merchant did nothing wrong but the buyer should not lose out),
   or SEND_MESSAGE to agree a return. Never ACCEPT_CLAIM or PROVIDE_EVIDENCE for agent fault.
 - buyer_regret -> PROVIDE_EVIDENCE (delivery, the matching cart and the signed mandate). Do not refund.
-  PayPal only offers PROVIDE_EVIDENCE once a dispute reaches the claim stage. At the inquiry stage it is usually not in
-  allowed_actions; then choose SEND_MESSAGE: the system sends the evidence from the records in that message.
+  Look at dispute.allowed_actions, not at the stage: if PROVIDE_EVIDENCE is in it, choose PROVIDE_EVIDENCE. Only when it
+  is missing from allowed_actions and SEND_MESSAGE is there, choose SEND_MESSAGE; the system then sends the evidence from
+  the records in that message. SEND_MESSAGE is never a substitute for an action that is allowed and fits.
 - unclear -> SEND_MESSAGE to ask the buyer for facts, or NO_ACTION; and set needs_human true.
 
 Rules:
