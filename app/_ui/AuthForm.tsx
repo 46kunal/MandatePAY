@@ -75,7 +75,7 @@ export function AuthForm() {
     }
   }
 
-  const title = mode === 'sign-up' ? 'Create your account' : 'Welcome back';
+  const title = mode === 'sign-up' ? 'Create your account' : 'Sign in';
   const subtitle = mode === 'sign-up' ? 'It takes a minute. You can start right away.' : 'Sign in with your email and password.';
 
   return (
@@ -85,11 +85,8 @@ export function AuthForm() {
           <span className={a.mark}>M</span>
           MandatePay
         </Link>
-        <span className={a.stamp}>Signed</span>
         <div className={a.quote}>
-          <h2>
-            Let an AI shop for you. <em>Keep the proof.</em>
-          </h2>
+          <h2>Let an AI shop for you, and keep the proof</h2>
           <p>Your limits are signed before anything is bought, and every purchase is checked against them.</p>
         </div>
         <span className={a.fine}>Runs on the PayPal sandbox. No real money moves.</span>

@@ -400,6 +400,11 @@
 
 /* ---------- buyer frame ---------- */
 .buyer {
+  /* A shopping app, so the surface is only faintly warm; the serif titles carry the character. */
+  --paper: #f8f7f4;
+  --bg: #ffffff;
+  --bg-2: #f4f3ef;
+  --border: #e7e5df;
   min-height: 100vh;
   background: var(--paper);
 }

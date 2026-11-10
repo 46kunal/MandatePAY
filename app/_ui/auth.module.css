@@ -1,4 +1,4 @@
-/* Sign-in: a split page. The left is the brand on ink, with the stamp; the right is the form on paper. */
+/* Sign-in: a split page. The left is the brand on ink; the right is the form on paper. */
 .page {
   min-height: 100vh;
   display: grid;
@@ -29,10 +29,10 @@
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   color: #f5f1e9;
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1.1rem;
 }
 .mark {
@@ -44,7 +44,7 @@
   display: grid;
   place-items: center;
   font-family: var(--font-serif);
-  font-weight: 700;
+  font-weight: 600;
 }
 .quote {
   max-width: 28rem;
@@ -57,40 +57,10 @@
   line-height: 1.08;
   letter-spacing: -0.02em;
 }
-.quote h2 em {
-  background: linear-gradient(transparent 62%, rgba(243, 215, 124, 0.5) 62% 92%, transparent 92%);
-  font-style: italic;
-  padding: 0 0.1em;
-  margin: 0 -0.1em;
-}
 .quote p {
   margin: 0;
   color: #b9bfca;
   font-size: 1.05rem;
-}
-.stamp {
-  position: absolute;
-  right: 8%;
-  top: 14%;
-  padding: 0.35rem 1rem;
-  border: 3px solid var(--stamp);
-  border-radius: 6px;
-  color: #e8765a;
-  border-color: #e8765a;
-  font-family: var(--font-serif);
-  font-weight: 800;
-  font-size: 1.4rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  opacity: 0.55;
-  transform: rotate(-10deg);
-  animation: land 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) 0.3s both;
-}
-@keyframes land {
-  from {
-    opacity: 0;
-    transform: rotate(-10deg) scale(1.8);
-  }
 }
 .fine {
   font-size: 0.85rem;
@@ -105,13 +75,13 @@
   width: 100%;
   max-width: 400px;
   display: grid;
-  gap: 1.1rem;
+  gap: 1rem;
 }
 .mobileLogo {
   display: none;
   align-items: center;
-  gap: 0.6rem;
-  font-weight: 700;
+  gap: 0.5rem;
+  font-weight: 600;
   color: var(--ink);
   text-decoration: none;
 }
@@ -123,7 +93,7 @@
 .title {
   margin: 0;
   font-family: var(--font-serif);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 2rem;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -136,9 +106,4 @@
   text-align: center;
   color: var(--muted);
   margin: 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .stamp {
-    animation: none;
-  }
 }

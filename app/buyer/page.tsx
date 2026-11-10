@@ -1,10 +1,9 @@
 'use client';
-// OWNER: C. The buyer's home. It opens with a greeting and one clear way to start, and shows what is already going on
+// OWNER: C. The buyer's home. It opens with one clear way to start, and shows what is already going on
 // (mandates that are active, recent orders) instead of dropping straight into the purchase form.
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { MyMandate, MyOrder } from '@/contracts/schemas';
-import { useSession } from '@/lib/auth/client';
 import { apiFetch } from '../_ui/api';
 import { Icon } from '../_ui/Icons';
 import { formatDay, formatMoney } from '../_ui/labels';
@@ -12,17 +11,7 @@ import { Badge, Skeleton } from '../_ui/Ui';
 import u from '../_ui/ui.module.css';
 import h from './home.module.css';
 
-function greeting(): string {
-  const hour = new Date().getHours();
-  return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-}
-
 export default function BuyerHome() {
-  // Time of day depends on the visitor's clock, so it is decided in the browser only (no server mismatch).
-  const [hello, setHello] = useState('Welcome');
-  useEffect(() => setHello(greeting()), []);
-  const { data } = useSession();
-  const first = data?.user?.name?.trim().split(/\s+/)[0];
   const [mandates, setMandates] = useState<MyMandate[] | null>(null);
   const [orders, setOrders] = useState<MyOrder[] | null>(null);
 
@@ -40,21 +29,13 @@ export default function BuyerHome() {
   return (
     <>
       <section className={h.hero} aria-label="Start a purchase">
-        <span className={h.seal} aria-hidden="true">
-          Signed
-          <br />
-          &amp; sealed
-        </span>
         <div>
-          <h1>
-            {hello}
-            {first ? `, ${first}` : ''}
-          </h1>
-          <p>Tell your agent what you need and set your limits. You can type it or say it, and you approve everything before you pay.</p>
+          <h1>Tell your agent what to buy</h1>
+          <p>Set your limits once, by typing or speaking. Everything is checked against them, and you approve before you pay.</p>
         </div>
         <Link href="/buyer/shop" className={h.heroBtn}>
           <Icon name="bag" />
-          Start a purchase
+          New purchase
           <Icon name="arrow" size={16} />
         </Link>
       </section>
