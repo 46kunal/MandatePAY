@@ -25,6 +25,11 @@
   /* Text on a tinted background needs a darker shade of the same hue to stay readable. */
   --warn-text: #7a4a07;
   --radius: 6px;
+  /* Motion: one easing curve, a few durations. Hover and press 150ms, menus 200ms, entrances 400ms, stagger 50ms. */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-fast: 150ms;
+  --t-menu: 200ms;
+  --t-enter: 400ms;
   --font-ui: var(--font-body), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-serif: var(--font-display), Georgia, 'Times New Roman', serif;
 }
@@ -307,7 +312,7 @@
   background: var(--accent);
   color: #fff;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 .btn:focus-visible {
   outline: 3px solid var(--accent-line);
@@ -382,6 +387,7 @@
 
 /* ---------- Feedback ---------- */
 .notice {
+  animation: enterUp 300ms var(--ease) both;
   border: 1px solid var(--border);
   background: var(--bg-2);
   border-radius: var(--radius);
@@ -589,6 +595,7 @@
   padding: 0.5rem 0.75rem;
   cursor: pointer;
   white-space: nowrap;
+  transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 .tab:hover {
   color: var(--text);
@@ -625,6 +632,12 @@
 }
 
 /* ---------- Dialog ---------- */
+.dialog[open] {
+  animation: dialogIn var(--t-menu) var(--ease) both;
+}
+.dialog[open]::backdrop {
+  animation: fadeIn var(--t-menu) var(--ease) both;
+}
 .dialog {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -752,7 +765,7 @@
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
 }
 .chipBtn:hover:not(:disabled) {
   background: var(--accent-bg);
@@ -790,4 +803,97 @@
 }
 .userName {
   font-weight: 500;
+}
+
+
+/* ---------- Motion ---------- */
+@keyframes enterUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@keyframes growX {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* One entrance per page: the content fades and rises, and its first six blocks follow 50ms apart. */
+.pageIn {
+  animation: enterUp var(--t-enter) var(--ease) both;
+}
+.pageIn > * {
+  animation: enterUp var(--t-enter) var(--ease) both;
+}
+.pageIn > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+.pageIn > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+.pageIn > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+.pageIn > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+.pageIn > *:nth-child(n + 6) {
+  animation-delay: 250ms;
+}
+
+/* A list or grid whose items rise in turn. Give each item style={{ '--i': index }} (index capped at 5). */
+.enter {
+  animation: enterUp var(--t-enter) var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+
+/* Table rows settle in once, the first six in turn. */
+.table tbody tr {
+  animation: fadeIn var(--t-enter) var(--ease) both;
+}
+.table tbody tr:nth-child(2) {
+  animation-delay: 50ms;
+}
+.table tbody tr:nth-child(3) {
+  animation-delay: 100ms;
+}
+.table tbody tr:nth-child(4) {
+  animation-delay: 150ms;
+}
+.table tbody tr:nth-child(5) {
+  animation-delay: 200ms;
+}
+.table tbody tr:nth-child(n + 6) {
+  animation-delay: 250ms;
+}
+.table tbody tr td {
+  transition: background-color var(--t-fast) var(--ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pageIn,
+  .pageIn > *,
+  .enter,
+  .notice,
+  .table tbody tr,
+  .dialog[open],
+  .dialog[open]::backdrop {
+    animation: none;
+  }
+  .btn,
+  .tab {
+    transition: none;
+  }
 }

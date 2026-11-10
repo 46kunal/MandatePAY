@@ -366,3 +366,58 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- Motion ---------- */
+@keyframes enterUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes rec {
+  50% {
+    opacity: 0.35;
+  }
+}
+/* Lines added to the cart and the summary rise in once, so the change is seen. */
+.cartItem,
+.asideList li {
+  animation: enterUp 300ms var(--ease) both;
+}
+.asideTotal {
+  animation: enterUp 300ms var(--ease) both;
+}
+.stepNum {
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.shopCard {
+  transition: border-color var(--t-fast) var(--ease);
+}
+.shopCard:hover {
+  border-color: var(--muted-2);
+}
+.voiceBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* A recording light: it blinks only while the microphone is live. */
+.recDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--stamp);
+  animation: rec 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cartItem,
+  .asideList li,
+  .asideTotal,
+  .recDot {
+    animation: none;
+  }
+  .stepNum,
+  .shopCard {
+    transition: none;
+  }
+}

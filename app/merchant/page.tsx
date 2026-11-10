@@ -8,6 +8,7 @@ import { apiFetch } from '../_ui/api';
 import { Icon, type IconName } from '../_ui/Icons';
 import { ACTION, FAULT, dueLabel, formatMoney, formatWhen, reasonLabel } from '../_ui/labels';
 import { Badge, Notice, Skeleton } from '../_ui/Ui';
+import { Tween } from '../_ui/Tween';
 import { useCases } from '../_ui/useCases';
 import u from '../_ui/ui.module.css';
 import o from './overview.module.css';
@@ -122,12 +123,12 @@ export default function OverviewPage() {
       <div className={o.kpis}>
         <div className={o.kpi}>
           <div className={o.kpiLabel}>Needs you</div>
-          <div className={o.kpiValue}>{loading ? '–' : todo.length}</div>
+          <div className={o.kpiValue}>{loading ? '–' : <Tween value={todo.length} />}</div>
           <div className={o.kpiHint}>Disputes and buyer reports</div>
         </div>
         <div className={o.kpi}>
           <div className={o.kpiLabel}>Open disputes</div>
-          <div className={o.kpiValue}>{loading ? '–' : total - (buckets.find((b) => b.key === 'done')?.n ?? 0)}</div>
+          <div className={o.kpiValue}>{loading ? '–' : <Tween value={total - (buckets.find((b) => b.key === 'done')?.n ?? 0)} />}</div>
           <div className={o.kpiHint}>{results ? `${results.disputes.total} received in total` : 'Not resolved yet'}</div>
         </div>
         <div className={o.kpi}>
@@ -137,7 +138,7 @@ export default function OverviewPage() {
         </div>
         <div className={o.kpi}>
           <div className={o.kpiLabel}>AI accuracy</div>
-          <div className={o.kpiValue}>{results?.eval ? `${Math.round(results.eval.overall * 100)}%` : '–'}</div>
+          <div className={o.kpiValue}>{results?.eval ? <Tween value={Math.round(results.eval.overall * 100)} suffix="%" /> : '–'}</div>
           <div className={o.kpiHint}>{results?.eval ? `On ${results.eval.cases} labelled disputes` : 'Run the test set'}</div>
         </div>
       </div>
@@ -163,8 +164,8 @@ export default function OverviewPage() {
               </div>
             ) : (
               <ul className={o.todo}>
-                {todo.slice(0, 8).map((t) => (
-                  <li key={t.key}>
+                {todo.slice(0, 8).map((t, idx) => (
+                  <li key={t.key} className={u.enter} style={{ ['--i' as string]: Math.min(idx, 5) }}>
                     <Link href={t.href} className={o.todoItem}>
                       <span className={`${o.todoIcon} ${t.tone}`}>
                         <Icon name={t.icon} />
@@ -227,8 +228,8 @@ export default function OverviewPage() {
               </div>
             ) : (
               <ul className={o.timeline}>
-                {recent.map((a) => (
-                  <li key={a.key} className={o.tl}>
+                {recent.map((a, idx) => (
+                  <li key={a.key} className={`${o.tl} ${u.enter}`} style={{ ['--i' as string]: Math.min(idx, 5) }}>
                     <span className={o.tlDot} />
                     <div>
                       <Link href={`/merchant/disputes/${encodeURIComponent(a.id)}`}>{a.text}</Link>

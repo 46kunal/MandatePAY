@@ -87,7 +87,7 @@
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
   padding: 8px;
   z-index: 50;
-  animation: pop 0.14s ease-out;
+  animation: pop var(--t-menu) var(--ease);
 }
 @keyframes pop {
   from {

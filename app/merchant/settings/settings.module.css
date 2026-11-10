@@ -192,7 +192,7 @@
   color: #fff;
   border-radius: 14px;
   box-shadow: 0 2px 8px rgba(20, 27, 38, 0.2);
-  animation: slideUp 0.25s ease-out;
+  animation: slideUp var(--t-menu) var(--ease);
 }
 @keyframes slideUp {
   from {

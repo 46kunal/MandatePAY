@@ -4,7 +4,7 @@
 // Motion is limited to what explains something: the request is typed once and the stamp lands once in the hero, and
 // sections fade in a little as they arrive. All of it is off for people who ask their device to reduce motion.
 import Link from 'next/link';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useSession } from '@/lib/auth/client';
 import '../_ui/ui.module.css'; // loads the shared colour tokens
 import c from './landing.module.css';
@@ -24,9 +24,9 @@ function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
 
-/** Fades its children in once, a little, when they come into view. */
-function Reveal({ children, className = '' }: { children: ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+/** Fades and rises once when it comes into view. `i` staggers siblings by 50ms (the first six). */
+function Reveal({ children, className = '', i = 0, as = 'div' }: { children: ReactNode; className?: string; i?: number; as?: 'div' | 'li' }) {
+  const ref = useRef<HTMLElement>(null);
   const [on, setOn] = useState(false);
   useEffect(() => {
     const el = ref.current;
@@ -47,10 +47,54 @@ function Reveal({ children, className = '' }: { children: ReactNode; className?:
     io.observe(el);
     return () => io.disconnect();
   }, []);
+  const Tag = as;
   return (
-    <div ref={ref} className={`${c.reveal} ${on ? c.revealOn : ''} ${className}`}>
+    <Tag
+      ref={ref as never}
+      className={`${c.reveal} ${on ? c.revealOn : ''} ${className}`}
+      style={{ ['--i' as string]: Math.min(i, 5) } as CSSProperties}
+    >
       {children}
-    </div>
+    </Tag>
+  );
+}
+
+/** The six links of the record light up once, in order, when the list comes into view. */
+function RecordList({ items }: { items: [string, string][] }) {
+  const ref = useRef<HTMLOListElement>(null);
+  const [lit, setLit] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (reducedMotion() || typeof IntersectionObserver === 'undefined') {
+      setLit(items.length);
+      return;
+    }
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        items.forEach((_, n) => timers.push(setTimeout(() => setLit(n + 1), 250 + n * 220)));
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, [items]);
+  return (
+    <ol className={c.record} ref={ref}>
+      {items.map(([t, d], n) => (
+        <li key={t} className={`${c.recordItem} ${n < lit ? c.recordOn : ''}`}>
+          <span className={c.recordNum}>{n + 1}</span>
+          <b>{t}</b>
+          <span>{d}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -106,12 +150,12 @@ function MandateCard() {
         </dl>
         <span className={`${c.stamp} ${stage >= 2 ? c.stampOn : ''}`}>Signed</span>
       </div>
-      <div className={c.cartCheck}>
+      <div className={`${c.cartCheck} ${stage >= 2 ? c.cartOn : ''}`}>
         <div className={c.cartRow}>
           <span>Aero Runner, white, size 10</span>
           <span className={c.mono}>$89.00</span>
         </div>
-        <ul className={c.checks}>
+        <ul className={`${c.checks} ${stage >= 2 ? c.checksOn : ''}`}>
           {CHECKS.map((t) => (
             <li key={t}>{t}</li>
           ))}
@@ -185,9 +229,16 @@ const RECORD: [string, string][] = [
 ];
 
 export default function Landing() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 8);
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
   return (
     <div className={c.page}>
-      <header className={c.nav}>
+      <header className={`${c.nav} ${scrolled ? c.navScrolled : ''}`}>
         <div className={`${c.wrap} ${c.navInner}`}>
           <Link href="/" className={c.brand}>
             <span className={c.mark} aria-hidden="true">
@@ -214,15 +265,21 @@ export default function Landing() {
         <section className={c.hero}>
           <div className={`${c.wrap} ${c.heroGrid}`}>
             <div>
-              <h1 className={c.h1}>Let an AI shop for you, and keep proof of what you asked</h1>
-              <p className={c.lead}>
+              <h1 className={`${c.h1} ${c.heroIn}`} style={{ ['--i' as string]: 0 } as CSSProperties}>Let an AI shop for you, and keep proof of what you asked</h1>
+              <p className={`${c.lead} ${c.heroIn}`} style={{ ['--i' as string]: 1 } as CSSProperties}>
                 Set your limits once. MandatePay signs them, checks every cart against them, and gives the store the record if a payment is
                 disputed.
               </p>
-              <HeroActions />
-              <p className={c.note}>Runs on the PayPal sandbox. No real money moves.</p>
+              <div className={c.heroIn} style={{ ['--i' as string]: 2 } as CSSProperties}>
+                <HeroActions />
+              </div>
+              <p className={`${c.note} ${c.heroIn}`} style={{ ['--i' as string]: 3 } as CSSProperties}>
+                Runs on the PayPal sandbox. No real money moves.
+              </p>
             </div>
-            <MandateCard />
+            <div className={c.heroIn} style={{ ['--i' as string]: 2 } as CSSProperties}>
+              <MandateCard />
+            </div>
           </div>
         </section>
 
@@ -233,7 +290,7 @@ export default function Landing() {
               <p className={c.sub}>Today nobody can prove it. That is a problem for shoppers and for stores.</p>
             </Reveal>
             <div className={c.split}>
-              <Reveal>
+              <Reveal i={0}>
                 <div className={c.panel}>
                   <h3>Without a record</h3>
                   <p>
@@ -242,7 +299,7 @@ export default function Landing() {
                   </p>
                 </div>
               </Reveal>
-              <Reveal>
+              <Reveal i={1}>
                 <div className={c.panel}>
                   <h3>With MandatePay</h3>
                   <p>
@@ -263,11 +320,12 @@ export default function Landing() {
             </Reveal>
             <ol className={c.steps}>
               {STEPS.map(([t, d], i) => (
-                <li key={t} className={c.step}>
+                <Reveal as="li" key={t} i={i} className={c.step}>
+                  <span className={c.stepLine} aria-hidden="true" />
                   <span className={c.stepNum}>{i + 1}</span>
                   <h3>{t}</h3>
                   <p>{d}</p>
-                </li>
+                </Reveal>
               ))}
             </ol>
           </div>
@@ -279,15 +337,7 @@ export default function Landing() {
               <h2 className={c.h2}>Every step leaves a record</h2>
               <p className={c.sub}>From the first request to the final decision, each link is stored, so a dispute is settled by what happened.</p>
             </Reveal>
-            <ol className={c.record}>
-              {RECORD.map(([t, d], i) => (
-                <li key={t} className={c.recordItem}>
-                  <span className={c.recordNum}>{i + 1}</span>
-                  <b>{t}</b>
-                  <span>{d}</span>
-                </li>
-              ))}
-            </ol>
+            <RecordList items={RECORD} />
           </div>
         </section>
 
@@ -341,7 +391,7 @@ export default function Landing() {
               <p className={c.sub}>One sign-in. What you see depends on who you are.</p>
             </Reveal>
             <div className={c.cards}>
-              <Reveal>
+              <Reveal i={0}>
                 <div className={c.card}>
                   <h3>If you shop</h3>
                   <p>Hand the repetitive part of shopping to an agent without giving up control.</p>
@@ -353,7 +403,7 @@ export default function Landing() {
                   </ul>
                 </div>
               </Reveal>
-              <Reveal>
+              <Reveal i={1}>
                 <div className={c.card}>
                   <h3>If you run a store</h3>
                   <p>Sell to people and to their agents, with the proof ready when a payment is disputed.</p>
@@ -372,22 +422,22 @@ export default function Landing() {
         <section className={`${c.section} ${c.sectionAlt}`}>
           <div className={c.wrap}>
             <ul className={c.trust}>
-              <li>
+              <Reveal as="li" i={0}>
                 <b>Signed mandates</b>
                 <span>Your own key, checked every time</span>
-              </li>
-              <li>
+              </Reveal>
+              <Reveal as="li" i={1}>
                 <b>PayPal checkout</b>
                 <span>Card details never touch our servers</span>
-              </li>
-              <li>
+              </Reveal>
+              <Reveal as="li" i={2}>
                 <b>A person decides</b>
                 <span>The AI recommends, you approve</span>
-              </li>
-              <li>
+              </Reveal>
+              <Reveal as="li" i={3}>
                 <b>Audit trail</b>
                 <span>Who did what, and when</span>
-              </li>
+              </Reveal>
             </ul>
           </div>
         </section>

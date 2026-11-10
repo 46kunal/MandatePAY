@@ -282,10 +282,10 @@ export default function BuyerPage() {
             <p className={u.muted}>Nothing is available in {mandate.constraints.max_total.currency} right now.</p>
           ) : (
             <div className={s.shopGrid} style={{ marginTop: '0.75rem' }}>
-              {catalog.map((p) => {
+              {catalog.map((p, idx) => {
                 const have = inCart(p.sku);
                 return (
-                  <article key={p.sku} className={s.shopCard}>
+                  <article key={p.sku} className={`${s.shopCard} ${u.enter}`} style={{ ['--i' as string]: Math.min(idx, 5) }}>
                     {p.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img className={s.shopImg} src={p.image_url} alt={p.name} loading="lazy" referrerPolicy="no-referrer" />

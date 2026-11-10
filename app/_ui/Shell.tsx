@@ -138,7 +138,11 @@ export function BuyerShell({ children }: { children: ReactNode }) {
           />
         </div>
       </header>
-      <main className={s.buyerPage}>{children}</main>
+      <main className={s.buyerPage}>
+        <div key={path} className={u.pageIn}>
+          {children}
+        </div>
+      </main>
     </div>
   );
 }
@@ -277,7 +281,11 @@ export function MerchantShell({ children }: { children: ReactNode }) {
               ]}
             />
           </div>
-          <main className={s.page}>{children}</main>
+          <main className={s.page}>
+            <div key={path} className={u.pageIn}>
+              {children}
+            </div>
+          </main>
         </div>
       </div>
     </div>
