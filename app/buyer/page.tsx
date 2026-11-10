@@ -37,6 +37,11 @@ export default function BuyerHome() {
   return (
     <>
       <section className={h.hero} aria-label="Start a purchase">
+        <span className={h.seal} aria-hidden="true">
+          Signed
+          <br />
+          &amp; sealed
+        </span>
         <div>
           <h1>
             {greeting()}

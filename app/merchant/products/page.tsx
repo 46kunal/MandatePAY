@@ -69,6 +69,7 @@ export default function ProductsPage() {
   const [form, setForm] = useState<Form>(EMPTY);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -91,6 +92,7 @@ export default function ProductsPage() {
     try {
       await apiFetch<Product>('/api/products', { body: input });
       setForm({ ...EMPTY, currency: form.currency });
+      setAdding(false);
       await load();
     } catch (err) {
       setFormError(errMsg(err));
@@ -127,7 +129,15 @@ export default function ProductsPage() {
 
   return (
     <>
-      <PageHeader title="Products" subtitle="Your catalog. The shopping agent can only buy active, in-stock products listed here, at these prices." />
+      <PageHeader
+        title="Products"
+        subtitle="Your catalog. The shopping agent can only buy active, in-stock products listed here, at these prices."
+        actions={
+          <button className={adding ? `${u.btn} ${u.btnSecondary}` : u.btn} onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
+            {adding ? 'Close' : 'Add a product'}
+          </button>
+        }
+      />
 
       {loadError && (
         <Notice tone="bad" alert>
@@ -138,7 +148,8 @@ export default function ProductsPage() {
         </Notice>
       )}
 
-      <Card id="add" title="Add a product">
+      {(adding || (products && products.length === 0)) && (
+      <Card id="add" title="Add a product" subtitle="A picture link is optional; buyers see it in the store.">
         <form onSubmit={add}>
           <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
             {field('name', 'Name', { required: true, maxLength: 127 })}
@@ -175,10 +186,11 @@ export default function ProductsPage() {
           </div>
         </form>
       </Card>
+      )}
 
       {!products && !loadError && <Skeleton height={120} label="Loading products" />}
       {products && products.length === 0 && (
-        <EmptyState title="No products yet">Add your first product above. The shopping agent has nothing to buy until you do.</EmptyState>
+        <EmptyState title="No products yet">Add your first product with the form above. The shopping agent has nothing to buy until you do.</EmptyState>
       )}
       {products && products.length > 0 && (
         <Card id="catalog" title={`Catalog (${products.filter((p) => p.active).length} active of ${products.length})`}>
@@ -197,9 +209,21 @@ export default function ProductsPage() {
                 {products.map((p) => (
                   <tr key={p.product_id}>
                     <td>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                        {p.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.image_url} alt="" width={44} height={44} style={{ borderRadius: 8, objectFit: 'cover', flex: 'none' }} referrerPolicy="no-referrer" />
+                        ) : (
+                          <span aria-hidden="true" style={{ width: 44, height: 44, borderRadius: 8, background: 'var(--bg-2)', display: 'grid', placeItems: 'center', fontWeight: 700, color: 'var(--muted)', flex: 'none' }}>
+                            {p.name.slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                        <div>
                       <strong>{p.name}</strong>
                       <div className={u.muted}>
                         {[p.sku, p.category, ...Object.entries(p.attributes).map(([k, v]) => `${titleCase(k)}: ${v}`)].join(' · ')}
+                      </div>
+                        </div>
                       </div>
                     </td>
                     <td>{formatMoney(p.unit_price, p.currency)}</td>

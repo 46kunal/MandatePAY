@@ -8,6 +8,7 @@ import type { CaseRecord, ProblemReport } from '@/contracts/schemas';
 import { authClient, useSession } from '@/lib/auth/client';
 import { canOpen } from '@/lib/auth/routes';
 import { apiFetch } from './api';
+import { CHANGED } from './events';
 import { Icon, type IconName } from './Icons';
 import { needsReview } from './labels';
 import s from './shell.module.css';
@@ -110,7 +111,7 @@ export function BuyerShell({ children }: { children: ReactNode }) {
   const { data } = useSession();
   const role = (data?.user as { role?: string } | undefined)?.role;
   return (
-    <div className={`${u.root} ${s.buyer}`}>
+    <div className={`${u.root} ${s.buyer}`} style={{ ['--h1-font' as string]: 'var(--font-serif)' }}>
       <header className={s.bar}>
         <div className={s.barInner}>
           <Brand href="/buyer" />
@@ -179,6 +180,17 @@ function isOn(path: string, n: { href: string; exact?: boolean }) {
 function useShellInfo() {
   const [info, setInfo] = useState<{ review: number; reports: number; store: string | null }>({ review: 0, reports: 0, store: null });
   const path = usePathname();
+  const [tick, setTick] = useState(0);
+  // Re-read when a page says something changed, and quietly every minute while the tab is open.
+  useEffect(() => {
+    const bump = () => setTick((n) => n + 1);
+    window.addEventListener(CHANGED, bump);
+    const t = setInterval(() => document.visibilityState === 'visible' && bump(), 60_000);
+    return () => {
+      window.removeEventListener(CHANGED, bump);
+      clearInterval(t);
+    };
+  }, []);
   useEffect(() => {
     let live = true;
     (async () => {
@@ -197,8 +209,8 @@ function useShellInfo() {
     return () => {
       live = false;
     };
-    // Refresh the counts when the person moves to another page, so a handled item stops showing.
-  }, [path]);
+    // Refresh when the person moves to another page, when a page reports a change, and on the timer above.
+  }, [path, tick]);
   return info;
 }
 

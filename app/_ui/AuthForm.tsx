@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { authClient } from '@/lib/auth/client';
 import { Card, Notice } from './Ui';
+import a from './auth.module.css';
 import u from './ui.module.css';
 
 /** After signing in, /start sends the person home (or to the page they asked for, if their role may open it). */
@@ -78,14 +79,34 @@ export function AuthForm() {
   const subtitle = mode === 'sign-up' ? 'It takes a minute. You can start right away.' : 'Sign in with your email and password.';
 
   return (
-    <div style={{ maxWidth: 420, margin: '8vh auto 0', padding: '0 16px', display: 'grid', gap: '1rem' }}>
-      <Link href="/" className={u.brand}>
-        <span className={u.brandMark} aria-hidden="true">
-          M
-        </span>
-        MandatePay
-      </Link>
-      <Card title={title} subtitle={subtitle}>
+    <div className={a.page}>
+      <aside className={a.brandSide} aria-hidden="true">
+        <Link href="/" className={a.logo} tabIndex={-1}>
+          <span className={a.mark}>M</span>
+          MandatePay
+        </Link>
+        <span className={a.stamp}>Signed</span>
+        <div className={a.quote}>
+          <h2>
+            Let an AI shop for you. <em>Keep the proof.</em>
+          </h2>
+          <p>Your limits are signed before anything is bought, and every purchase is checked against them.</p>
+        </div>
+        <span className={a.fine}>Runs on the PayPal sandbox. No real money moves.</span>
+      </aside>
+      <main className={a.formSide}>
+        <div className={a.formWrap}>
+          <Link href="/" className={a.mobileLogo}>
+            <span className={a.mark} style={{ background: 'var(--ink)', color: '#f5f1e9' }}>
+              M
+            </span>
+            MandatePay
+          </Link>
+          <div>
+            <h1 className={a.title}>{title}</h1>
+            <p className={a.sub}>{subtitle}</p>
+          </div>
+          <Card>
         {PAYPAL_LOGIN && (
           <div style={{ display: 'grid', gap: '0.6rem', marginBottom: '1rem' }}>
             <button className={u.btn} type="button" onClick={continueWithPayPal} disabled={busy}>
@@ -141,20 +162,22 @@ export function AuthForm() {
             {busy ? 'Please wait…' : mode === 'sign-up' ? 'Create account' : 'Sign in'}
           </button>
         </form>
-      </Card>
-      <p className={u.muted} style={{ textAlign: 'center', margin: 0 }}>
-        {mode === 'sign-in' ? 'New here? ' : 'Already have an account? '}
-        <button
-          type="button"
-          className={u.linkButton}
-          onClick={() => {
-            setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
-            setError(null);
-          }}
-        >
-          {mode === 'sign-in' ? 'Create an account' : 'Sign in'}
-        </button>
-      </p>
+          </Card>
+          <p className={a.switch}>
+            {mode === 'sign-in' ? 'New here? ' : 'Already have an account? '}
+            <button
+              type="button"
+              className={u.linkButton}
+              onClick={() => {
+                setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
+                setError(null);
+              }}
+            >
+              {mode === 'sign-in' ? 'Create an account' : 'Sign in'}
+            </button>
+          </p>
+        </div>
+      </main>
     </div>
   );
 }

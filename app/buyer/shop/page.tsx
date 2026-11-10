@@ -184,6 +184,8 @@ export default function BuyerPage() {
         </Notice>
       )}
 
+      <div className={s.shopLayout}>
+        <div className={s.shopMain}>
       {/* 1. Request */}
       <Card
         id="request"
@@ -402,6 +404,11 @@ export default function BuyerPage() {
         </Card>
       )}
       {mandate && (shopped || catalog.length > 0) && !cart && <Notice tone="warn">Your cart is empty. Add something from the store above, or ask your agent.</Notice>}
+        </div>
+        <aside className={s.shopAside} aria-label="Your purchase so far">
+          <SummaryAside text={text} mandate={mandate} draft={draft} cart={cart} guard={guard} paid={paid} />
+        </aside>
+      </div>
     </>
   );
 }
@@ -460,6 +467,84 @@ function GuardView({ guard }: { guard: GuardResult }) {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+/** A sticky summary: what was asked, what was signed, and what is in the cart, so the buyer never loses their place. */
+function SummaryAside({
+  text,
+  mandate,
+  draft,
+  cart,
+  guard,
+  paid,
+}: {
+  text: string;
+  mandate: Created | null;
+  draft: Draft | null;
+  cart: Cart | null;
+  guard: GuardResult | null;
+  paid: boolean;
+}) {
+  const total = cart ? cart.items.reduce((n, i) => n + Number(i.unit_price) * i.quantity, 0) : 0;
+  const limits = mandate?.constraints ?? draft?.constraints;
+  return (
+    <div className={s.asideCard}>
+      <h2 className={s.asideTitle}>Your purchase</h2>
+      <section>
+        <h3 className={s.asideLabel}>1 · Request</h3>
+        {text.trim() ? <p className={s.asideText}>&ldquo;{text.trim()}&rdquo;</p> : <p className={u.muted}>Nothing yet. Say what you want to buy.</p>}
+      </section>
+      <section>
+        <h3 className={s.asideLabel}>2 · Mandate</h3>
+        {limits ? (
+          <p className={s.asideText}>
+            Up to <b>{formatMoney(limits.max_total.value, limits.max_total.currency)}</b>
+            {mandate ? (
+              <>
+                {' '}
+                · signed · until {formatDay(mandate.expires_at)}
+              </>
+            ) : (
+              ' · not signed yet'
+            )}
+          </p>
+        ) : (
+          <p className={u.muted}>Your limits appear here.</p>
+        )}
+      </section>
+      <section>
+        <h3 className={s.asideLabel}>3 · Cart</h3>
+        {cart ? (
+          <>
+            <ul className={s.asideList}>
+              {cart.items.map((i) => (
+                <li key={i.sku}>
+                  <span>
+                    {i.quantity} × {i.name}
+                  </span>
+                  <b>{formatMoney((Number(i.unit_price) * i.quantity).toFixed(2), cart.currency)}</b>
+                </li>
+              ))}
+            </ul>
+            <div className={s.asideTotal}>
+              <span>Total</span>
+              <b>{formatMoney(total.toFixed(2), cart.currency)}</b>
+            </div>
+            {guard && (
+              <p style={{ margin: '0.5rem 0 0' }}>
+                <Badge tone={guard.verdict === 'allow' ? 'good' : guard.verdict === 'escalate' ? 'warn' : 'bad'}>
+                  {guard.verdict === 'allow' ? 'Within your mandate' : guard.verdict === 'escalate' ? 'Needs your approval' : 'Outside your mandate'}
+                </Badge>
+              </p>
+            )}
+          </>
+        ) : (
+          <p className={u.muted}>Empty. Add something from the store.</p>
+        )}
+      </section>
+      {paid && <Notice tone="good">Paid. Thank you! See it under My orders.</Notice>}
     </div>
   );
 }

@@ -20,7 +20,7 @@ export default function LedgerPage() {
     <>
       <PageHeader title="Mandate ledger" subtitle="The signed purchase limits behind each disputed order." />
       <Notice tone="info">
-        Only mandates behind disputed orders are listed here. The full ledger will appear once a mandates service is connected.
+        This lists the signed limits behind orders that have a dispute, which is where the proof matters. Each one links to its dispute.
       </Notice>
       {error && (
         <Notice tone="bad" alert>

@@ -1,0 +1,144 @@
+/* Sign-in: a split page. The left is the brand on ink, with the stamp; the right is the form on paper. */
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  background: var(--paper);
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+  .brandSide {
+    display: none;
+  }
+}
+.brandSide {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(2rem, 5vw, 4rem);
+  background: var(--ink);
+  color: #f5f1e9;
+  overflow: hidden;
+  background-image: repeating-linear-gradient(transparent 0 35px, rgba(255, 255, 255, 0.04) 35px 36px);
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #f5f1e9;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #f5f1e9;
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-serif);
+  font-weight: 700;
+}
+.quote {
+  max-width: 28rem;
+}
+.quote h2 {
+  margin: 0 0 1rem;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: clamp(2rem, 3.4vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+.quote h2 em {
+  background: linear-gradient(transparent 62%, rgba(243, 215, 124, 0.5) 62% 92%, transparent 92%);
+  font-style: italic;
+  padding: 0 0.1em;
+  margin: 0 -0.1em;
+}
+.quote p {
+  margin: 0;
+  color: #b9bfca;
+  font-size: 1.05rem;
+}
+.stamp {
+  position: absolute;
+  right: 8%;
+  top: 14%;
+  padding: 0.35rem 1rem;
+  border: 3px solid var(--stamp);
+  border-radius: 6px;
+  color: #e8765a;
+  border-color: #e8765a;
+  font-family: var(--font-serif);
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  transform: rotate(-10deg);
+  animation: land 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) 0.3s both;
+}
+@keyframes land {
+  from {
+    opacity: 0;
+    transform: rotate(-10deg) scale(1.8);
+  }
+}
+.fine {
+  font-size: 0.85rem;
+  color: #8993a3;
+}
+.formSide {
+  display: grid;
+  place-items: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+.formWrap {
+  width: 100%;
+  max-width: 400px;
+  display: grid;
+  gap: 1.1rem;
+}
+.mobileLogo {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+@media (max-width: 900px) {
+  .mobileLogo {
+    display: inline-flex;
+  }
+}
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.sub {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+.switch {
+  text-align: center;
+  color: var(--muted);
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stamp {
+    animation: none;
+  }
+}

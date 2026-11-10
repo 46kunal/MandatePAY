@@ -6,6 +6,7 @@ import type { ProblemKind, ProblemReport } from '@/contracts/schemas';
 import { useSession } from '@/lib/auth/client';
 import { can } from '@/lib/auth/roles';
 import { apiFetch } from '../../_ui/api';
+import { notifyChanged } from '../../_ui/events';
 import { Dialog } from '../../_ui/Dialog';
 import { formatDateTime, formatMoney } from '../../_ui/labels';
 import { Badge, Card, EmptyState, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
@@ -18,12 +19,20 @@ const KIND: Record<ProblemKind, string> = {
   other: 'Something else',
 };
 
+const QUICK = [
+  { label: 'Refund and apologise', text: 'Sorry about this. We have refunded you in full through PayPal.' },
+  { label: 'Ask for details', text: 'Sorry to hear that. Could you tell us a little more, or send a photo, so we can sort it out quickly?' },
+  { label: 'It matches the order', text: 'Thanks for letting us know. We have checked your order against what you asked for and it matches. If you tell us more, we will happily look again.' },
+  { label: 'Still on its way', text: 'Thanks for your patience. Your order is still on its way. If it has not arrived within a few days, report it again and we will refund you.' },
+];
+
 function OpenReport({ r, canRefund, onDone }: { r: ProblemReport; canRefund: boolean; onDone: (text: string) => void }) {
   const refundFirst = r.assessment.suggestion === 'refund' && canRefund;
+  // Never an empty box: a sensible first line is filled in, and the quick replies below swap it for another.
   const [reply, setReply] = useState(
     r.assessment.suggestion === 'refund'
       ? 'Sorry about this. We have refunded you in full through PayPal.'
-      : '',
+      : 'Thanks for letting us know. We have checked your order against what you asked for and it matches. If you tell us more, we will happily look again.',
   );
   const [confirm, setConfirm] = useState<{ key: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,6 +44,7 @@ function OpenReport({ r, canRefund, onDone }: { r: ProblemReport; canRefund: boo
     try {
       await apiFetch(`/api/reports/${encodeURIComponent(r.report_id)}/resolve`, { body: { outcome, reply, idempotency_key: key } });
       setConfirm(null);
+      notifyChanged();
       onDone(outcome === 'refund' ? 'Refunded through PayPal and the buyer can see your reply.' : 'Reply sent. The report is closed.');
     } catch (e) {
       setErr((e as Error).message);
@@ -56,7 +66,14 @@ function OpenReport({ r, canRefund, onDone }: { r: ProblemReport; canRefund: boo
 
   return (
     <>
-      <div className={u.field} style={{ marginTop: '0.9rem' }}>
+      <div className={u.row} style={{ gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.9rem' }} aria-label="Quick replies">
+        {QUICK.map((q) => (
+          <button key={q.label} type="button" className={u.chipBtn} onClick={() => setReply(q.text)} disabled={busy}>
+            {q.label}
+          </button>
+        ))}
+      </div>
+      <div className={u.field} style={{ marginTop: '0.6rem' }}>
         <label htmlFor={`reply-${r.report_id}`}>Your reply to the buyer</label>
         <textarea id={`reply-${r.report_id}`} className={u.input} rows={2} maxLength={1000} value={reply} onChange={(e) => setReply(e.target.value)} disabled={busy} />
       </div>
