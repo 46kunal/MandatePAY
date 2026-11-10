@@ -12,7 +12,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | Route | Permission (roles) |
 |---|---|
 | `/api/auth/*` | public: Better Auth sign-up (always a buyer), sign-in (email, or PayPal at `/sign-in/social` with `provider: "paypal"`), sign-out, get-session. Signed in: `/link-social` and `/unlink-account` connect or disconnect PayPal; PayPal is never linked to an existing account by matching email |
-| POST `/api/mandates/draft`, POST `/api/mandates` | `shop` (everyone). The mandate is signed for the signed-in user; `buyer_ref` is their user id |
+| POST `/api/mandates/draft`, POST `/api/mandates` | `shop` (everyone). The mandate is signed with the signed-in user's own key (kid `buyer-u-…` in the JWS header, created on first use); `buyer_ref` is their user id, and verification requires the key's owner to be that buyer. Mandates signed before per-buyer keys carry the shared key's kid and still verify |
 | POST `/api/agent/shop`, POST `/api/carts/check`, POST `/api/orders` | `shop`, and the mandate must be the user's own (else 404) |
 | POST `/api/orders/:id/capture` | `shop`, and the order must be the user's own (else 404) |
 | GET `/api/orders` | signed in. Staff, owner, admin see all orders; a buyer sees only their own |

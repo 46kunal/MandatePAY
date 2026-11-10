@@ -64,6 +64,11 @@ export async function GET(req: Request) {
       if (process.env.VERCEL === '1') throw new Error('Signing keys must be environment variables on Vercel.');
       return `Key files in ${c.KEY_DIR} (local)`;
     }),
+    timed('Buyer key encryption', async () => {
+      if (process.env.MANDATE_KEY_ENCRYPTION_KEY?.trim()) return 'Master key from environment variable';
+      if (process.env.VERCEL === '1') throw new Error('MANDATE_KEY_ENCRYPTION_KEY is not set: buyers cannot sign mandates.');
+      return `Master key file in ${c.KEY_DIR} (local)`;
+    }),
   ]);
 
   const body: z.infer<typeof SystemHealth> = { checked_at: new Date().toISOString(), checks };

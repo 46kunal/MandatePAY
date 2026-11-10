@@ -85,6 +85,21 @@ export const rateLimits = pgTable('rate_limits', {
   lastRequest: bigint('last_request', { mode: 'number' }).notNull(),
 });
 
+/**
+ * Each buyer's own mandate signing key (Ed25519). The public key is stored as is, so anyone verifying a mandate can
+ * check it; the private key is encrypted (AES-256-GCM) with MANDATE_KEY_ENCRYPTION_KEY and never leaves the server.
+ * kid goes in the mandate's JWS header, so a signature names the exact key, and through it the buyer, that signed.
+ */
+export const buyerKeys = pgTable('buyer_keys', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  kid: text('kid').notNull().unique(),
+  publicKeyPem: text('public_key_pem').notNull(),
+  privateKeyEnc: text('private_key_enc').notNull(), // "v1.<iv>.<tag>.<ciphertext>", base64url parts
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
+
 /** One row per confirmed open (checkout) mandate. */
 export const mandates = pgTable('mandates', {
   mandateId: text('mandate_id').primaryKey(), // "mnd_<hex>", also stored in PayPal custom_id

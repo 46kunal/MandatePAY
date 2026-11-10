@@ -7,7 +7,10 @@
  */
 import { createHash } from 'node:crypto';
 import { ClosedMandatePayload, type Cart } from '../../contracts/schemas';
-import { signJws, verifyJws, type KeyOptions, type VerifyFailureReason } from './jws';
+import { CompactSign, compactVerify, decodeProtectedHeader } from 'jose';
+import { isBuyerKid } from './buyerKeys';
+import { signJws, verifyJws, type KeyOptions, type RawVerifyResult, type VerifyFailureReason } from './jws';
+import { ALG } from './keys';
 import { cartTotalMinor, fromMinor } from './money';
 
 /** JSON with object keys sorted at every level, so equal data always hashes equally. */
@@ -57,7 +60,41 @@ export async function createClosedMandate(input: CreateClosedMandateInput, opts:
     approved_by: input.approvedBy,
     iat: input.now ?? Math.floor(Date.now() / 1000),
   });
+  if (input.approvedBy === 'buyer' && opts.buyerKey) {
+    // The buyer approved this cart: their own key signs, like their open mandate.
+    const jws = await new CompactSign(new TextEncoder().encode(JSON.stringify(payload)))
+      .setProtectedHeader({ alg: ALG, kid: opts.buyerKey.kid })
+      .sign(opts.buyerKey.privateKey);
+    return { jws, payload };
+  }
   return { jws: await signJws(payload, input.approvedBy, opts), payload };
+}
+
+/** The buyer_ref and signing kid of an open mandate, read without verifying (callers verify it separately). */
+export function openMandateSigner(openMandateJws: string): { buyerRef?: string; kid?: string } {
+  try {
+    const kid = decodeProtectedHeader(openMandateJws).kid;
+    const body = JSON.parse(Buffer.from(openMandateJws.split('.')[1] ?? '', 'base64url').toString('utf8')) as { buyer_ref?: unknown };
+    return { kid, buyerRef: typeof body.buyer_ref === 'string' ? body.buyer_ref : undefined };
+  } catch {
+    return {};
+  }
+}
+
+/** Buyer-approved closed mandate signed with a buyer key: verify with that key; its owner must be the open mandate's buyer. */
+async function verifyBuyerSigned(jws: string, kid: string, openMandateJws: string | undefined, opts: KeyOptions): Promise<RawVerifyResult> {
+  const resolve = opts.resolveBuyerKey ?? (await import('./buyerKeys')).dbBuyerKeyResolver;
+  const key = await resolve(kid);
+  if (!key) return { ok: false, reason: 'bad_signature', message: 'signed with an unknown buyer key' };
+  if (openMandateJws && openMandateSigner(openMandateJws).buyerRef !== key.userId) {
+    return { ok: false, reason: 'bad_signature', message: 'approved with a key that does not belong to the mandate buyer' };
+  }
+  try {
+    const v = await compactVerify(jws, key.publicKey, { algorithms: [ALG] });
+    return { ok: true, payload: JSON.parse(new TextDecoder().decode(v.payload)), kid };
+  } catch {
+    return { ok: false, reason: 'bad_signature', message: 'signature verification failed' };
+  }
 }
 
 export type ClosedMandateVerifyResult =
@@ -74,7 +111,16 @@ export async function verifyClosedMandate(
   expected: { openMandateJws?: string; cart?: Cart } = {},
   opts: KeyOptions = {},
 ): Promise<ClosedMandateVerifyResult> {
-  const raw = await verifyJws(jws, approvedBy, opts);
+  let kid: string | undefined;
+  try {
+    kid = decodeProtectedHeader(jws).kid;
+  } catch {
+    return { ok: false, reason: 'malformed', message: 'not a valid compact JWS' };
+  }
+  const raw =
+    approvedBy === 'buyer' && isBuyerKid(kid)
+      ? await verifyBuyerSigned(jws, kid, expected.openMandateJws, opts)
+      : await verifyJws(jws, approvedBy, opts);
   if (!raw.ok) return raw;
 
   const parsed = ClosedMandatePayload.safeParse(raw.payload);

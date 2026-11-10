@@ -32,6 +32,7 @@ const detail = (over: Partial<CaseDetail> = {}): CaseDetail => ({
     mandate_id: 'mnd_1',
     buyer_ref: 'buyer_demo',
     expires_at: '2026-11-16T00:00:00.000Z',
+    signed_with: 'buyer_key',
     constraints: {
       max_total: { value: '110.00', currency: 'USD' },
       categories: ['shoes'],
@@ -66,7 +67,7 @@ describe('buildEvidenceModel', () => {
   it('includes the payment record, mandate, cart, guard checks and analysis', () => {
     const text = evidenceModelToText(buildEvidenceModel(detail(), new Date('2026-11-09T12:00:00Z')));
     for (const expected of [
-      'PP-R-1', 'ORD1', 'CAP1', 'sha256:abc', 'Paid with: PayPal account',
+      'PP-R-1', 'ORD1', 'CAP1', 'sha256:abc', 'Paid with: PayPal account', "Signed with: This buyer's own signing key",
       'The PayPal account that paid is the one the buyer linked to MandatePay', 'mnd_1', 'Maximum total: 110.00 USD', 'color = white, size = 10',
       'white trainers size 10 under $110', 'cart_1', 'Total: 89.00 USD', 'color=white, size=10', 'max_total | pass',
       'Assessed fault: merchant', 'mandate.constraints.required_attributes.color',

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { db, schema } from '@/db/client';
 import { apiError } from '@/lib/http';
-import { signOpenMandate } from '@/lib/mandate';
+import { getOrCreateBuyerKey, signOpenMandate } from '@/lib/mandate';
 import { toMinor } from '@/lib/mandate/money';
 import { CreateMandateRequest, type CreateMandateResponse } from '@/contracts/schemas';
 import type { z } from 'zod';
@@ -32,7 +32,9 @@ export async function POST(req: Request) {
 
   const mandate_id = `mnd_${randomBytes(8).toString('hex')}`;
   const exp = now + MANDATE_TTL_SECONDS;
-  const jws = await signOpenMandate({ typ: 'checkout_mandate.open', mandate_id, buyer_ref, constraints, iat: now, exp });
+  // Signed with this buyer's own key, so the signature itself says which buyer agreed.
+  const buyerKey = await getOrCreateBuyerKey(authz.user.id);
+  const jws = await signOpenMandate({ typ: 'checkout_mandate.open', mandate_id, buyer_ref, constraints, iat: now, exp }, { buyerKey });
 
   const expires_at = new Date(exp * 1000).toISOString();
   await db.insert(schema.mandates).values({
