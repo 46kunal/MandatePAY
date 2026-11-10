@@ -5,9 +5,9 @@ import { authorize } from './guard';
 import { can, isMerchantRole, PERMISSIONS, ROLES, type Permission } from './roles';
 
 describe('roles', () => {
-  it('a buyer can shop and see products, nothing on the merchant side', () => {
+  it('a buyer can shop, nothing on the merchant side (and no raw product list)', () => {
     assert.ok(can('buyer', 'shop'));
-    assert.ok(can('buyer', 'products:read'));
+    assert.ok(!can('buyer', 'products:read'));
     for (const p of ['cases:read', 'orders:read:all', 'products:write', 'settings:read', 'settings:write', 'cases:act'] as Permission[]) {
       assert.equal(can('buyer', p), false, p);
     }

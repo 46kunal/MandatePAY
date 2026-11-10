@@ -10,6 +10,10 @@ const config: NextConfig = {
     '/api/cases/*/act': ['./node_modules/pdfkit/js/data/**/*'],
   },
   poweredByHeader: false,
+  // The old separate store-team sign-in address now goes to the one sign-in everyone uses.
+  async redirects() {
+    return [{ source: '/merchant/login', destination: '/login', permanent: true }];
+  },
   // Safe-by-default headers. No Content-Security-Policy on purpose: PayPal's checkout script and popups need a
   // policy written against PayPal's own hosts, and a wrong one breaks paying.
   async headers() {

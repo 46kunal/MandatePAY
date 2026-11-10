@@ -1,18 +1,10 @@
-import Link from 'next/link';
+import Landing from './_landing/Landing';
+
+export const metadata = {
+  title: 'MandatePay: AI shopping with proof',
+  description: 'Let an AI shop for you and keep signed proof of what you asked. Disputes are settled with facts, not guesses.',
+};
 
 export default function Home() {
-  return (
-    <main style={{ maxWidth: 640, margin: '4rem auto', padding: '0 16px', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>MandatePay</h1>
-      <p>Every AI purchase on PayPal comes with proof of what you asked for.</p>
-      <ul>
-        <li>
-          <Link href="/buyer">Shop with your agent</Link> (sign in or create an account)
-        </li>
-        <li>
-          <Link href="/merchant">Store dashboard</Link> (store team sign-in)
-        </li>
-      </ul>
-    </main>
-  );
+  return <Landing />;
 }

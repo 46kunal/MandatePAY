@@ -16,7 +16,8 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/agent/shop`, POST `/api/carts/check`, POST `/api/orders` | `shop`, and the mandate must be the user's own (else 404) |
 | POST `/api/orders/:id/capture` | `shop`, and the order must be the user's own (else 404) |
 | GET `/api/orders` | signed in. Staff, owner, admin see all orders; a buyer sees only their own |
-| GET `/api/products` | `products:read` (everyone) |
+| GET `/api/products` | `products:read` (store team; buyers use `/api/shop/catalog`) |
+| GET `/api/shop/catalog` | `shop` |
 | POST `/api/products`, PATCH `/api/products/:id` | `products:write` (staff, owner, admin) |
 | GET `/api/cases`, `/api/cases/:id`, `/api/cases/:id/evidence-pack` | `cases:read` (staff, owner, admin) |
 | POST `/api/cases/:id/analyse` | `cases:analyse` (staff, owner, admin) |
@@ -59,7 +60,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/audit?limit=` | A | none | `ListAuditResponse` (newest first, max 1000) | none |
 | GET `/api/export/orders`, `/api/export/disputes` | A | none | `text/csv` download (formulas defused) | none |
 | GET `/api/me/mandates` | A | none | `ListMyMandatesResponse` | none |
-| GET `/api/me/orders` | A | none | `ListMyOrdersResponse`: the buyer's own paid orders, newest first, each with its latest `report` | none |
+| GET `/api/me/orders` | A | none | `ListMyOrdersResponse`: the buyer's own paid orders, newest first, each with its latest `report` | none. Each order also carries `seller` (the store's name) and `images` (picture links the store added) |
 | POST `/api/me/orders/:id/report` | A | `CreateReportRequest` | `ProblemReport` (201). `assessment` is computed from the cart guard result at checkout, never from the buyer's text: `agent_mistake` when a check did not pass | 404 not the buyer's order, 409 `not_paid` / `report_open` |
 | GET `/api/reports` | A | none | `ListReportsResponse`: every report, open first, with `buyer_email`, `order_total`, `items` | none |
 | POST `/api/reports/:id/resolve` | A | `ResolveReportRequest` (`outcome` refund or close; `reply` is shown to the buyer) | `ResolveReportResponse` | 404 report, 409 `already_answered`, 403 refund without `orders:refund`, plus the refund errors of POST `/api/orders/:id/refund` |
@@ -73,6 +74,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/cases/:id/evidence-pack` | A | none | `application/pdf` | 404 |
 | POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal. PROVIDE_EVIDENCE also uploads the evidence pack PDF (multipart, `file1`).. SEND_MESSAGE on a buyer-regret verdict sends the evidence from the records (not the AI's free text), attaching the evidence PDF when PayPal accepts it and otherwise sending the same text alone. NO_ACTION is only a recorded review: nothing is sent and the case stays open (`analysis_status` is never `acted` for it). After a real action the dispute is re-read from PayPal, so `status` in the response is PayPal's current one. MAKE_OFFER or ACCEPT_CLAIM on a payment that was already refunded (also outside MandatePay) answers 409 `already_refunded` with the refund in `details`, unless the request sends `confirm_refunded: true` |
 | GET `/api/products` | A | `?active=1` optional | `Product[]` | none |
+| GET `/api/shop/catalog` | A | `?currency=USD` optional | `ShopCatalogResponse`: the store name and what a buyer may browse (active, in stock, with `image_url`, `availability` in_stock or low_stock, `max_quantity`). No stock counts | none |
 | POST `/api/products` | A | `ProductInput` | `Product` (201) | 400 invalid, 409 duplicate SKU |
 | PATCH `/api/products/:id` | A | `UpdateProductRequest` | `Product` | 400, 404, 409 duplicate SKU |
 | POST `/api/agent/shop` | A | `AgentShopRequest` | `AgentShopResponse` | 404 mandate, 410 expired, 422 empty catalog / nothing fits, 500 LLM not configured, 502 LLM failed |

@@ -1,16 +1,16 @@
 'use client';
-// Sign-in and sign-up form shared by /login (buyers) and /merchant/login (store team).
+// The one sign-in and sign-up form. Everyone signs in here; /start sends each role to its own home, so nobody has to
+// choose a buyer or a store login.
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { authClient } from '@/lib/auth/client';
-import { isMerchantRole } from '@/lib/auth/roles';
 import { Card, Notice } from './Ui';
 import u from './ui.module.css';
 
-/** Only same-site paths, so a crafted link cannot send someone to another site after signing in. */
-function safeNext(next: string | null, fallback: string): string {
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : fallback;
+/** After signing in, /start sends the person home (or to the page they asked for, if their role may open it). */
+function startUrl(next: string | null): string {
+  return next && /^\/(?![/\\])/.test(next) ? `/start?next=${encodeURIComponent(next)}` : '/start';
 }
 
 type Mode = 'sign-in' | 'sign-up';
@@ -29,13 +29,12 @@ function paypalErrorText(code: string | null): string | null {
   return 'PayPal sign-in did not finish. Try again, or sign in with your email.';
 }
 
-export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
+export function AuthForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const home = side === 'merchant' ? '/merchant' : '/buyer';
-  const next = safeNext(params.get('next'), home);
+  const next = startUrl(params.get('next'));
 
-  const [mode, setMode] = useState<Mode>('sign-in');
+  const [mode, setMode] = useState<Mode>(params.get('mode') === 'sign-up' ? 'sign-up' : 'sign-in');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,8 +44,7 @@ export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
   async function continueWithPayPal() {
     setBusy(true);
     setError(null);
-    const back = `/login?next=${encodeURIComponent(next)}`;
-    const r = await authClient.signIn.social({ provider: 'paypal', callbackURL: next, errorCallbackURL: back });
+    const r = await authClient.signIn.social({ provider: 'paypal', callbackURL: next, errorCallbackURL: '/login' });
     // On success the browser is already on its way to PayPal.
     if (r?.error) {
       setError(r.error.message ?? 'Could not start PayPal sign-in.');
@@ -67,12 +65,6 @@ export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
         setError(res.error.message ?? 'That did not work. Check your details and try again.');
         return;
       }
-      const role = (res.data?.user as { role?: string } | undefined)?.role;
-      if (side === 'merchant' && !isMerchantRole(role)) {
-        await authClient.signOut();
-        setError('This is a buyer account. Store team accounts are created by the store owner.');
-        return;
-      }
       router.replace(next);
       router.refresh();
     } catch {
@@ -82,13 +74,8 @@ export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
     }
   }
 
-  const title = side === 'merchant' ? 'Store team sign-in' : mode === 'sign-up' ? 'Create your account' : 'Sign in';
-  const subtitle =
-    side === 'merchant'
-      ? 'For the store owner and staff.'
-      : mode === 'sign-up'
-        ? 'Your mandates, carts and orders are kept under this account.'
-        : 'Sign in to shop with your agent.';
+  const title = mode === 'sign-up' ? 'Create your account' : 'Welcome back';
+  const subtitle = mode === 'sign-up' ? 'It takes a minute. You can start right away.' : 'Sign in with your email and password.';
 
   return (
     <div style={{ maxWidth: 420, margin: '8vh auto 0', padding: '0 16px', display: 'grid', gap: '1rem' }}>
@@ -99,14 +86,13 @@ export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
         MandatePay
       </Link>
       <Card title={title} subtitle={subtitle}>
-        {side === 'buyer' && PAYPAL_LOGIN && (
+        {PAYPAL_LOGIN && (
           <div style={{ display: 'grid', gap: '0.6rem', marginBottom: '1rem' }}>
             <button className={u.btn} type="button" onClick={continueWithPayPal} disabled={busy}>
               Continue with PayPal
             </button>
             <span className={u.muted} style={{ fontSize: '0.85em' }}>
-              Links your PayPal account, so the payments you make can be matched to you. Paying by card without PayPal? Use
-              your email below.
+              Links your PayPal account, so the payments you make can be matched to you.
             </span>
             <div className={u.muted} style={{ textAlign: 'center', fontSize: '0.85em' }}>
               or with email
@@ -156,27 +142,19 @@ export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
           </button>
         </form>
       </Card>
-      {side === 'buyer' ? (
-        <p className={u.muted} style={{ textAlign: 'center', margin: 0 }}>
-          {mode === 'sign-in' ? 'New here? ' : 'Already have an account? '}
-          <button
-            type="button"
-            className={u.linkButton}
-            onClick={() => {
-              setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
-              setError(null);
-            }}
-          >
-            {mode === 'sign-in' ? 'Create an account' : 'Sign in'}
-          </button>
-          {' · '}
-          <Link href="/merchant/login">Store team sign-in</Link>
-        </p>
-      ) : (
-        <p className={u.muted} style={{ textAlign: 'center', margin: 0 }}>
-          Shopping? <Link href="/login">Buyer sign-in</Link>
-        </p>
-      )}
+      <p className={u.muted} style={{ textAlign: 'center', margin: 0 }}>
+        {mode === 'sign-in' ? 'New here? ' : 'Already have an account? '}
+        <button
+          type="button"
+          className={u.linkButton}
+          onClick={() => {
+            setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
+            setError(null);
+          }}
+        >
+          {mode === 'sign-in' ? 'Create an account' : 'Sign in'}
+        </button>
+      </p>
     </div>
   );
 }

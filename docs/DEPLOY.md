@@ -73,7 +73,7 @@ DATABASE_URL="<neon production url>" npm run auth:create-user -- --email you@exa
 ```
 
 The password goes to `.keys/new-user-<email>.txt` (or set `NEW_USER_PASSWORD` first). Sign in at
-`/merchant/login`, then delete the file. The same command with an existing email only changes the role.
+`/login`, then delete the file. The same command with an existing email only changes the role.
 
 ## 3c. Log in with PayPal (optional)
 
