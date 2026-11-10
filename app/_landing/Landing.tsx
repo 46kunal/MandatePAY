@@ -442,6 +442,41 @@ export default function Landing() {
           </div>
         </section>
 
+        <section id="built" className={c.section}>
+          <div className={c.wrap}>
+            <Reveal>
+              <h2 className={c.h2}>Built on PayPal and AI</h2>
+              <p className={c.sub}>Each one has a specific job, and the AI never acts alone: a person approves what is sent to PayPal.</p>
+            </Reveal>
+            <div className={c.cards}>
+              <Reveal i={0}>
+                <div className={c.card}>
+                  <h3>What PayPal does</h3>
+                  <ul>
+                    <li>Orders and Card Fields for checkout, with 3-D Secure</li>
+                    <li>The Disputes API to send evidence, offers and messages</li>
+                    <li>Verified webhooks, so disputes arrive on their own</li>
+                    <li>Refunds, read back from PayPal so none is paid twice</li>
+                    <li>Log in with PayPal, to match the payer to the buyer</li>
+                  </ul>
+                </div>
+              </Reveal>
+              <Reveal i={1}>
+                <div className={c.card}>
+                  <h3>What the AI does</h3>
+                  <ul>
+                    <li>Turns a sentence into limits you sign</li>
+                    <li>Shops for you, from real products only</li>
+                    <li>Settles the cart checks that rules cannot</li>
+                    <li>Reads a dispute against the record, scored on 28 labelled cases</li>
+                    <li>Is overridden by code rules when an answer would be unsafe</li>
+                  </ul>
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+
         <section className={c.final}>
           <div className={c.wrap}>
             <h2 className={c.finalTitle}>Sign your first mandate</h2>
