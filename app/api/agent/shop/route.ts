@@ -7,6 +7,7 @@ import { apiError } from '@/lib/http';
 import { checkCart, verifyOpenMandate } from '@/lib/mandate';
 import type { z } from 'zod';
 import { requirePermission } from '@/lib/auth/guard';
+import { limited } from '@/lib/rateLimit';
 import { mandateOwnerId, notOwned } from '@/lib/auth/ownership';
 
 export const runtime = 'nodejs';
@@ -18,6 +19,8 @@ export const maxDuration = 150;
 export async function POST(req: Request) {
   const authz = await requirePermission(req, 'shop');
   if (!authz.ok) return authz.response;
+  const slow = limited(authz.user.id, 'ai', 10);
+  if (slow) return slow;
   const body = AgentShopRequest.safeParse(await req.json().catch(() => null));
   if (!body.success) return apiError(400, 'invalid_request', 'Expected { mandate_id }.', body.error.issues);
 

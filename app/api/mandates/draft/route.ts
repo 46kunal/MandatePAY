@@ -4,6 +4,7 @@ import { listProducts } from '@/lib/catalog/products';
 import { draftMandate } from '@/lib/mandate/draft';
 import { DraftMandateRequest } from '@/contracts/schemas';
 import { requirePermission } from '@/lib/auth/guard';
+import { limited } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 // Calls the AI model: up to 60 s per attempt plus one fallback attempt.
@@ -13,6 +14,8 @@ export const maxDuration = 150;
 export async function POST(req: Request) {
   const authz = await requirePermission(req, 'shop');
   if (!authz.ok) return authz.response;
+  const slow = limited(authz.user.id, 'ai', 10);
+  if (slow) return slow;
   const body = DraftMandateRequest.safeParse(await req.json().catch(() => null));
   if (!body.success) return apiError(400, 'invalid_request', 'Expected { request_text: string }', body.error.issues);
 

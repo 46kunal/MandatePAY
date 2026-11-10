@@ -1,5 +1,6 @@
 import { ResolveReportRequest } from '@/contracts/schemas';
 import { authorize, requirePermission } from '@/lib/auth/guard';
+import { limited } from '@/lib/rateLimit';
 import { apiError } from '@/lib/http';
 import { PayPalConfigError, PayPalError } from '@/lib/paypal';
 import { refundOrder } from '@/lib/paypal/refundOrder';
@@ -13,6 +14,8 @@ export const runtime = 'nodejs';
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const authz = await requirePermission(req, 'cases:act');
   if (!authz.ok) return authz.response;
+  const slow = limited(authz.user.id, 'resolve', 20);
+  if (slow) return slow;
   const { id } = await ctx.params;
   const body = ResolveReportRequest.safeParse(await req.json().catch(() => null));
   if (!body.success) return apiError(400, 'invalid_request', 'Expected { outcome, reply, amount?, idempotency_key }.', body.error.issues);
