@@ -28,10 +28,10 @@ function pipeline(cases: CaseRecord[]): Bucket[] {
   const review = cases.filter((c) => c.status === 'UNDER_REVIEW' || c.status === 'UNDER_PAYPAL_REVIEW').length;
   const buyer = cases.filter((c) => c.status !== 'RESOLVED' && !isWaitingOnStore(c) && c.status !== 'UNDER_REVIEW' && c.status !== 'UNDER_PAYPAL_REVIEW').length;
   return [
-    { key: 'store', label: 'Waiting for you', color: '#d97706', n: mine },
-    { key: 'buyer', label: 'Waiting for the buyer', color: '#2563eb', n: buyer },
-    { key: 'review', label: 'Under PayPal review', color: '#7c3aed', n: review },
-    { key: 'done', label: 'Resolved', color: '#16a34a', n: resolved },
+    { key: 'store', label: 'Waiting for you', color: 'var(--warn)', n: mine },
+    { key: 'buyer', label: 'Waiting for the buyer', color: 'var(--accent)', n: buyer },
+    { key: 'review', label: 'Under PayPal review', color: 'var(--stamp)', n: review },
+    { key: 'done', label: 'Resolved', color: 'var(--ok)', n: resolved },
   ];
 }
 

@@ -7,43 +7,76 @@
   justify-content: space-between;
   gap: 1.5rem;
   flex-wrap: wrap;
-  padding: clamp(1.25rem, 3vw, 2.25rem);
-  border-radius: 18px;
-  color: #fff;
-  background: radial-gradient(600px 240px at 90% -20%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 60%),
-    linear-gradient(120deg, #1d4ed8, #2563eb 55%, #4f46e5);
-  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.25);
+  padding: clamp(1.4rem, 3vw, 2.4rem);
+  border-radius: 16px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border), 0 14px 30px rgba(20, 27, 38, 0.06);
   margin-bottom: 1.5rem;
+  background-image: repeating-linear-gradient(transparent 0 31px, rgba(20, 27, 38, 0.045) 31px 32px);
 }
 .hero h1 {
-  margin: 0 0 0.35rem;
-  font-size: clamp(1.4rem, 2.6vw, 2rem);
+  margin: 0 0 0.4rem;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
   letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: 1.12;
 }
 .hero p {
   margin: 0;
   max-width: 38rem;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--text-2);
+}
+.seal {
+  position: absolute;
+  right: clamp(8rem, 24vw, 22rem);
+  top: 50%;
+  width: 92px;
+  height: 92px;
+  margin-top: -46px;
+  border: 3px double var(--stamp);
+  border-radius: 50%;
+  color: var(--stamp);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  opacity: 0.16;
+  transform: rotate(-12deg);
+  pointer-events: none;
+}
+@media (max-width: 760px) {
+  .seal {
+    display: none;
+  }
 }
 .heroBtn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.8rem 1.3rem;
-  border-radius: 12px;
-  background: #fff;
-  color: #1d4ed8;
-  font-weight: 700;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #f5f1e9;
+  font-weight: 600;
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 .heroBtn:hover {
+  background: var(--accent-dark);
   transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 10px 22px rgba(20, 27, 38, 0.22);
 }
 .heroBtn:focus-visible {
-  outline: 3px solid #bfdbfe;
+  outline: 3px solid var(--accent-line);
   outline-offset: 2px;
 }
 .grid {
@@ -58,7 +91,7 @@
   }
 }
 .panel {
-  background: #fff;
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 1.1rem 1.2rem 0.6rem;
@@ -143,9 +176,9 @@
   display: flex;
   gap: 0.75rem;
   padding: 1rem;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--border);
   border-radius: 14px;
-  color: #475569;
+  color: var(--text-2);
   font-size: 0.92rem;
 }
 .step b {

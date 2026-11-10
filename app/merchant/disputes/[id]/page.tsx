@@ -24,6 +24,7 @@ import {
 } from '../../../_ui/labels';
 import { parseCase } from '../../../_ui/parse';
 import { errMsg } from '../../../_ui/useCases';
+import { notifyChanged } from '../../../_ui/events';
 import { EvidenceSummary } from '../../_components/EvidenceSummary';
 import { MandateVsCart } from '../../_components/MandateVsCart';
 import u from '../../../_ui/ui.module.css';
@@ -58,6 +59,7 @@ export default function CaseDetailPage() {
     try {
       const r = await apiFetch<{ dismissed_at: string | null }>(`/api/cases/${encodeURIComponent(id)}/dismiss`, { body: { dismissed: hide } });
       setDetail((cur) => (cur ? { ...cur, dismissed_at: r.data.dismissed_at } : cur));
+      notifyChanged();
       setNotice({ ok: true, text: hide ? 'Dispute hidden from the lists.' : 'Dispute restored to the lists.' });
     } catch (e) {
       setNotice({ ok: false, text: errMsg(e) });
@@ -100,6 +102,7 @@ export default function CaseDetailPage() {
       setDetail((cur) => (cur ? { ...cur, ...r.data } : cur));
       setPending(null);
       setForm(null);
+      notifyChanged();
       setNotice({ ok: true, text: `Sent to PayPal: ${describe(p.action, p.offerType)}.` });
     } catch (e) {
       setPending(null);

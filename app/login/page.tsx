@@ -2,7 +2,7 @@
 import { Suspense } from 'react';
 import { AuthForm } from '../_ui/AuthForm';
 
-export const metadata = { title: 'Sign in · MandatePay' };
+export const metadata = { title: 'Sign in' };
 
 export default function LoginPage() {
   return (

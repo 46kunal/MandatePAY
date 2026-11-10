@@ -15,7 +15,7 @@ export default function EvidenceListPage() {
     <>
       <PageHeader title="Evidence reports" subtitle="A summary of the mandate, cart, payment and AI assessment for each dispute." />
       <Notice tone="info">
-        Automatic PDF reports are not connected yet. Open a summary and use your browser&apos;s print option to save it as a PDF.
+        Open a summary to read the evidence for a dispute. Every dispute also has a PDF evidence pack you can download from its page and send to PayPal.
       </Notice>
       {error && (
         <Notice tone="bad" alert>

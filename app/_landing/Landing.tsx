@@ -5,6 +5,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useSession } from '@/lib/auth/client';
+import '../_ui/ui.module.css'; // loads the shared colour tokens
 import c from './landing.module.css';
 
 const REQUEST = 'White running trainers, size 10, under $110, delivered within two weeks';
@@ -286,6 +287,7 @@ function HeroDemo() {
             </span>
           ))}
         </div>
+        <span className={`${c.stamp} ${signed ? c.stampOn : ''}`}>Signed</span>
       </div>
       <div className={`${c.signed} ${signed ? c.signedOn : ''}`}>
         <span className={c.tick}>✓</span>
@@ -401,11 +403,6 @@ export default function Landing() {
       <main>
         {/* hero */}
         <section className={c.hero}>
-          <div className={c.blobs} aria-hidden="true">
-            <span className={`${c.blob} ${c.blob1}`} />
-            <span className={`${c.blob} ${c.blob2}`} />
-            <span className={`${c.blob} ${c.blob3}`} />
-          </div>
           <div className={`${c.wrap} ${c.heroGrid}`}>
             <div>
               <span className={c.eyebrow}>AI shopping with proof</span>
@@ -432,6 +429,7 @@ export default function Landing() {
         <section className={c.section}>
           <div className={c.wrap}>
             <Reveal>
+              <span className={c.kicker}>01 · The problem</span>
               <h2 className={c.h2}>When an AI buys something, who decides it was the right thing?</h2>
               <p className={c.sub}>Today nobody can prove it. That is bad for shoppers and for stores.</p>
             </Reveal>
@@ -462,8 +460,9 @@ export default function Landing() {
         <section id="how" className={`${c.section} ${c.sectionAlt}`}>
           <div className={c.wrap}>
             <Reveal className={c.center}>
-              <h2 className={c.h2}>How it works</h2>
-              <p className={c.sub}>Four steps, and you stay in charge of every one of them.</p>
+              <span className={c.kicker}>02 · How it works</span>
+              <h2 className={c.h2}>Four steps, and you stay in charge</h2>
+              <p className={c.sub}>From a sentence to a paid order, with your limits signed before anything is bought.</p>
             </Reveal>
             <div className={c.steps}>
               {[
@@ -487,6 +486,7 @@ export default function Landing() {
         <section className={c.section}>
           <div className={c.wrap}>
             <Reveal className={c.center}>
+              <span className={c.kicker}>03 · The record</span>
               <h2 className={c.h2}>Every step leaves a record</h2>
               <p className={c.sub}>From the first request to the final decision, each link in the chain is stored, so a dispute is settled by what happened.</p>
             </Reveal>
@@ -498,6 +498,7 @@ export default function Landing() {
         <section id="fair" className={c.section}>
           <div className={`${c.wrap} ${c.dispute}`}>
             <Reveal>
+              <span className={c.kicker}>04 · Fair disputes</span>
               <h2 className={c.h2}>Disputes settled with facts, not guesses</h2>
               <p className={c.sub}>
                 When a buyer disputes a payment, an AI analyst reads the signed mandate, the cart and the payment, and recommends
@@ -555,6 +556,7 @@ export default function Landing() {
         <section id="who" className={`${c.section} ${c.sectionAlt}`}>
           <div className={c.wrap}>
             <Reveal className={c.center}>
+              <span className={c.kicker}>05 · Who it is for</span>
               <h2 className={c.h2}>Made for both sides of the sale</h2>
               <p className={c.sub}>One sign-in. What you see depends on who you are.</p>
             </Reveal>
