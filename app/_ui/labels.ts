@@ -23,9 +23,9 @@ export function reasonLabel(code: string | null | undefined): string {
 }
 
 export const FAULT: Record<Verdict['fault'], { label: string; tone: Tone }> = {
-  merchant: { label: 'Merchant at fault', tone: 'bad' },
-  agent: { label: 'Agent at fault', tone: 'warn' },
-  buyer_regret: { label: 'Buyer regret', tone: 'info' },
+  merchant: { label: 'Merchant at fault', tone: 'neutral' },
+  agent: { label: 'Agent at fault', tone: 'neutral' },
+  buyer_regret: { label: 'Buyer regret', tone: 'neutral' },
   unclear: { label: 'Needs further review', tone: 'neutral' },
 };
 
@@ -151,10 +151,10 @@ export function dueLabel(
   if (Number.isNaN(ms)) return null;
   const days = Math.ceil(ms / 86_400_000);
   const day = formatDay(due.at);
-  if (due.party === 'buyer') return { text: `Waiting for the buyer until ${day}`, tone: 'neutral' };
+  if (due.party === 'buyer') return { text: `Buyer, by ${day}`, tone: 'neutral' };
   if (ms <= 0) return { text: `Response was due ${day}`, tone: 'bad' };
   const left = days <= 1 ? 'today or tomorrow' : `in ${days} days`;
-  return { text: `Respond by ${day} (${left})`, tone: days <= 3 ? 'bad' : days <= 7 ? 'warn' : 'neutral' };
+  return { text: `You, by ${day} (${left})`, tone: days <= 3 ? 'bad' : days <= 7 ? 'warn' : 'neutral' };
 }
 
 /** PayPal's own dispute status, in words the store uses. */

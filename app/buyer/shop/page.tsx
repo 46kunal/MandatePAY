@@ -210,9 +210,8 @@ export default function BuyerPage() {
           <VoiceButton disabled={busy !== null} value={text} onChange={setText} />
           <span className={`${u.muted} ${s.count}`}>{text.length}/1000</span>
         </div>
-        <p className={u.muted} style={{ margin: '0.5rem 0 0', fontSize: '0.85em' }}>
-          Speaking only fills the box above. Your browser may send the audio to its speech service (Google or Apple) to turn it into text.
-          Nothing is signed or paid until you click Create mandate.
+        <p className={u.muted} style={{ margin: '8px 0 0' }}>
+          Your browser may send speech to its speech service. Nothing is signed or paid until you create the mandate.
         </p>
       </Card>
 
@@ -226,7 +225,7 @@ export default function BuyerPage() {
         >
           <MandateSummary constraints={draft.constraints} />
           {draft.warnings.length > 0 && (
-            <div style={{ marginTop: '0.9rem' }}>
+            <div style={{ marginTop: '1rem' }}>
               <Notice tone="warn">
                 <strong>Check these assumptions:</strong>
                 <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.1rem' }}>
@@ -237,7 +236,7 @@ export default function BuyerPage() {
               </Notice>
             </div>
           )}
-          <div className={u.row} style={{ marginTop: '0.9rem' }}>
+          <div className={u.row} style={{ marginTop: '1rem' }}>
             {mandate ? (
               <span className={u.muted}>
                 Confirmed as {mandate.mandate_id} · valid until {formatDay(mandate.expires_at)}
@@ -311,13 +310,16 @@ export default function BuyerPage() {
                         {p.availability === 'low_stock' ? ' · Selling fast' : ''}
                       </span>
                       <div className={s.shopFoot}>
-                        <span className={s.price}>{formatMoney(p.unit_price, p.currency)}</span>
+                        <span className={s.price}>
+                          {formatMoney(p.unit_price, p.currency)}
+                          {have > 0 && <span className={s.inCart}>{have} in cart</span>}
+                        </span>
                         <button
                           className={have ? `${u.btn} ${u.btnSecondary}` : u.btn}
                           onClick={() => addToCart(p)}
                           disabled={busy !== null || have >= p.max_quantity}
                         >
-                          {have ? `In cart (${have}) · Add one more` : 'Add to cart'}
+                          {have ? 'Add another' : 'Add to cart'}
                         </button>
                       </div>
                     </div>
@@ -360,7 +362,7 @@ export default function BuyerPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className={s.price}>{formatMoney(i.unit_price, cart.currency)}</div>
-                  <div className={u.row} style={{ marginTop: '0.4rem', justifyContent: 'flex-end' }}>
+                  <div className={u.row} style={{ marginTop: '0.5rem', justifyContent: 'flex-end' }}>
                     <label className={u.srOnly} htmlFor={`qty-${i.sku}`}>
                       Quantity for {i.name}
                     </label>
@@ -494,7 +496,7 @@ function SummaryAside({
       <h2 className={s.asideTitle}>Your purchase</h2>
       <section>
         <h3 className={s.asideLabel}>1 · Request</h3>
-        {text.trim() ? <p className={s.asideText}>&ldquo;{text.trim()}&rdquo;</p> : <p className={u.muted}>Nothing yet. Say what you want to buy.</p>}
+        {text.trim() ? <p className={s.asideText}>&ldquo;{text.trim()}&rdquo;</p> : <p className={u.muted}>No request yet</p>}
       </section>
       <section>
         <h3 className={s.asideLabel}>2 · Mandate</h3>
@@ -511,7 +513,7 @@ function SummaryAside({
             )}
           </p>
         ) : (
-          <p className={u.muted}>Your limits appear here.</p>
+          <p className={u.muted}>Not set yet</p>
         )}
       </section>
       <section>
@@ -541,7 +543,7 @@ function SummaryAside({
             )}
           </>
         ) : (
-          <p className={u.muted}>Empty. Add something from the store.</p>
+          <p className={u.muted}>Empty</p>
         )}
       </section>
       {paid && <Notice tone="good">Paid. Thank you! See it under My orders.</Notice>}

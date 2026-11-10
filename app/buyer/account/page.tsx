@@ -90,7 +90,7 @@ function MandatesCard() {
                   <td style={{ textAlign: 'right' }}>
                     {m.status === 'active' &&
                       (confirming === m.mandate_id ? (
-                        <span className={u.row} style={{ gap: '0.4rem', justifyContent: 'flex-end' }}>
+                        <span className={u.row} style={{ gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className={u.btn} type="button" disabled={busy} onClick={() => revoke(m.mandate_id)}>
                             {busy ? 'Revoking…' : 'Yes, revoke'}
                           </button>

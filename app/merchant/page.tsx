@@ -4,7 +4,6 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { CaseRecord, ProblemReport, ResultsResponse } from '@/contracts/schemas';
-import { useSession } from '@/lib/auth/client';
 import { apiFetch } from '../_ui/api';
 import { Icon, type IconName } from '../_ui/Icons';
 import { ACTION, FAULT, dueLabel, formatMoney, formatWhen, reasonLabel } from '../_ui/labels';
@@ -13,9 +12,8 @@ import { useCases } from '../_ui/useCases';
 import u from '../_ui/ui.module.css';
 import o from './overview.module.css';
 
-function greeting(): string {
-  const h = new Date().getHours();
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+function today(): string {
+  return new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 const isWaitingOnStore = (c: CaseRecord) => c.analysis_status !== 'acted' && c.status !== 'RESOLVED' && (c.response_due?.party === 'seller' || c.status === 'WAITING_FOR_SELLER_RESPONSE');
@@ -28,10 +26,10 @@ function pipeline(cases: CaseRecord[]): Bucket[] {
   const review = cases.filter((c) => c.status === 'UNDER_REVIEW' || c.status === 'UNDER_PAYPAL_REVIEW').length;
   const buyer = cases.filter((c) => c.status !== 'RESOLVED' && !isWaitingOnStore(c) && c.status !== 'UNDER_REVIEW' && c.status !== 'UNDER_PAYPAL_REVIEW').length;
   return [
-    { key: 'store', label: 'Waiting for you', color: 'var(--warn)', n: mine },
-    { key: 'buyer', label: 'Waiting for the buyer', color: 'var(--accent)', n: buyer },
-    { key: 'review', label: 'Under PayPal review', color: 'var(--stamp)', n: review },
-    { key: 'done', label: 'Resolved', color: 'var(--ok)', n: resolved },
+    { key: 'store', label: 'Waiting for you', color: 'var(--stamp)', n: mine },
+    { key: 'buyer', label: 'Waiting for the buyer', color: 'var(--text-2)', n: buyer },
+    { key: 'review', label: 'Under PayPal review', color: 'var(--muted-2)', n: review },
+    { key: 'done', label: 'Resolved', color: 'var(--border)', n: resolved },
   ];
 }
 
@@ -42,9 +40,10 @@ function hours(min: number): string {
 }
 
 export default function OverviewPage() {
-  const { data } = useSession();
-  const first = data?.user?.name?.trim().split(/\s+/)[0];
   const { cases, error, reload } = useCases();
+  // The date depends on the visitor's clock and locale, so it is filled in only in the browser (no server mismatch).
+  const [date, setDate] = useState('');
+  useEffect(() => setDate(today()), []);
   const [reports, setReports] = useState<ProblemReport[] | null>(null);
   const [results, setResults] = useState<ResultsResponse | null>(null);
 
@@ -66,7 +65,7 @@ export default function OverviewPage() {
         key: c.dispute_id,
         href: `/merchant/disputes/${encodeURIComponent(c.dispute_id)}`,
         icon: 'shield',
-        tone: o.tAmber,
+        tone: o.tNeutral,
         title: `${reasonLabel(c.reason)}${c.amount ? ` · ${formatMoney(c.amount.value, c.amount.currency)}` : ''}`,
         meta: `${c.dispute_id} · ${c.verdict ? `AI: ${ACTION[c.verdict.action] ?? c.verdict.action}` : 'AI has not looked yet'}`,
         chip: due ? { text: due.text, tone: due.tone } : undefined,
@@ -79,7 +78,7 @@ export default function OverviewPage() {
         key: r.report_id,
         href: '/merchant/reports',
         icon: 'inbox',
-        tone: o.tBlue,
+        tone: o.tNeutral,
         title: `Buyer reported a problem${r.items?.length ? `: ${r.items.join(', ')}` : ''}`,
         meta: `${r.buyer_email ?? 'A buyer'} · ${formatWhen(r.created_at)}`,
         chip: r.assessment.agent_mistake ? { text: 'Refund recommended', tone: 'warn' } : undefined,
@@ -106,14 +105,9 @@ export default function OverviewPage() {
 
   return (
     <>
-      <div className={`${o.welcome} ${o.fade}`}>
-        <div>
-          <h1>
-            {greeting()}
-            {first ? `, ${first}` : ''}
-          </h1>
-          <p>Here is what needs you today, and how the store is doing.</p>
-        </div>
+      <div className={o.head}>
+        <h1>Overview</h1>
+        <p>{date || ' '}</p>
       </div>
 
       {error && (
@@ -125,52 +119,32 @@ export default function OverviewPage() {
         </Notice>
       )}
 
-      <div className={`${o.kpis} ${o.fade}`}>
+      <div className={o.kpis}>
         <div className={o.kpi}>
-          <span className={`${o.kpiIcon} ${o.tAmber}`}>
-            <Icon name="alert" />
-          </span>
-          <div>
-            <div className={o.kpiLabel}>Needs you</div>
-            <div className={o.kpiValue}>{loading ? '–' : todo.length}</div>
-            <div className={o.kpiHint}>Disputes and buyer reports</div>
-          </div>
+          <div className={o.kpiLabel}>Needs you</div>
+          <div className={o.kpiValue}>{loading ? '–' : todo.length}</div>
+          <div className={o.kpiHint}>Disputes and buyer reports</div>
         </div>
         <div className={o.kpi}>
-          <span className={`${o.kpiIcon} ${o.tBlue}`}>
-            <Icon name="shield" />
-          </span>
-          <div>
-            <div className={o.kpiLabel}>Open disputes</div>
-            <div className={o.kpiValue}>{loading ? '–' : total - (buckets.find((b) => b.key === 'done')?.n ?? 0)}</div>
-            <div className={o.kpiHint}>{results ? `${results.disputes.total} received in all` : 'Not resolved yet'}</div>
-          </div>
+          <div className={o.kpiLabel}>Open disputes</div>
+          <div className={o.kpiValue}>{loading ? '–' : total - (buckets.find((b) => b.key === 'done')?.n ?? 0)}</div>
+          <div className={o.kpiHint}>{results ? `${results.disputes.total} received in total` : 'Not resolved yet'}</div>
         </div>
         <div className={o.kpi}>
-          <span className={`${o.kpiIcon} ${o.tGreen}`}>
-            <Icon name="clock" />
-          </span>
-          <div>
-            <div className={o.kpiLabel}>Typical response time</div>
-            <div className={o.kpiValue}>{results?.speed.median_minutes_to_response != null ? hours(results.speed.median_minutes_to_response) : '–'}</div>
-            <div className={o.kpiHint}>{results ? `About ${hours(results.speed.est_minutes_saved)} saved (estimate)` : 'Arrival to response'}</div>
-          </div>
+          <div className={o.kpiLabel}>Typical response time</div>
+          <div className={o.kpiValue}>{results?.speed.median_minutes_to_response != null ? hours(results.speed.median_minutes_to_response) : '–'}</div>
+          <div className={o.kpiHint}>From a dispute arriving to your response</div>
         </div>
         <div className={o.kpi}>
-          <span className={`${o.kpiIcon} ${o.tViolet}`}>
-            <Icon name="spark" />
-          </span>
-          <div>
-            <div className={o.kpiLabel}>AI accuracy</div>
-            <div className={o.kpiValue}>{results?.eval ? `${Math.round(results.eval.overall * 100)}%` : '–'}</div>
-            <div className={o.kpiHint}>{results?.eval ? `On ${results.eval.cases} labelled disputes` : 'Run the test set'}</div>
-          </div>
+          <div className={o.kpiLabel}>AI accuracy</div>
+          <div className={o.kpiValue}>{results?.eval ? `${Math.round(results.eval.overall * 100)}%` : '–'}</div>
+          <div className={o.kpiHint}>{results?.eval ? `On ${results.eval.cases} labelled disputes` : 'Run the test set'}</div>
         </div>
       </div>
 
       <div className={o.cols}>
         <div>
-          <section className={`${o.panel} ${o.fade}`} aria-labelledby="todo-h">
+          <section className={`${o.panel}`} aria-labelledby="todo-h">
             <div className={o.panelHead}>
               <h2 id="todo-h">Needs your attention</h2>
               <span>{todo.length === 0 ? 'Nothing waiting' : `${todo.length} item${todo.length === 1 ? '' : 's'}`}</span>
@@ -208,10 +182,10 @@ export default function OverviewPage() {
             )}
           </section>
 
-          <section className={`${o.panel} ${o.fade}`} aria-labelledby="pipe-h">
+          <section className={`${o.panel}`} aria-labelledby="pipe-h">
             <div className={o.panelHead}>
               <h2 id="pipe-h">Dispute pipeline</h2>
-              <Link href="/merchant/disputes" style={{ fontSize: '0.88rem', color: 'var(--accent)', textDecoration: 'none' }}>
+              <Link href="/merchant/disputes" style={{ fontSize: '0.88rem', color: 'var(--text-2)', textDecoration: 'none' }}>
                 All disputes
               </Link>
             </div>
@@ -243,35 +217,7 @@ export default function OverviewPage() {
         </div>
 
         <div>
-          <section className={`${o.panel} ${o.fade}`} aria-labelledby="quick-h">
-            <div className={o.panelHead}>
-              <h2 id="quick-h">Jump to</h2>
-            </div>
-            <div className={o.quick}>
-              <Link href="/merchant/disputes" className={o.quickLink}>
-                <Icon name="shield" />
-                Disputes
-                <Icon name="arrow" size={16} />
-              </Link>
-              <Link href="/merchant/orders" className={o.quickLink}>
-                <Icon name="receipt" />
-                Orders and refunds
-                <Icon name="arrow" size={16} />
-              </Link>
-              <Link href="/merchant/products" className={o.quickLink}>
-                <Icon name="box" />
-                Products
-                <Icon name="arrow" size={16} />
-              </Link>
-              <Link href="/merchant/results" className={o.quickLink}>
-                <Icon name="chart" />
-                Results
-                <Icon name="arrow" size={16} />
-              </Link>
-            </div>
-          </section>
-
-          <section className={`${o.panel} ${o.fade}`} aria-labelledby="act-h">
+          <section className={`${o.panel}`} aria-labelledby="act-h">
             <div className={o.panelHead}>
               <h2 id="act-h">Recent activity</h2>
             </div>

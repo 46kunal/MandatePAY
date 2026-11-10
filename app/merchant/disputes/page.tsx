@@ -286,7 +286,7 @@ export default function DisputesPage() {
                               return due ? <Badge tone={due.tone}>{due.text}</Badge> : <span className={u.muted}>—</span>;
                             })()}
                           </td>
-                          <td className={u.muted}>{formatWhen(c.created_at)}</td>
+                          <td className={`${u.muted} ${u.nowrap}`}>{formatWhen(c.created_at)}</td>
                           <td style={{ textAlign: 'right' }}>
                             <button
                               type="button"

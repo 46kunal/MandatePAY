@@ -88,7 +88,7 @@ export function MyOrdersCard() {
               {orders.map((o) => (
                 <tr key={o.paypal_order_id}>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       {o.images.slice(0, 2).map((src) => (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img key={src} src={src} alt="" width={44} height={44} style={{ borderRadius: 6, objectFit: 'cover' }} referrerPolicy="no-referrer" />
@@ -108,7 +108,7 @@ export function MyOrdersCard() {
                     {o.report && o.report.status === 'open' ? (
                       <ReportState o={o} />
                     ) : (
-                      <div style={{ display: 'grid', gap: '0.4rem', justifyItems: 'end' }}>
+                      <div style={{ display: 'grid', gap: '0.5rem', justifyItems: 'end' }}>
                         <ReportState o={o} />
                         <button
                           className={`${u.btn} ${u.btnSecondary}`}
@@ -159,8 +159,8 @@ export function MyOrdersCard() {
             <p style={{ margin: 0 }}>
               {open.items.join(', ')} · {formatMoney(open.total.value, open.total.currency)}
             </p>
-            <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: '0.4rem' }}>
-              <legend style={{ fontWeight: 600, marginBottom: '0.4rem' }}>What went wrong?</legend>
+            <fieldset style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: '0.5rem' }}>
+              <legend style={{ fontWeight: 600, marginBottom: '0.5rem' }}>What went wrong?</legend>
               {KINDS.map((k) => (
                 <label key={k.value} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input type="radio" name="kind" value={k.value} checked={kind === k.value} onChange={() => setKind(k.value)} disabled={busy} />
