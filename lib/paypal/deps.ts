@@ -144,8 +144,8 @@ export function drizzleDisputeStore(): DisputeStore {
 /** Drizzle-backed store for acting on cases. */
 export function drizzleActStore(): ActStore {
   const load = async () => {
-    const [{ and, eq, ne }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
-    return { and, eq, ne, db, schema };
+    const [{ and, eq, ne, or }, { db, schema }] = await Promise.all([import('drizzle-orm'), import('../../db/client')]);
+    return { and, eq, ne, or, db, schema };
   };
 
   return {
@@ -155,12 +155,12 @@ export function drizzleActStore(): ActStore {
       return row ? { row, rawDispute: (row.rawDispute as RawDispute | null) ?? null } : undefined;
     },
     async markActed(disputeId, f) {
-      const { and, eq, ne, db, schema } = await load();
+      const { and, eq, ne, or, db, schema } = await load();
       const now = new Date();
       const [row] = await db
         .update(schema.cases)
         .set({
-          analysisStatus: 'acted',
+          analysisStatus: f.close === false ? 'analysed' : 'acted',
           actionTaken: f.action,
           outcome: f.outcome,
           humanApprovedAt: f.humanApproved ? now : null,
@@ -168,7 +168,12 @@ export function drizzleActStore(): ActStore {
           updatedAt: now,
         })
         // Conditional update: the second of two concurrent requests matches nothing and gets a 409.
-        .where(and(eq(schema.cases.disputeId, disputeId), ne(schema.cases.analysisStatus, 'acted')))
+        .where(
+          and(
+            eq(schema.cases.disputeId, disputeId),
+            or(ne(schema.cases.analysisStatus, 'acted'), eq(schema.cases.actionTaken, 'NO_ACTION')),
+          ),
+        )
         .returning();
       return row;
     },
@@ -183,9 +188,15 @@ export function defaultActDeps(): ActDeps {
       provideEvidence: (id, notes, files) => provideEvidence(client, id, notes, files),
       makeOffer: (id, offer) => makeOffer(client, id, offer),
       acceptClaim: (id, note) => acceptClaim(client, id, note),
-      sendMessage: (id, message) => sendMessage(client, id, message),
+      sendMessage: (id, message, files) => sendMessage(client, id, message, files),
     },
     evidenceFiles: evidencePackFiles,
+    evidenceMessage: async (id) => {
+      const { getCaseDetail } = await import('./cases');
+      const { evidenceMessageText } = await import('./evidencePack');
+      const detail = await getCaseDetail(id);
+      return detail ? { text: evidenceMessageText(detail), files: await evidencePackFiles(id) } : null;
+    },
   };
 }
 

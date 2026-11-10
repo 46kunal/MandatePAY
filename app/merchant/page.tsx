@@ -80,7 +80,7 @@ export default function OverviewPage() {
             <StatCard label="Total disputes" value={stats.total} />
             <StatCard label="Pending" value={stats.pending} hint="Not resolved yet" />
             <StatCard label="Need your review" value={stats.review.length} hint="Waiting for a decision" />
-            <StatCard label="Resolved" value={stats.resolved} hint="Action sent to PayPal" />
+            <StatCard label="Responded" value={stats.resolved} hint="Response sent to PayPal" />
           </div>
 
           <div className={m.grid2}>

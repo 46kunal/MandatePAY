@@ -6,6 +6,7 @@
  */
 import { OfferType, type ActionType, type DisputeSummary, type Money } from '../../contracts/schemas';
 import type { PayPalClient } from './client';
+import { PayPalError } from './errors';
 
 interface PayPalLink {
   rel: string;
@@ -122,12 +123,33 @@ export function showDispute(client: PayPalClient, disputeId: string) {
 
 const path = (id: string, action: string) => `/v1/customer/disputes/${encodeURIComponent(id)}/${action}`;
 
-export function sendMessage(client: PayPalClient, disputeId: string, message: string) {
-  return client.request(path(disputeId, 'send-message'), {
+/**
+ * Message to the other party (the buyer, at the inquiry stage). With files, PayPal takes a multipart request: the
+ * message as JSON in `input` and the file in `message_document` (PayPal's send-message reference). If PayPal refuses
+ * the upload, the same message goes out as plain text, so a rejected attachment never blocks the response.
+ * Returns whether the files were attached.
+ */
+export async function sendMessage(client: PayPalClient, disputeId: string, message: string, files: EvidenceFile[] = []): Promise<{ attached: boolean }> {
+  const requestId = `msg-${disputeId}-${fingerprint(message + files.map((f) => f.filename).join(','))}`;
+  const file = files[0]; // PayPal's message accepts one document
+  if (file) {
+    const form = new FormData();
+    form.append('input', new Blob([JSON.stringify({ message })], { type: 'application/json' }));
+    form.append('message_document', new Blob([file.bytes], { type: file.contentType }), file.filename);
+    try {
+      await client.request(path(disputeId, 'send-message'), { method: 'POST', form, requestId });
+      return { attached: true };
+    } catch (err) {
+      // Not "PayPal is down" (status 0 / 5xx): a refusal of the upload format. Fall through to plain text.
+      if (!(err instanceof PayPalError) || err.status === 0 || err.status >= 500 || err.status === 401 || err.status === 403) throw err;
+    }
+  }
+  await client.request(path(disputeId, 'send-message'), {
     method: 'POST',
     body: { message },
     requestId: `msg-${disputeId}-${fingerprint(message)}`,
   });
+  return { attached: false };
 }
 
 /** A file sent with provide-evidence. PayPal accepts PDF, JPG, GIF and PNG up to 10 MB each. */

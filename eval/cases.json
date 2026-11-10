@@ -294,5 +294,18 @@
     "cart": { "items": [{ "name": "Wired headphones", "unit_price": "39.00" }] },
     "payment": { "source": "paypal", "payer_check": "different", "mandate_signed_with": "buyer_key" },
     "expect": { "fault": "unclear", "action": ["SEND_MESSAGE", "NO_ACTION"], "needs_human": true }
+  },
+  {
+    "id": "nad-regret-inquiry-no-evidence-option",
+    "note": "Buyer just dislikes the item; the cart matched the signed mandate; at the inquiry stage PayPal offers no evidence upload, only messages, offers and accepting",
+    "reason": "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED",
+    "tracking": { "carrier": "UPS", "status": "DELIVERED" },
+    "amount": "89.00",
+    "allowed_actions": ["ACCEPT_CLAIM", "MAKE_OFFER", "SEND_MESSAGE", "NO_ACTION"],
+    "messages": [{ "from": "BUYER", "text": "They arrived and they are the right size and colour, but I do not like how they look in person. I want my money back." }],
+    "mandate": { "max_total": { "value": "110.00", "currency": "USD" }, "required_attributes": { "color": "white", "size": "10" }, "request_text": "white running trainers size 10 under 110" },
+    "cart": { "items": [{ "name": "Aero Runner", "unit_price": "89.00", "attributes": { "color": "white", "size": "10" } }] },
+    "payment": { "source": "paypal", "payer_check": "match", "mandate_signed_with": "buyer_key" },
+    "expect": { "fault": "buyer_regret", "action": ["SEND_MESSAGE"] }
   }
 ]

@@ -28,12 +28,13 @@ export interface ActCase {
 export interface ActStore {
   getCase(disputeId: string): Promise<ActCase | undefined>;
   /**
-   * Atomically mark the case acted. Returns the updated row, or undefined when it was already acted
+   * Atomically record what was done. `close` (default true) marks the case acted; a no-action review passes
+   * close: false so the case stays open while PayPal is still waiting. Returns the updated row, or undefined when it was already acted
    * (a concurrent request won), so the caller can answer 409.
    */
   markActed(
     disputeId: string,
-    fields: { action: ActionType; outcome: string; humanApproved: boolean; actedBy?: string },
+    fields: { action: ActionType; outcome: string; humanApproved: boolean; actedBy?: string; close?: boolean },
   ): Promise<CaseRow | undefined>;
 }
 
@@ -41,7 +42,7 @@ export interface DisputeActions {
   provideEvidence(disputeId: string, notes: string, files?: EvidenceFile[]): Promise<unknown>;
   makeOffer(disputeId: string, offer: { note: string; offerType: OfferType; amount: Money }): Promise<unknown>;
   acceptClaim(disputeId: string, note: string): Promise<unknown>;
-  sendMessage(disputeId: string, message: string): Promise<unknown>;
+  sendMessage(disputeId: string, message: string, files?: EvidenceFile[]): Promise<unknown>;
 }
 
 export interface ActDeps {
@@ -49,6 +50,11 @@ export interface ActDeps {
   actions: DisputeActions;
   /** Files attached to PROVIDE_EVIDENCE (the evidence pack PDF). Optional: without it only notes are sent. */
   evidenceFiles?(disputeId: string): Promise<EvidenceFile[]>;
+  /**
+   * The evidence as a message (text built from the records, plus the PDF), for SEND_MESSAGE when the AI judged the
+   * buyer's claim to be regret and PayPal offers no provide-evidence at this stage.
+   */
+  evidenceMessage?(disputeId: string): Promise<{ text: string; files: EvidenceFile[] } | null>;
 }
 
 export type ActResult =
@@ -79,7 +85,8 @@ export async function actOnCase(deps: ActDeps, disputeId: string, input: ActInpu
   if (!found) return fail(404, 'case_not_found', `No case with id ${disputeId}.`);
   const { row, rawDispute } = found;
 
-  if (row.analysisStatus === 'acted') {
+  // A "no action" review answered nobody, so it never closes a case (older rows were stored as acted).
+  if (row.analysisStatus === 'acted' && row.actionTaken !== 'NO_ACTION') {
     return fail(409, 'already_acted', `Case ${disputeId} was already acted on (${row.actionTaken ?? 'unknown action'}).`);
   }
 
@@ -118,7 +125,11 @@ export async function actOnCase(deps: ActDeps, disputeId: string, input: ActInpu
         );
       break;
     case 'SEND_MESSAGE':
-      send = () => deps.actions.sendMessage(disputeId, buildNote(verdict, 'Message from the merchant.'));
+      send = async () => {
+        // When the AI judged this as buyer regret, the message states the evidence from the records.
+        const evidence = verdict?.fault === 'buyer_regret' && deps.evidenceMessage ? await deps.evidenceMessage(disputeId) : null;
+        return deps.actions.sendMessage(disputeId, evidence?.text ?? buildNote(verdict, 'Message from the merchant.'), evidence?.files);
+      };
       break;
     case 'ACCEPT_CLAIM':
       send = () => deps.actions.acceptClaim(disputeId, buildNote(verdict, 'The merchant accepts this claim.'));
@@ -162,9 +173,11 @@ export async function actOnCase(deps: ActDeps, disputeId: string, input: ActInpu
 
   const updated = await deps.store.markActed(disputeId, {
     action,
-    outcome: action === 'NO_ACTION' ? 'No action taken' : `${action} submitted to PayPal`,
+    outcome: action === 'NO_ACTION' ? 'Reviewed. No response has been sent to PayPal.' : `${action} submitted to PayPal`,
     humanApproved: input.humanApproved,
     actedBy: input.actedBy,
+    // Deciding to do nothing answers nobody: PayPal still waits on the store, so the case stays open.
+    close: action !== 'NO_ACTION',
   });
   if (!updated) return fail(409, 'already_acted', `Case ${disputeId} was already acted on.`);
   return { ok: true, row: updated, action };

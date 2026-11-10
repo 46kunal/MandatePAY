@@ -54,7 +54,7 @@ export const STATUS: Record<AnalysisStatus, { label: string; tone: Tone }> = {
   pending: { label: 'Not analysed', tone: 'neutral' },
   analysed: { label: 'Ready to review', tone: 'info' },
   awaiting_human: { label: 'Needs your review', tone: 'warn' },
-  acted: { label: 'Resolved', tone: 'good' },
+  acted: { label: 'Response sent', tone: 'good' },
   error: { label: 'Analysis failed', tone: 'bad' },
 };
 
@@ -155,4 +155,25 @@ export function dueLabel(
   if (ms <= 0) return { text: `Response was due ${day}`, tone: 'bad' };
   const left = days <= 1 ? 'today or tomorrow' : `in ${days} days`;
   return { text: `Respond by ${day} (${left})`, tone: days <= 3 ? 'bad' : days <= 7 ? 'warn' : 'neutral' };
+}
+
+/** PayPal's own dispute status, in words the store uses. */
+export function paypalStatusLabel(status: string | null | undefined): string {
+  switch (status) {
+    case 'WAITING_FOR_SELLER_RESPONSE':
+      return 'Waiting for the store';
+    case 'WAITING_FOR_BUYER_RESPONSE':
+      return 'Waiting for the buyer';
+    case 'UNDER_REVIEW':
+    case 'UNDER_PAYPAL_REVIEW':
+      return 'Under PayPal review';
+    case 'RESOLVED':
+      return 'Resolved';
+    case 'OPEN':
+      return 'Open';
+    case 'OTHER':
+      return 'Other';
+    default:
+      return status ? titleCase(status.replace(/_/g, ' ')) : 'Unknown';
+  }
 }

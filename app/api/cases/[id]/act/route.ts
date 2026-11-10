@@ -2,8 +2,9 @@ import { ActOnCaseRequest } from '@/contracts/schemas';
 import { apiError } from '@/lib/http';
 import { PayPalConfigError } from '@/lib/paypal';
 import { actOnCase } from '@/lib/paypal/caseActions';
-import { toCaseRecord } from '@/lib/paypal/cases';
-import { defaultActDeps } from '@/lib/paypal/deps';
+import { getCaseRecord, toCaseRecord } from '@/lib/paypal/cases';
+import { defaultActDeps, defaultPollDeps } from '@/lib/paypal/deps';
+import { fetchDisputeById } from '@/lib/paypal/disputeService';
 import { audit } from '@/lib/audit';
 import { authorize, requirePermission } from '@/lib/auth/guard';
 
@@ -47,7 +48,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       targetId: id,
       details: { action: result.action, human_approved: parsed.data.human_approved, override: parsed.data.override ?? null },
     });
-    return Response.json(toCaseRecord(result.row));
+    // What PayPal now says about the dispute (e.g. "waiting for the buyer") is read straight away, so the page shows it
+    // without waiting for the webhook. Best effort: the action itself already succeeded.
+    if (result.action !== 'NO_ACTION') {
+      try {
+        await fetchDisputeById(defaultPollDeps(), id);
+      } catch (err) {
+        console.error(`[act] could not refresh ${id} from PayPal: ${(err as Error).message}`);
+      }
+    }
+    return Response.json((await getCaseRecord(id)) ?? toCaseRecord(result.row));
   } catch (err) {
     if (err instanceof PayPalConfigError) return apiError(500, 'paypal_not_configured', err.message);
     throw err;

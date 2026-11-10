@@ -20,6 +20,7 @@ import {
   formatMoney,
   reasonLabel,
   dueLabel,
+  paypalStatusLabel,
 } from '../../../_ui/labels';
 import { parseCase } from '../../../_ui/parse';
 import { errMsg } from '../../../_ui/useCases';
@@ -83,7 +84,7 @@ export default function CaseDetailPage() {
       setDetail((cur) => (cur ? { ...cur, ...r.data } : cur));
       setPending(null);
       setForm(null);
-      setNotice({ ok: true, text: `Resolved: ${describe(p.action, p.offerType)} was sent to PayPal.` });
+      setNotice({ ok: true, text: `Sent to PayPal: ${describe(p.action, p.offerType)}.` });
     } catch (e) {
       setPending(null);
       let text = errMsg(e);
@@ -221,6 +222,12 @@ export default function CaseDetailPage() {
         </Notice>
       )}
 
+      {detail.action_taken === 'NO_ACTION' && !acted && (
+        <Notice tone="warn">
+          This case was reviewed and no response was sent. PayPal still shows it as{' '}
+          {paypalStatusLabel(detail.status).toLowerCase()}, so nothing is settled until the store responds.
+        </Notice>
+      )}
       {(() => {
         const due = detail.analysis_status === 'acted' ? null : dueLabel(detail.response_due);
         if (!due) return null;
@@ -265,8 +272,9 @@ export default function CaseDetailPage() {
 
               {acted ? (
                 <Notice tone="good">
-                  Resolved. Action taken: {ACTION[detail.action_taken ?? ''] ?? detail.action_taken}
-                  {detail.updated_at ? ` on ${formatDateTime(detail.updated_at)}` : ''}.
+                  Response sent: {ACTION[detail.action_taken ?? ''] ?? detail.action_taken}
+                  {detail.updated_at ? ` on ${formatDateTime(detail.updated_at)}` : ''}. PayPal now says:{' '}
+                  {paypalStatusLabel(detail.status).toLowerCase()}.
                 </Notice>
               ) : (
                 <>
@@ -344,6 +352,8 @@ export default function CaseDetailPage() {
             <dd>{detail.dispute_id}</dd>
             <dt>Amount</dt>
             <dd>{detail.amount ? formatMoney(detail.amount.value, detail.amount.currency) : '—'}</dd>
+            <dt>PayPal status</dt>
+            <dd>{paypalStatusLabel(detail.status)}</dd>
             <dt>Reason</dt>
             <dd>{reasonLabel(detail.reason)}</dd>
             <dt>Opened</dt>

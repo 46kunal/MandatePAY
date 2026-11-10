@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { CaseDetail } from './cases';
-import { buildEvidenceModel, evidenceModelToText, renderEvidencePdf } from './evidencePack';
+import { buildEvidenceModel, evidenceMessageText, evidenceModelToText, MAX_DISPUTE_MESSAGE, renderEvidencePdf } from './evidencePack';
 
 const detail = (over: Partial<CaseDetail> = {}): CaseDetail => ({
   dispute_id: 'PP-R-1',
@@ -102,5 +102,49 @@ describe('renderEvidencePdf', () => {
     d.cart = { ...d.cart!, cart: { currency: 'USD', merchant: 'M', items } };
     const pdf = await renderEvidencePdf(buildEvidenceModel(d));
     assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
+  });
+});
+
+describe('evidenceMessageText', () => {
+  it('states the proof from the records: mandate, cart, payment, payer, receipt hash', () => {
+    const t = evidenceMessageText(detail());
+    for (const expected of [
+      'PP-R-1',
+      'white trainers size 10 under $110',
+      "signed with the buyer's own signing key",
+      '1 x',
+      'total 89.00 USD',
+      'passed 1 of 1 checks',
+      'Payment ORD1 was captured on 2026-11-09',
+      'paid from the PayPal account the buyer had linked',
+      'sha256:abc',
+      'please tell us exactly what',
+    ]) {
+      assert.ok(t.includes(expected), `missing: ${expected}
+${t}`);
+    }
+  });
+
+  it('uses no AI text, and never includes signed tokens or secrets', () => {
+    const t = evidenceMessageText(detail());
+    assert.ok(!t.includes('The cart matched the mandate.'), 'analysis reasoning must not be in the message');
+    assert.ok(!/eyJ|secret|password/i.test(t));
+  });
+
+  it('is always within PayPal’s message limit, even with a very long request or many items', () => {
+    const many = Array.from({ length: 80 }, (_, n) => ({ sku: `S${n}`, name: `Item number ${n} with a long descriptive name`, quantity: 1, unit_price: '1.00', attributes: { color: 'white', size: String(n) } }));
+    const base = detail();
+    const d = detail({
+      cart: { ...base.cart!, cart: { currency: 'USD', items: many } },
+      mandate: { ...base.mandate!, constraints: { request_text: 'x'.repeat(900), max_total: { value: '9.00', currency: 'USD' } } },
+    });
+    const t = evidenceMessageText(d);
+    assert.ok(t.length <= MAX_DISPUTE_MESSAGE);
+  });
+
+  it('still reads sensibly when the case has no mandate, cart or order', () => {
+    const t = evidenceMessageText(detail({ mandate: null, cart: null, order: null }));
+    assert.match(t, /PP-R-1/);
+    assert.ok(t.length > 20);
   });
 });

@@ -248,3 +248,64 @@ export function renderEvidencePdf(m: EvidenceModel): Promise<Buffer> {
     doc.end();
   });
 }
+
+/** PayPal's limit for a dispute message. */
+export const MAX_DISPUTE_MESSAGE = 2000;
+
+/**
+ * The evidence as a plain message to the other party, for stages where PayPal's provide-evidence is not available
+ * (an inquiry only allows messages, offers and accepting). Built only from the records, so every line is a fact the
+ * store can stand behind; the AI's free text is not used. Always within PayPal's message limit.
+ */
+export function evidenceMessageText(d: CaseDetail): string {
+  const lines: string[] = [`Hello. Here is the record of this purchase (dispute ${d.dispute_id}).`];
+
+  if (d.mandate) {
+    const c = (d.mandate.constraints ?? {}) as {
+      request_text?: string;
+      max_total?: { value: string; currency: string };
+      required_attributes?: Record<string, string>;
+    };
+    const ask = c.request_text ? ` for "${c.request_text}"` : '';
+    const limit = c.max_total ? `, with a limit of ${money(c.max_total.value, c.max_total.currency)}` : '';
+    lines.push(
+      `- Before buying, the buyer signed a purchase mandate${ask}${limit}. ` +
+        (d.mandate.signed_with === 'buyer_key'
+          ? "It is signed with the buyer's own signing key."
+          : 'It carries the store’s signature record.'),
+    );
+  }
+
+  if (d.cart) {
+    const cart = d.cart.cart as { currency?: string; items?: { name: string; quantity: number; attributes?: Record<string, string> }[] };
+    const items = (cart.items ?? [])
+      .map((i) => `${i.quantity} x ${i.name}${i.attributes && Object.keys(i.attributes).length ? ` (${Object.entries(i.attributes).map(([k, v]) => `${k} ${v}`).join(', ')})` : ''}`)
+      .join('; ');
+    const guard = d.cart.guard as { verdict?: string; checks?: { status: string }[] } | null;
+    const passed = guard?.checks?.filter((c) => c.status === 'pass').length ?? 0;
+    const total = guard?.checks?.length ?? 0;
+    lines.push(
+      `- The order was: ${items || 'see the order'}, total ${money(minor(d.cart.total_minor), cart.currency ?? '')}.` +
+        (total ? ` It passed ${passed} of ${total} checks against the buyer's mandate.` : ''),
+    );
+  }
+
+  if (d.order) {
+    const who =
+      d.order.payer_check === 'match'
+        ? 'It was paid from the PayPal account the buyer had linked to our store.'
+        : d.order.payment_source === 'card'
+          ? 'It was paid by card through PayPal checkout.'
+          : '';
+    lines.push(`- Payment ${d.order.paypal_order_id} was captured${d.order.captured_at ? ` on ${d.order.captured_at.slice(0, 10)}` : ''}. ${who}`.trimEnd());
+    if (d.order.receipt_hash) lines.push(`- Receipt hash (ties the mandate, cart and payment together): ${d.order.receipt_hash}`);
+  }
+
+  lines.push(
+    'If something about the item is different from what was ordered, please tell us exactly what, so we can put it right.',
+  );
+
+  let text = lines.join('\n');
+  if (text.length > MAX_DISPUTE_MESSAGE) text = text.slice(0, MAX_DISPUTE_MESSAGE - 1).trimEnd() + '…';
+  return text;
+}
