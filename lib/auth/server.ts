@@ -15,7 +15,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { nextCookies } from 'better-auth/next-js';
 import { db, schema } from '../../db/client';
-import { clearPayPalIdentity, paypalAuthorizeUrl, savePayPalIdentity } from './paypalIdentity';
+import { clearPayPalIdentity, paypalAuthorizeUrl, paypalProfileToUser, savePayPalIdentity } from './paypalIdentity';
 
 const paypalClientId = process.env.PAYPAL_CLIENT_ID?.trim();
 const paypalClientSecret = process.env.PAYPAL_CLIENT_SECRET?.trim();
@@ -62,6 +62,8 @@ export const auth = betterAuth({
             // Better Auth's PayPal provider sends no scope; ask for email, name and the PayPal account attributes
             // (payer id, verified) through the authorization address instead.
             authorizationEndpoint: paypalAuthorizeUrl(),
+            // PayPal sends the address in an `emails` list; the provider only reads `email`.
+            mapProfileToUser: (profile) => paypalProfileToUser(profile),
           },
         }
       : {},
