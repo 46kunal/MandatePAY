@@ -10,7 +10,7 @@
  * Scores a real model: set LLM_PROVIDER and LLM_API_KEY in .env, then `npm run eval`. EVAL_DELAY_MS spaces the calls
  * out for free-tier rate limits.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { analyseCase, type AnalystInput } from '../lib/analyst/analyst';
 import { ActionType, OfferType, type Cart, type Constraints } from '../contracts/schemas';
@@ -113,6 +113,18 @@ async function main() {
   console.log(`  action accuracy       ${pct(actionOk, cases.length)}`);
   console.log(`  needs_human accuracy  ${pct(humanOk, humanTotal)}`);
   console.log(`  overall (all checks)  ${pct(allOk, cases.length)}`);
+  // The results page shows the latest run (eval/results.json is committed with the code it scored).
+  const ratio = (n: number, d: number) => (d === 0 ? 0 : Math.round((1000 * n) / d) / 1000);
+  const results = {
+    run_at: new Date().toISOString(),
+    provider,
+    cases: cases.length,
+    fault: ratio(faultOk, cases.length),
+    action: ratio(actionOk, cases.length),
+    needs_human: ratio(humanOk, humanTotal),
+    overall: ratio(allOk, cases.length),
+  };
+  writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify(results, null, 2) + '\n');
   if (failures.length && !verbose) {
     console.log('\nFailures:');
     for (const f of failures) console.log(`  ${f}`);

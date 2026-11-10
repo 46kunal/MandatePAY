@@ -82,10 +82,12 @@ function BuyerTopRight() {
 const NAV: { href: string; label: string; exact?: boolean; adminOnly?: boolean }[] = [
   { href: '/merchant', label: 'Overview', exact: true },
   { href: '/merchant/disputes', label: 'Disputes' },
+  { href: '/merchant/reports', label: 'Buyer reports' },
   { href: '/merchant/products', label: 'Products' },
   { href: '/merchant/orders', label: 'Orders' },
   { href: '/merchant/ledger', label: 'Mandate ledger' },
   { href: '/merchant/evidence', label: 'Evidence reports' },
+  { href: '/merchant/results', label: 'Results' },
   { href: '/merchant/settings', label: 'Settings' },
   { href: '/admin', label: 'Admin', adminOnly: true },
 ];
