@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "auto_analyse" boolean;

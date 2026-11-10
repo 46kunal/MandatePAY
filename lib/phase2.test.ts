@@ -99,3 +99,32 @@ describe('my mandates', () => {
     assert.equal(m.revoked_at, null);
   });
 });
+
+describe('auto-analysis and deadlines', async () => {
+  const { shouldAutoAnalyse } = await import('./analyst/runCase');
+  const { responseDue } = await import('./paypal/disputes');
+  const actionable = {
+    dispute_id: 'PP-1',
+    status: 'WAITING_FOR_SELLER_RESPONSE',
+    links: [{ rel: 'make_offer', href: 'x', method: 'POST' }],
+    seller_response_due_date: '2026-11-29T18:20:26.029Z',
+  };
+
+  it('analyses a linked, never-analysed case once PayPal lets the seller act', () => {
+    assert.equal(shouldAutoAnalyse({ analysisStatus: 'pending', mandateId: 'mnd_1', rawDispute: actionable }), true);
+  });
+
+  it('skips cases already analysed, not linked, or still under PayPal review', () => {
+    assert.equal(shouldAutoAnalyse({ analysisStatus: 'analysed', mandateId: 'mnd_1', rawDispute: actionable }), false);
+    assert.equal(shouldAutoAnalyse({ analysisStatus: 'pending', mandateId: null, rawDispute: actionable }), false);
+    const underReview = { dispute_id: 'PP-1', status: 'UNDER_REVIEW', links: [{ rel: 'self', href: 'x', method: 'GET' }] };
+    assert.equal(shouldAutoAnalyse({ analysisStatus: 'pending', mandateId: 'mnd_1', rawDispute: underReview }), false);
+  });
+
+  it('reads who PayPal is waiting on and until when', () => {
+    assert.deepEqual(responseDue(actionable), { party: 'seller', at: '2026-11-29T18:20:26.029Z' });
+    assert.deepEqual(responseDue({ buyer_response_due_date: '2026-11-29T11:02:03.675Z' }), { party: 'buyer', at: '2026-11-29T11:02:03.675Z' });
+    assert.equal(responseDue({}), null);
+    assert.equal(responseDue(null), null);
+  });
+});

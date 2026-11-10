@@ -26,6 +26,8 @@ interface EvalCase {
   messages?: { from: string; text: string }[];
   mandate: Constraints;
   cart: { items: { name: string; unit_price: string; quantity?: number; attributes?: Record<string, string> }[]; merchant?: string };
+  /** Payment facts from the records (who paid, which key signed), when the case is about them. */
+  payment?: AnalystInput['payment'];
   expect: { fault: string; action: ActionType[]; needs_human?: boolean };
 }
 
@@ -52,6 +54,7 @@ function toInput(c: EvalCase): AnalystInput {
     },
     mandate: { mandate_id: `mnd_eval_${c.id}`, constraints: c.mandate },
     cart,
+    ...(c.payment ? { payment: c.payment } : {}),
   };
 }
 

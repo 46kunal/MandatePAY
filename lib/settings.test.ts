@@ -25,6 +25,7 @@ describe('resolveSettings', () => {
       approval_threshold: '100.00',
       human_review_over: '100.00',
       min_confidence: 0.7,
+      auto_analyse: true,
       updated_at: null,
     });
   });

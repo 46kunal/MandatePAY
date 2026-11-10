@@ -146,6 +146,8 @@ export const DisputeSummary = z.object({
   offer_types: z.array(OfferType).default([]),
   messages: z.array(z.object({ from: z.string(), text: z.string(), at: z.string().optional() })).default([]),
   tracking: z.object({ carrier: z.string().optional(), number: z.string().optional(), status: z.string().optional() }).optional(),
+  /** Who PayPal is waiting on and the deadline (seller_response_due_date / buyer_response_due_date). */
+  response_due: z.object({ party: z.enum(['seller', 'buyer']), at: z.string() }).optional(),
 });
 export type DisputeSummary = z.infer<typeof DisputeSummary>;
 
@@ -180,6 +182,8 @@ export const CaseRecord = z.object({
   analysis_status: AnalysisStatus,
   action_taken: z.string().nullable(),
   outcome: z.string().nullable(),
+  /** Who PayPal is waiting on and until when; null when nothing is due. */
+  response_due: z.object({ party: z.enum(['seller', 'buyer']), at: z.string() }).nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -316,6 +320,7 @@ export const StoreSettings = z.object({
   approval_threshold: Amount, // carts above this need the buyer's click, unless the mandate sets its own limit
   human_review_over: Amount, // disputes at or above this always need a person
   min_confidence: z.number().min(0).max(1), // AI verdicts below this need a person
+  auto_analyse: z.boolean(), // analyse new disputes as soon as they arrive (webhook or poll)
   updated_at: z.string().nullable(), // null while every value is still the default
 });
 export type StoreSettings = z.infer<typeof StoreSettings>;

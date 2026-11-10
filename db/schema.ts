@@ -211,6 +211,7 @@ export const settings = pgTable('settings', {
   approvalThresholdMinor: integer('approval_threshold_minor'),
   humanReviewOverMinor: integer('human_review_over_minor'),
   minConfidence: real('min_confidence'),
+  autoAnalyse: boolean('auto_analyse'), // null = default (on)
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
 

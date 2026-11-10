@@ -26,6 +26,7 @@ const detail = (over: Partial<CaseDetail> = {}): CaseDetail => ({
   analysis_status: 'analysed',
   action_taken: null,
   outcome: null,
+  response_due: null,
   created_at: '2026-11-09T11:00:00.000Z',
   updated_at: '2026-11-09T11:00:00.000Z',
   mandate: {

@@ -27,6 +27,19 @@ export interface RawDispute {
   links?: PayPalLink[];
   update_time?: string;
   create_time?: string;
+  /** When the seller must respond by (while PayPal waits on the seller). */
+  seller_response_due_date?: string;
+  /** When the buyer must respond by (while PayPal waits on the buyer). */
+  buyer_response_due_date?: string;
+}
+
+/** Who PayPal is waiting on, and until when. null when no response is due (under review, resolved). */
+export function responseDue(d: Pick<RawDispute, 'seller_response_due_date' | 'buyer_response_due_date'> | null | undefined):
+  | { party: 'seller' | 'buyer'; at: string }
+  | null {
+  if (d?.seller_response_due_date) return { party: 'seller', at: d.seller_response_due_date };
+  if (d?.buyer_response_due_date) return { party: 'buyer', at: d.buyer_response_due_date };
+  return null;
 }
 
 /** Link relation -> analyst action. HATEOAS links are what PayPal actually permits right now. */
@@ -85,6 +98,7 @@ export function toDisputeSummary(d: RawDispute): DisputeSummary {
     seller_transaction_id: d.disputed_transactions?.[0]?.seller_transaction_id,
     allowed_actions: deriveAllowedActions(d),
     offer_types: deriveOfferTypes(d),
+    ...(responseDue(d) ? { response_due: responseDue(d)! } : {}),
     messages: (d.messages ?? []).map((m) => ({
       from: m.posted_by ?? 'UNKNOWN',
       text: m.content ?? '',
