@@ -44,6 +44,172 @@ function Reveal({ children, delay = 0, className = '' }: { children: ReactNode; 
   );
 }
 
+/** A thin bar at the very top that fills as the page is scrolled. */
+function ScrollProgress() {
+  const bar = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (reducedMotion()) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      if (bar.current) bar.current.style.transform = `scaleX(${h > 0 ? Math.min(1, window.scrollY / h) : 0})`;
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+  return <div ref={bar} className={c.progress} aria-hidden="true" />;
+}
+
+/** What the product does, sliding past. Repeats once so the loop is seamless. */
+const FEATURES = ['Signed mandates', 'Cart guard', 'Pay with PayPal or card', 'AI dispute analyst', 'A person approves', 'Evidence PDFs', 'Refund protection', 'Full audit trail'];
+function Marquee() {
+  return (
+    <div className={c.marquee} aria-hidden="true">
+      <div className={c.track}>
+        {[...FEATURES, ...FEATURES].map((f, i) => (
+          <span key={i} className={c.pill}>
+            <i />
+            {f}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A number that counts up once it scrolls into view. */
+function CountUp({ to, suffix = '' }: { to: number; suffix?: string }) {
+  const ref = useRef<HTMLElement>(null);
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (reducedMotion() || typeof IntersectionObserver === 'undefined') {
+      setN(to);
+      return;
+    }
+    let raf = 0;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        const start = performance.now();
+        const step = (t: number) => {
+          const k = Math.min(1, (t - start) / 1100);
+          setN(Math.round(to * (1 - Math.pow(1 - k, 3))));
+          if (k < 1) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+      },
+      { threshold: 0.6 },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [to]);
+  return (
+    <b ref={ref}>
+      {n}
+      {suffix}
+    </b>
+  );
+}
+
+function Counters() {
+  const items: [number, string, string][] = [
+    [5, '', 'safety checks on every cart'],
+    [4, '', 'steps from request to paid'],
+    [2, '', 'ways to pay: PayPal or card'],
+    [1, '', 'person approves every response'],
+  ];
+  return (
+    <div className={c.counters}>
+      {items.map(([to, suffix, label]) => (
+        <div key={label} className={c.counter}>
+          <CountUp to={to} suffix={suffix} />
+          <span>{label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Six links light up one after another while the line underneath fills. Starts when it scrolls into view. */
+const CHAIN: [string, string, string][] = [
+  ['1', 'Request', 'What you asked for'],
+  ['2', 'Mandate', 'Signed with your key'],
+  ['3', 'Cart', 'Checked against it'],
+  ['4', 'Payment', 'PayPal, tied to you'],
+  ['5', 'Dispute', 'Read from the records'],
+  ['6', 'Decision', 'A person approves'],
+];
+function ProofChain() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [on, setOn] = useState(-1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (reducedMotion() || typeof IntersectionObserver === 'undefined') {
+      setOn(CHAIN.length);
+      return;
+    }
+    let alive = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const run = async () => {
+      while (alive) {
+        for (let i = 0; i <= CHAIN.length && alive; i++) {
+          setOn(i);
+          await new Promise<void>((r) => timers.push(setTimeout(r, 900)));
+        }
+        await new Promise<void>((r) => timers.push(setTimeout(r, 1800)));
+        setOn(-1);
+        await new Promise<void>((r) => timers.push(setTimeout(r, 500)));
+      }
+    };
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          void run();
+        }
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => {
+      alive = false;
+      io.disconnect();
+      timers.forEach(clearTimeout);
+    };
+  }, []);
+  return (
+    <div ref={ref}>
+      <div className={c.chain}>
+        {CHAIN.map(([n, t, d], i) => (
+          <div key={t} className={`${c.link} ${i < on ? c.linkOn : ''}`}>
+            <div className={c.linkIcon}>{i < on ? '✓' : n}</div>
+            <b>{t}</b>
+            <span>{d}</span>
+          </div>
+        ))}
+      </div>
+      <div className={c.line} aria-hidden="true">
+        <div className={c.lineFill} style={{ width: `${Math.max(0, Math.min(1, on / CHAIN.length)) * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
 /** The hero demo: a request is typed, turns into limits, and gets signed. Then it starts again. */
 function HeroDemo() {
   const [chars, setChars] = useState(0);
@@ -89,8 +255,21 @@ function HeroDemo() {
     };
   }, []);
 
+  const stage = useRef<HTMLDivElement>(null);
+  function tilt(e: React.MouseEvent) {
+    const el = stage.current;
+    if (!el || reducedMotion()) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform = `perspective(900px) rotateY(${x * 7}deg) rotateX(${-y * 6}deg)`;
+  }
+  function untilt() {
+    if (stage.current) stage.current.style.transform = '';
+  }
+
   return (
-    <div className={c.stage} aria-hidden="true">
+    <div className={`${c.stage} ${c.tilt}`} aria-hidden="true" ref={stage} onMouseMove={tilt} onMouseLeave={untilt}>
       <div className={`${c.float} ${c.floatA}`}>
         <div className={c.floatTitle}>
           <span>What you asked for</span>
@@ -195,6 +374,7 @@ export default function Landing() {
 
   return (
     <div className={c.page}>
+      <ScrollProgress />
       <header className={c.nav}>
         <div className={`${c.wrap} ${c.navInner}`}>
           <Link href="/" className={c.brand}>
@@ -221,6 +401,11 @@ export default function Landing() {
       <main>
         {/* hero */}
         <section className={c.hero}>
+          <div className={c.blobs} aria-hidden="true">
+            <span className={`${c.blob} ${c.blob1}`} />
+            <span className={`${c.blob} ${c.blob2}`} />
+            <span className={`${c.blob} ${c.blob3}`} />
+          </div>
           <div className={`${c.wrap} ${c.heroGrid}`}>
             <div>
               <span className={c.eyebrow}>AI shopping with proof</span>
@@ -237,6 +422,11 @@ export default function Landing() {
             <HeroDemo />
           </div>
         </section>
+
+        <Marquee />
+        <div className={c.wrap}>
+          <Counters />
+        </div>
 
         {/* problem and answer */}
         <section className={c.section}>
@@ -291,6 +481,16 @@ export default function Landing() {
                 </Reveal>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className={c.section}>
+          <div className={c.wrap}>
+            <Reveal className={c.center}>
+              <h2 className={c.h2}>Every step leaves a record</h2>
+              <p className={c.sub}>From the first request to the final decision, each link in the chain is stored, so a dispute is settled by what happened.</p>
+            </Reveal>
+            <ProofChain />
           </div>
         </section>
 
@@ -414,7 +614,7 @@ export default function Landing() {
         </section>
 
         {/* call to action */}
-        <section className={c.final}>
+        <section className={`${c.final} ${c.finalBand}`}>
           <div className={c.wrap}>
             <Reveal>
               <h2 className={c.h2}>Ready to try it?</h2>

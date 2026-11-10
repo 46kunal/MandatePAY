@@ -1,149 +1,302 @@
 'use client';
-// OWNER: C. Merchant overview: totals, what needs attention, AI-recommended actions and recent activity.
-// Everything here is computed from GET /api/cases. Nothing is invented.
+// OWNER: C. Store overview. It leads with what needs a person (disputes due, buyer reports), then the numbers, the
+// dispute pipeline and recent activity. Everything is computed from stored records; nothing is invented.
 import Link from 'next/link';
-import { useMemo } from 'react';
-import type { CaseRecord } from '@/contracts/schemas';
-import { Badge, Card, EmptyState, Notice, PageHeader, Skeleton, StatCard } from '../_ui/Ui';
-import { ACTION, FAULT, formatMoney, formatWhen, needsReview, reasonLabel } from '../_ui/labels';
+import { useEffect, useMemo, useState } from 'react';
+import type { CaseRecord, ProblemReport, ResultsResponse } from '@/contracts/schemas';
+import { useSession } from '@/lib/auth/client';
+import { apiFetch } from '../_ui/api';
+import { Icon, type IconName } from '../_ui/Icons';
+import { ACTION, FAULT, dueLabel, formatMoney, formatWhen, reasonLabel } from '../_ui/labels';
+import { Badge, Notice, Skeleton } from '../_ui/Ui';
 import { useCases } from '../_ui/useCases';
 import u from '../_ui/ui.module.css';
-import m from './merchant.module.css';
+import o from './overview.module.css';
 
-interface Activity {
-  key: string;
-  id: string;
-  at: string;
-  text: string;
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 
-function activity(cases: CaseRecord[]): Activity[] {
-  const out: Activity[] = [];
-  for (const c of cases) {
-    out.push({ key: `${c.dispute_id}-open`, id: c.dispute_id, at: c.created_at, text: `Dispute opened: ${reasonLabel(c.reason)}` });
-    if (c.analysis_status === 'acted') {
-      out.push({ key: `${c.dispute_id}-act`, id: c.dispute_id, at: c.updated_at, text: `Action taken: ${ACTION[c.action_taken ?? ''] ?? c.action_taken ?? 'resolved'}` });
-    } else if (c.verdict) {
-      out.push({ key: `${c.dispute_id}-ai`, id: c.dispute_id, at: c.updated_at, text: `AI recommended: ${ACTION[c.verdict.action] ?? c.verdict.action} (${FAULT[c.verdict.fault].label})` });
-    }
-  }
-  return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 6);
+const isWaitingOnStore = (c: CaseRecord) => c.analysis_status !== 'acted' && c.status !== 'RESOLVED' && (c.response_due?.party === 'seller' || c.status === 'WAITING_FOR_SELLER_RESPONSE');
+
+type Bucket = { key: string; label: string; color: string; n: number };
+
+function pipeline(cases: CaseRecord[]): Bucket[] {
+  const mine = cases.filter(isWaitingOnStore).length;
+  const resolved = cases.filter((c) => c.status === 'RESOLVED').length;
+  const review = cases.filter((c) => c.status === 'UNDER_REVIEW' || c.status === 'UNDER_PAYPAL_REVIEW').length;
+  const buyer = cases.filter((c) => c.status !== 'RESOLVED' && !isWaitingOnStore(c) && c.status !== 'UNDER_REVIEW' && c.status !== 'UNDER_PAYPAL_REVIEW').length;
+  return [
+    { key: 'store', label: 'Waiting for you', color: '#d97706', n: mine },
+    { key: 'buyer', label: 'Waiting for the buyer', color: '#2563eb', n: buyer },
+    { key: 'review', label: 'Under PayPal review', color: '#7c3aed', n: review },
+    { key: 'done', label: 'Resolved', color: '#16a34a', n: resolved },
+  ];
+}
+
+function hours(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = min / 60;
+  return h < 48 ? `${h.toFixed(h < 10 ? 1 : 0)} h` : `${(h / 24).toFixed(1)} days`;
 }
 
 export default function OverviewPage() {
+  const { data } = useSession();
+  const first = data?.user?.name?.trim().split(/\s+/)[0];
   const { cases, error, reload } = useCases();
+  const [reports, setReports] = useState<ProblemReport[] | null>(null);
+  const [results, setResults] = useState<ResultsResponse | null>(null);
 
-  const stats = useMemo(() => {
-    if (!cases) return null;
-    const resolved = cases.filter((c) => c.analysis_status === 'acted').length;
-    const review = cases.filter(needsReview);
-    const byAction = new Map<string, number>();
-    for (const c of cases) {
-      if (c.verdict && c.analysis_status !== 'acted') byAction.set(c.verdict.action, (byAction.get(c.verdict.action) ?? 0) + 1);
+  useEffect(() => {
+    apiFetch<{ reports: ProblemReport[] }>('/api/reports')
+      .then((r) => setReports(r.data.reports))
+      .catch(() => setReports([]));
+    apiFetch<ResultsResponse>('/api/results')
+      .then((r) => setResults(r.data))
+      .catch(() => setResults(null));
+  }, []);
+
+  const todo = useMemo(() => {
+    const items: { key: string; href: string; icon: IconName; tone: string; title: string; meta: string; chip?: { text: string; tone: 'good' | 'bad' | 'warn' | 'info' | 'neutral' }; sort: number }[] = [];
+    for (const c of cases ?? []) {
+      if (!isWaitingOnStore(c)) continue;
+      const due = dueLabel(c.response_due);
+      items.push({
+        key: c.dispute_id,
+        href: `/merchant/disputes/${encodeURIComponent(c.dispute_id)}`,
+        icon: 'shield',
+        tone: o.tAmber,
+        title: `${reasonLabel(c.reason)}${c.amount ? ` · ${formatMoney(c.amount.value, c.amount.currency)}` : ''}`,
+        meta: `${c.dispute_id} · ${c.verdict ? `AI: ${ACTION[c.verdict.action] ?? c.verdict.action}` : 'AI has not looked yet'}`,
+        chip: due ? { text: due.text, tone: due.tone } : undefined,
+        sort: c.response_due ? Date.parse(c.response_due.at) : Number.MAX_SAFE_INTEGER - 1,
+      });
     }
-    return { total: cases.length, pending: cases.length - resolved, resolved, review, byAction: [...byAction.entries()].sort((a, b) => b[1] - a[1]) };
+    for (const r of reports ?? []) {
+      if (r.status !== 'open') continue;
+      items.push({
+        key: r.report_id,
+        href: '/merchant/reports',
+        icon: 'inbox',
+        tone: o.tBlue,
+        title: `Buyer reported a problem${r.items?.length ? `: ${r.items.join(', ')}` : ''}`,
+        meta: `${r.buyer_email ?? 'A buyer'} · ${formatWhen(r.created_at)}`,
+        chip: r.assessment.agent_mistake ? { text: 'Refund recommended', tone: 'warn' } : undefined,
+        sort: Date.parse(r.created_at),
+      });
+    }
+    return items.sort((a, b) => a.sort - b.sort);
+  }, [cases, reports]);
+
+  const buckets = useMemo(() => (cases ? pipeline(cases) : []), [cases]);
+  const total = buckets.reduce((n, b) => n + b.n, 0);
+
+  const recent = useMemo(() => {
+    const out: { key: string; id: string; at: string; text: string }[] = [];
+    for (const c of cases ?? []) {
+      out.push({ key: `${c.dispute_id}-open`, id: c.dispute_id, at: c.created_at, text: `Dispute opened: ${reasonLabel(c.reason)}` });
+      if (c.analysis_status === 'acted') out.push({ key: `${c.dispute_id}-act`, id: c.dispute_id, at: c.updated_at, text: `You responded: ${ACTION[c.action_taken ?? ''] ?? c.action_taken ?? 'done'}` });
+      else if (c.verdict) out.push({ key: `${c.dispute_id}-ai`, id: c.dispute_id, at: c.updated_at, text: `AI view: ${FAULT[c.verdict.fault].label}` });
+    }
+    return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 6);
   }, [cases]);
 
-  const recent = useMemo(() => (cases ? activity(cases) : []), [cases]);
+  const loading = !cases && !error;
 
   return (
     <>
-      <PageHeader title="Overview" subtitle="Disputes on your orders and what the AI recommends for each." />
+      <div className={`${o.welcome} ${o.fade}`}>
+        <div>
+          <h1>
+            {greeting()}
+            {first ? `, ${first}` : ''}
+          </h1>
+          <p>Here is what needs you today, and how the store is doing.</p>
+        </div>
+      </div>
 
       {error && (
         <Notice tone="bad" alert>
           Could not load disputes: {error}{' '}
-          <button className={`${u.btn} ${u.btnSecondary}`} onClick={reload}>
+          <button className={`${u.btn} ${u.btnSecondary}`} onClick={reload} style={{ marginLeft: 8 }}>
             Try again
           </button>
         </Notice>
       )}
 
-      {!cases && !error && (
-        <div className={m.skelStack} aria-busy="true" aria-label="Loading overview">
-          <Skeleton height={84} />
-          <Skeleton height={200} />
+      <div className={`${o.kpis} ${o.fade}`}>
+        <div className={o.kpi}>
+          <span className={`${o.kpiIcon} ${o.tAmber}`}>
+            <Icon name="alert" />
+          </span>
+          <div>
+            <div className={o.kpiLabel}>Needs you</div>
+            <div className={o.kpiValue}>{loading ? '–' : todo.length}</div>
+            <div className={o.kpiHint}>Disputes and buyer reports</div>
+          </div>
         </div>
-      )}
-
-      {cases && cases.length === 0 && (
-        <Card>
-          <EmptyState title="No disputes yet" action={<Link href="/merchant/disputes" className={`${u.btn}`} style={{ textDecoration: 'none' }}>Go to disputes</Link>}>
-            When a buyer disputes a payment, it appears here with an AI recommendation.
-          </EmptyState>
-        </Card>
-      )}
-
-      {stats && cases && cases.length > 0 && (
-        <>
-          <div className={u.stats}>
-            <StatCard label="Total disputes" value={stats.total} />
-            <StatCard label="Pending" value={stats.pending} hint="Not resolved yet" />
-            <StatCard label="Need your review" value={stats.review.length} hint="Waiting for a decision" />
-            <StatCard label="Responded" value={stats.resolved} hint="Response sent to PayPal" />
+        <div className={o.kpi}>
+          <span className={`${o.kpiIcon} ${o.tBlue}`}>
+            <Icon name="shield" />
+          </span>
+          <div>
+            <div className={o.kpiLabel}>Open disputes</div>
+            <div className={o.kpiValue}>{loading ? '–' : total - (buckets.find((b) => b.key === 'done')?.n ?? 0)}</div>
+            <div className={o.kpiHint}>{results ? `${results.disputes.total} received in all` : 'Not resolved yet'}</div>
           </div>
+        </div>
+        <div className={o.kpi}>
+          <span className={`${o.kpiIcon} ${o.tGreen}`}>
+            <Icon name="clock" />
+          </span>
+          <div>
+            <div className={o.kpiLabel}>Typical response time</div>
+            <div className={o.kpiValue}>{results?.speed.median_minutes_to_response != null ? hours(results.speed.median_minutes_to_response) : '–'}</div>
+            <div className={o.kpiHint}>{results ? `About ${hours(results.speed.est_minutes_saved)} saved (estimate)` : 'Arrival to response'}</div>
+          </div>
+        </div>
+        <div className={o.kpi}>
+          <span className={`${o.kpiIcon} ${o.tViolet}`}>
+            <Icon name="spark" />
+          </span>
+          <div>
+            <div className={o.kpiLabel}>AI accuracy</div>
+            <div className={o.kpiValue}>{results?.eval ? `${Math.round(results.eval.overall * 100)}%` : '–'}</div>
+            <div className={o.kpiHint}>{results?.eval ? `On ${results.eval.cases} labelled disputes` : 'Run the test set'}</div>
+          </div>
+        </div>
+      </div>
 
-          <div className={m.grid2}>
-            <Card id="attention" title="Needs your review" subtitle="A person must approve these before anything is sent." flush>
-              {stats.review.length === 0 ? (
-                <EmptyState title="All caught up">No disputes are waiting for a decision.</EmptyState>
-              ) : (
-                <ul className={m.list}>
-                  {stats.review.map((c) => (
-                    <li key={c.dispute_id} className={m.listItem}>
-                      <Link href={`/merchant/disputes/${encodeURIComponent(c.dispute_id)}`} className={m.listLink}>
-                        <span>
-                          <span className={m.listTitle}>{reasonLabel(c.reason)}</span>
-                          <br />
-                          <span className={u.muted}>
-                            {c.dispute_id}
-                            {c.amount ? ` · ${formatMoney(c.amount.value, c.amount.currency)}` : ''}
-                          </span>
-                        </span>
-                        {c.verdict && <Badge tone={FAULT[c.verdict.fault].tone}>{FAULT[c.verdict.fault].label}</Badge>}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
+      <div className={o.cols}>
+        <div>
+          <section className={`${o.panel} ${o.fade}`} aria-labelledby="todo-h">
+            <div className={o.panelHead}>
+              <h2 id="todo-h">Needs your attention</h2>
+              <span>{todo.length === 0 ? 'Nothing waiting' : `${todo.length} item${todo.length === 1 ? '' : 's'}`}</span>
+            </div>
+            {loading ? (
+              <div style={{ padding: '1rem 1.25rem' }}>
+                <Skeleton height={64} label="Loading" />
+              </div>
+            ) : todo.length === 0 ? (
+              <div className={o.caught}>
+                <span className={o.caughtIcon}>
+                  <Icon name="check" size={22} />
+                </span>
+                <b>You are all caught up</b>
+                <span>New disputes and buyer reports will appear here the moment they arrive.</span>
+              </div>
+            ) : (
+              <ul className={o.todo}>
+                {todo.slice(0, 8).map((t) => (
+                  <li key={t.key}>
+                    <Link href={t.href} className={o.todoItem}>
+                      <span className={`${o.todoIcon} ${t.tone}`}>
+                        <Icon name={t.icon} />
+                      </span>
+                      <span className={o.todoBody}>
+                        <b>{t.title}</b>
+                        <span>{t.meta}</span>
+                      </span>
+                      {t.chip && <Badge tone={t.chip.tone}>{t.chip.text}</Badge>}
+                      <Icon name="arrow" size={16} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-            <Card id="actions" title="AI-recommended actions" subtitle="For disputes that are not resolved yet.">
-              {stats.byAction.length === 0 ? (
-                <p className={u.muted} style={{ margin: 0 }}>No open recommendations.</p>
+          <section className={`${o.panel} ${o.fade}`} aria-labelledby="pipe-h">
+            <div className={o.panelHead}>
+              <h2 id="pipe-h">Dispute pipeline</h2>
+              <Link href="/merchant/disputes" style={{ fontSize: '0.88rem', color: 'var(--accent)', textDecoration: 'none' }}>
+                All disputes
+              </Link>
+            </div>
+            <div className={o.pipe}>
+              {total === 0 ? (
+                <span style={{ color: 'var(--muted)' }}>No disputes yet.</span>
               ) : (
-                stats.byAction.map(([action, n]) => (
-                  <div key={action} className={m.barRow}>
-                    <span>{ACTION[action] ?? action}</span>
-                    <div className={u.meter} role="img" aria-label={`${n} of ${stats.pending}`}>
-                      <div className={u.meterFill} style={{ width: `${(n / Math.max(stats.pending, 1)) * 100}%` }} />
-                    </div>
-                    <strong>{n}</strong>
+                <>
+                  <div className={o.bar} role="img" aria-label={buckets.map((b) => `${b.label}: ${b.n}`).join(', ')}>
+                    {buckets
+                      .filter((b) => b.n > 0)
+                      .map((b) => (
+                        <div key={b.key} className={o.seg} style={{ flexGrow: b.n, background: b.color }} />
+                      ))}
                   </div>
-                ))
+                  <div className={o.legend}>
+                    {buckets.map((b) => (
+                      <div key={b.key} className={o.legendRow}>
+                        <span className={o.dot} style={{ background: b.color }} />
+                        {b.label}
+                        <b>{b.n}</b>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
-            </Card>
-          </div>
+            </div>
+          </section>
+        </div>
 
-          <Card id="recent" title="Recent dispute activity" flush>
-            <ul className={m.list}>
-              {recent.map((a) => (
-                <li key={a.key} className={m.listItem}>
-                  <Link href={`/merchant/disputes/${encodeURIComponent(a.id)}`} className={m.listLink}>
-                    <span>
-                      <span className={m.listTitle}>{a.text}</span>
-                      <br />
-                      <span className={u.muted}>{a.id}</span>
-                    </span>
-                    <span className={u.muted}>{formatWhen(a.at)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </>
-      )}
+        <div>
+          <section className={`${o.panel} ${o.fade}`} aria-labelledby="quick-h">
+            <div className={o.panelHead}>
+              <h2 id="quick-h">Jump to</h2>
+            </div>
+            <div className={o.quick}>
+              <Link href="/merchant/disputes" className={o.quickLink}>
+                <Icon name="shield" />
+                Disputes
+                <Icon name="arrow" size={16} />
+              </Link>
+              <Link href="/merchant/orders" className={o.quickLink}>
+                <Icon name="receipt" />
+                Orders and refunds
+                <Icon name="arrow" size={16} />
+              </Link>
+              <Link href="/merchant/products" className={o.quickLink}>
+                <Icon name="box" />
+                Products
+                <Icon name="arrow" size={16} />
+              </Link>
+              <Link href="/merchant/results" className={o.quickLink}>
+                <Icon name="chart" />
+                Results
+                <Icon name="arrow" size={16} />
+              </Link>
+            </div>
+          </section>
+
+          <section className={`${o.panel} ${o.fade}`} aria-labelledby="act-h">
+            <div className={o.panelHead}>
+              <h2 id="act-h">Recent activity</h2>
+            </div>
+            {recent.length === 0 ? (
+              <div className={o.caught} style={{ padding: '1.6rem 1rem' }}>
+                <span>Activity shows up here once disputes arrive.</span>
+              </div>
+            ) : (
+              <ul className={o.timeline}>
+                {recent.map((a) => (
+                  <li key={a.key} className={o.tl}>
+                    <span className={o.tlDot} />
+                    <div>
+                      <Link href={`/merchant/disputes/${encodeURIComponent(a.id)}`}>{a.text}</Link>
+                      <span>
+                        {a.id} · {formatWhen(a.at)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
     </>
   );
 }
-

@@ -1,16 +1,19 @@
 'use client';
-// OWNER: C. Settings, in tabs. The tab is in the URL hash (#store, #connections, #team, #security, #data) so it can be
-// linked. Store and rules: GET/PATCH /api/settings (owner edits, staff read). The other tabs are in ./sections.tsx;
+// OWNER: C. Settings. A section list on the left (the section is in the URL hash, so it can be linked) and the content
+// on the right. Store profile and rules share one draft and one save bar that appears only when something changed.
+// Store and rules: GET/PATCH /api/settings (owner edits, staff read). The other sections are in ./sections.tsx;
 // Security is the signed-in person's own name, password and devices.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { StoreSettings } from '@/contracts/schemas';
 import { useSession } from '@/lib/auth/client';
 import { can } from '@/lib/auth/roles';
 import { PasswordCard, ProfileCard, SessionsCard } from '../../_ui/AccountPanels';
 import { apiFetch } from '../../_ui/api';
-import { Card, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
+import { Icon, type IconName } from '../../_ui/Icons';
+import { Notice, PageHeader, Skeleton } from '../../_ui/Ui';
 import u from '../../_ui/ui.module.css';
 import { ConnectionsCard, DataCard, TeamCard } from './sections';
+import t from './settings.module.css';
 
 type Draft = {
   store_name: string;
@@ -51,13 +54,52 @@ function toPatch(d: Draft): { ok: true; body: Record<string, unknown> } | { ok: 
   };
 }
 
-function StoreSettingsCard() {
+const SECTIONS: { id: string; label: string; icon: IconName }[] = [
+  { id: 'general', label: 'General', icon: 'store' },
+  { id: 'rules', label: 'Rules and automation', icon: 'shield' },
+  { id: 'connections', label: 'Connections', icon: 'spark' },
+  { id: 'team', label: 'Team', icon: 'user' },
+  { id: 'security', label: 'Security', icon: 'lock' },
+  { id: 'data', label: 'Data', icon: 'file' },
+];
+const LEGACY: Record<string, string> = { store: 'general' };
+
+function sectionFromHash(): string {
+  const h = window.location.hash.slice(1);
+  const id = LEGACY[h] ?? h;
+  return SECTIONS.find((s) => s.id === id)?.id ?? 'general';
+}
+
+function Setting({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: React.ReactNode }) {
+  return (
+    <div className={t.setting}>
+      <div>
+        <label className={t.label} htmlFor={htmlFor}>
+          {label}
+        </label>
+        {hint && <span className={t.hint}>{hint}</span>}
+      </div>
+      <div className={t.control}>{children}</div>
+    </div>
+  );
+}
+
+export default function SettingsPage() {
   const { data: session } = useSession();
   const canEdit = can((session?.user as { role?: string } | undefined)?.role, 'settings:write');
+  const [section, setSection] = useState('general');
   const [saved, setSaved] = useState<StoreSettings | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setSection(sectionFromHash());
+    sync();
+    window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
 
   useEffect(() => {
     apiFetch<StoreSettings>('/api/settings')
@@ -68,8 +110,9 @@ function StoreSettingsCard() {
       .catch((e: Error) => setMsg({ ok: false, text: `Could not load settings: ${e.message}` }));
   }, []);
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  const dirty = useMemo(() => Boolean(saved && draft && JSON.stringify(toDraft(saved)) !== JSON.stringify(draft)), [saved, draft]);
+
+  async function save() {
     if (!draft) return;
     const p = toPatch(draft);
     if (!p.ok) return setMsg({ ok: false, text: p.message });
@@ -79,7 +122,8 @@ function StoreSettingsCard() {
       const r = await apiFetch<StoreSettings>('/api/settings', { method: 'PATCH', body: p.body });
       setSaved(r.data);
       setDraft(toDraft(r.data));
-      setMsg({ ok: true, text: 'Saved' });
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2500);
     } catch (err) {
       setMsg({ ok: false, text: `Not saved: ${(err as Error).message}` });
     } finally {
@@ -87,132 +131,109 @@ function StoreSettingsCard() {
     }
   }
 
-  const field = (key: Exclude<keyof Draft, 'auto_analyse'>, label: string, hint: string, type = 'text', placeholder?: string) => (
-    <div className={u.field}>
-      <label htmlFor={`s-${key}`}>{label}</label>
-      <input
-        id={`s-${key}`}
-        className={u.input}
-        type={type}
-        inputMode={type === 'text' && key !== 'store_name' && key !== 'support_email' ? 'decimal' : undefined}
-        value={draft?.[key] ?? ''}
-        placeholder={placeholder}
-        onChange={(e) => setDraft((d) => (d ? { ...d, [key]: e.target.value } : d))}
-        disabled={!draft || busy || !canEdit}
-      />
-      <span className={u.muted} style={{ fontSize: '0.85em' }}>{hint}</span>
-    </div>
-  );
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
+  const disabled = !draft || busy || !canEdit;
 
-  return (
-    <Card id="store" title="Store and rules" subtitle="Changes apply to new carts and new dispute analyses.">
-      {!draft && !msg && <Skeleton height={120} label="Loading settings" />}
-      {draft && (
-        <form onSubmit={save} style={{ display: 'grid', gap: '0.9rem' }}>
-          <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-            {field('store_name', 'Store name', 'Shown on carts, receipts and evidence.', 'text', 'Your store')}
-            {field('support_email', 'Support email', 'Optional. Shown to buyers.', 'email', 'help@yourstore.com')}
-            {field('approval_threshold', 'Approval limit (USD)', 'Carts above this need the buyer to approve, unless their mandate sets a limit.')}
-            {field('human_review_over', 'Human review over (USD)', 'Disputes at or above this always need a person.')}
-            {field('min_confidence', 'Minimum AI confidence (%)', 'AI verdicts below this need a person.')}
+  const body = !draft ? (
+    <Skeleton height={160} label="Loading settings" />
+  ) : section === 'general' ? (
+    <section className={t.block}>
+      <h2>General</h2>
+      <p>How your store appears to buyers.</p>
+      <div className={t.panel}>
+        <Setting label="Store name" hint="Shown on carts, receipts and evidence." htmlFor="s-name">
+          <input id="s-name" className={u.input} value={draft.store_name} onChange={(e) => set('store_name', e.target.value)} placeholder="Your store" disabled={disabled} />
+        </Setting>
+        <Setting label="Support email" hint="Optional. Buyers can reach you here." htmlFor="s-email">
+          <input id="s-email" className={u.input} type="email" value={draft.support_email} onChange={(e) => set('support_email', e.target.value)} placeholder="help@yourstore.com" disabled={disabled} />
+        </Setting>
+      </div>
+      {!canEdit && <p style={{ margin: '0.75rem 0 0' }} className={u.muted}>Only the store owner can change these.</p>}
+    </section>
+  ) : section === 'rules' ? (
+    <section className={t.block}>
+      <h2>Rules and automation</h2>
+      <p>When a person must step in, and what the AI does on its own. Changes apply to new carts and new analyses.</p>
+      <div className={t.panel}>
+        <Setting label="Approval limit" hint="Carts above this need the buyer to approve, unless their mandate sets a limit." htmlFor="s-approval">
+          <div className={t.suffix}>
+            <input id="s-approval" className={u.input} inputMode="decimal" value={draft.approval_threshold} onChange={(e) => set('approval_threshold', e.target.value)} disabled={disabled} />
+            <span>USD</span>
           </div>
-          <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-            <input
-              id="s-auto_analyse"
-              type="checkbox"
-              checked={draft.auto_analyse}
-              disabled={busy || !canEdit}
-              onChange={(e) => setDraft((d) => (d ? { ...d, auto_analyse: e.target.checked } : d))}
-            />
-            <span>
-              Analyse new disputes automatically
-              <span className={u.muted} style={{ display: 'block', fontSize: '0.85em' }}>
-                As soon as a dispute arrives and PayPal lets the store respond, the AI analyses it (at most 3 at a time).
-                Nothing is sent to PayPal until a person approves.
-              </span>
-            </span>
+        </Setting>
+        <Setting label="Human review over" hint="Disputes at or above this amount always need a person." htmlFor="s-review">
+          <div className={t.suffix}>
+            <input id="s-review" className={u.input} inputMode="decimal" value={draft.human_review_over} onChange={(e) => set('human_review_over', e.target.value)} disabled={disabled} />
+            <span>USD</span>
+          </div>
+        </Setting>
+        <Setting label="Minimum AI confidence" hint="AI recommendations below this need a person." htmlFor="s-conf">
+          <div className={t.suffix}>
+            <input id="s-conf" className={u.input} inputMode="numeric" value={draft.min_confidence} onChange={(e) => set('min_confidence', e.target.value)} disabled={disabled} />
+            <span>%</span>
+          </div>
+        </Setting>
+        <Setting label="Analyse new disputes automatically" hint="As soon as a dispute arrives, the AI reads it (at most 3 at a time). Nothing is sent to PayPal until a person approves.">
+          <label className={t.switch}>
+            <input type="checkbox" role="switch" checked={draft.auto_analyse} onChange={(e) => set('auto_analyse', e.target.checked)} disabled={disabled} aria-label="Analyse new disputes automatically" />
+            <span className={t.track} />
           </label>
-          <div className={u.row} style={{ gap: '0.75rem' }}>
-            {canEdit ? (
-              <button className={u.btn} type="submit" disabled={busy}>
-                {busy ? 'Saving…' : 'Save'}
-              </button>
-            ) : (
-              <span className={u.muted}>Only the store owner can change these.</span>
-            )}
-            {saved?.updated_at ? (
-              <span className={u.muted}>Last saved {new Date(saved.updated_at).toLocaleString()}</span>
-            ) : (
-              <span className={u.muted}>Using the defaults from the server environment</span>
-            )}
-          </div>
-        </form>
-      )}
-      {msg && (
-        <div style={{ marginTop: '0.75rem' }}>
-          <Notice tone={msg.ok ? 'good' : 'bad'} alert={!msg.ok}>
-            {msg.text}
-          </Notice>
-        </div>
-      )}
-    </Card>
+        </Setting>
+      </div>
+      {!canEdit && <p style={{ margin: '0.75rem 0 0' }} className={u.muted}>Only the store owner can change these.</p>}
+    </section>
+  ) : section === 'connections' ? (
+    <ConnectionsCard />
+  ) : section === 'team' ? (
+    <TeamCard />
+  ) : section === 'security' ? (
+    <>
+      <ProfileCard />
+      <PasswordCard />
+      <SessionsCard />
+    </>
+  ) : (
+    <DataCard />
   );
-}
-
-const TABS = [
-  { id: 'store', label: 'Store and rules' },
-  { id: 'connections', label: 'Connections' },
-  { id: 'team', label: 'Team' },
-  { id: 'security', label: 'Security' },
-  { id: 'data', label: 'Data' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
-
-function tabFromHash(): TabId {
-  const h = window.location.hash.slice(1);
-  return TABS.find((t) => t.id === h)?.id ?? 'store';
-}
-
-export default function SettingsPage() {
-  const [tab, setTab] = useState<TabId>('store');
-  useEffect(() => {
-    const sync = () => setTab(tabFromHash());
-    sync();
-    window.addEventListener('hashchange', sync);
-    return () => window.removeEventListener('hashchange', sync);
-  }, []);
 
   return (
     <>
       <PageHeader title="Settings" subtitle="Your store, its team, and your own account." />
-      <div role="tablist" aria-label="Settings sections" className={u.row} style={{ gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-        {TABS.map((t) => (
-          <a
-            key={t.id}
-            role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={tab === t.id}
-            aria-controls={`panel-${t.id}`}
-            href={`#${t.id}`}
-            className={`${u.btn} ${tab === t.id ? '' : u.btnSecondary}`}
-          >
-            {t.label}
-          </a>
-        ))}
+      <div className={t.layout}>
+        <nav className={t.side} aria-label="Settings sections">
+          {SECTIONS.map((s) => (
+            <a key={s.id} href={`#${s.id}`} className={`${t.sideLink} ${section === s.id ? t.sideOn : ''}`} aria-current={section === s.id ? 'page' : undefined}>
+              <Icon name={s.icon} />
+              {s.label}
+            </a>
+          ))}
+        </nav>
+        <div className={t.content}>
+          {msg && (
+            <Notice tone={msg.ok ? 'good' : 'bad'} alert={!msg.ok}>
+              {msg.text}
+            </Notice>
+          )}
+          {body}
+        </div>
       </div>
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} style={{ display: 'grid', gap: '1rem' }}>
-        {tab === 'store' && <StoreSettingsCard />}
-        {tab === 'connections' && <ConnectionsCard />}
-        {tab === 'team' && <TeamCard />}
-        {tab === 'security' && (
-          <>
-            <ProfileCard />
-            <PasswordCard />
-            <SessionsCard />
-          </>
-        )}
-        {tab === 'data' && <DataCard />}
-      </div>
+      {canEdit && (dirty || justSaved) && (
+        <div className={t.saveBar} role="status">
+          {justSaved && !dirty ? (
+            <span className={t.saved}>✓ Changes saved</span>
+          ) : (
+            <>
+              <span>You have unsaved changes</span>
+              <button type="button" className={t.discard} onClick={() => saved && setDraft(toDraft(saved))} disabled={busy}>
+                Discard
+              </button>
+              <button type="button" className={t.save} onClick={save} disabled={busy}>
+                {busy ? 'Saving…' : 'Save changes'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </>
   );
 }

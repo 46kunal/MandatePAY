@@ -1,0 +1,245 @@
+/* Settings: a section list on the left, content on the right. Each setting is a row with its label and explanation on
+   the left and the control on the right. A save bar appears only while there are unsaved changes. */
+.layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+.side {
+  position: sticky;
+  top: 80px;
+  display: grid;
+  gap: 2px;
+}
+@media (max-width: 960px) {
+  .side {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    gap: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+}
+.sideLink {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 9px;
+  color: #475569;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.93rem;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sideLink svg {
+  color: #94a3b8;
+}
+.sideLink:hover {
+  background: #eef2f7;
+  color: var(--text);
+}
+.sideOn,
+.sideOn:hover {
+  background: #fff;
+  color: var(--accent-dark);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--border), 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.sideOn svg {
+  color: var(--accent);
+}
+.sideLink:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.content {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+  padding-bottom: 5rem;
+}
+.block h2 {
+  margin: 0 0 0.2rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+.block > p {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+.panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 1.5rem;
+  align-items: center;
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.setting:last-child {
+  border-bottom: 0;
+}
+@media (max-width: 760px) {
+  .setting {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+}
+.label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.hint {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+.control {
+  min-width: 0;
+}
+.suffix {
+  position: relative;
+}
+.suffix input {
+  padding-right: 3rem;
+}
+.suffix span {
+  position: absolute;
+  right: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+/* an on/off switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  width: 44px;
+  height: 26px;
+  flex: none;
+}
+.switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background 0.2s ease;
+  pointer-events: none;
+}
+.track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.3);
+  transition: transform 0.2s ease;
+}
+.switch input:checked + .track {
+  background: var(--accent);
+}
+.switch input:checked + .track::after {
+  transform: translateX(18px);
+}
+.switch input:focus-visible + .track {
+  outline: 3px solid #bfdbfe;
+  outline-offset: 2px;
+}
+.switch input:disabled {
+  cursor: not-allowed;
+}
+.switch input:disabled + .track {
+  opacity: 0.55;
+}
+.saveBar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 0.75rem 0.65rem 1.2rem;
+  background: #0f172a;
+  color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.35);
+  animation: slideUp 0.25s ease-out;
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+}
+.saveBar button {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 9px;
+  padding: 0.45rem 0.95rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.discard {
+  background: transparent;
+  color: #cbd5e1;
+  border-color: #334155 !important;
+}
+.discard:hover {
+  background: #1e293b;
+}
+.save {
+  background: var(--accent);
+  color: #fff;
+}
+.save:hover:not(:disabled) {
+  background: #3b82f6;
+}
+.save:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.saved {
+  color: #86efac;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .saveBar {
+    animation: none;
+  }
+  .track,
+  .track::after {
+    transition: none;
+  }
+}
