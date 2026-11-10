@@ -184,6 +184,8 @@ export const CaseRecord = z.object({
   outcome: z.string().nullable(),
   /** Who PayPal is waiting on and until when; null when nothing is due. */
   response_due: z.object({ party: z.enum(['seller', 'buyer']), at: z.string() }).nullable(),
+  /** When a person hid this dispute from the lists; null when it is shown. */
+  dismissed_at: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });

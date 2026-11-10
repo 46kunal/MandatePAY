@@ -96,7 +96,7 @@ export function computeResults(i: ResultsInput): ResultsResponse {
 }
 
 export async function loadResults(): Promise<ResultsResponse> {
-  const [{ db, schema }, { eq, isNotNull }, evalJson] = await Promise.all([
+  const [{ db, schema }, { eq, isNotNull, isNull }, evalJson] = await Promise.all([
     import('../db/client'),
     import('drizzle-orm'),
     import('../eval/results.json').then((m) => m.default as ResultsResponse['eval']).catch(() => null),
@@ -104,7 +104,8 @@ export async function loadResults(): Promise<ResultsResponse> {
   const [cases, acts, carts, orders, reports] = await Promise.all([
     db
       .select({ disputeId: schema.cases.disputeId, verdict: schema.cases.verdict, outcome: schema.cases.outcome, status: schema.cases.status, createdAt: schema.cases.createdAt })
-      .from(schema.cases),
+      .from(schema.cases)
+      .where(isNull(schema.cases.dismissedAt)), // hidden disputes are not counted
     db
       .select({ targetId: schema.auditLog.targetId, at: schema.auditLog.at, details: schema.auditLog.details })
       .from(schema.auditLog)

@@ -30,6 +30,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/audit` | `audit:read` (owner, admin) |
 | POST `/api/orders/:id/refund` | `orders:refund` (owner, admin) |
 | GET `/api/reports`, GET `/api/results` | `cases:read` (store team) |
+| POST `/api/cases/:id/dismiss` | `cases:act` (store team) |
 | POST `/api/reports/:id/resolve` | `cases:act` to reply; a refund also needs `orders:refund` (owner, admin) |
 | GET `/api/export/orders`, `/api/export/disputes` | `orders:read:all` / `cases:read` (staff, owner, admin) |
 | GET `/api/admin/users`, PATCH `/api/admin/users/:id` | `users:manage` (admin). Disabling ends the person's sessions |
@@ -68,11 +69,12 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/me/mandates/:id/revoke` | A | none | `MyMandate`. After this, cart checks, the agent and new orders on it answer 410 `mandate_revoked` | 404 not yours |
 | GET `/api/me/export` | A | none | JSON download of the person's account, mandates, carts and orders | none |
 | POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal. After answering, cases that are linked, not analysed yet and actionable are analysed automatically (max 3 per call) when the `auto_analyse` setting is on; the webhook does the same after a processed event |
-| GET `/api/cases` | A | none | `CaseRecord[]` | none |
+| GET `/api/cases` | A | none | `CaseRecord[]` | none. Dismissed disputes are left out; `?dismissed=1` returns only those. Each record has `dismissed_at` |
 | GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order. `order.payment_source` is `paypal` or `card`; `order.payer_check` is `match`, `different`, `not_linked` or `unknown` (did the buyer's linked PayPal account pay) | 404. `order.refunds` lists PayPal's refunds on the payment and `order.refunded` sums them (`covers_dispute`: none, partial, full), re-read from PayPal when older than 2 minutes |
 | POST `/api/cases/:id/analyse` | B | none | `Verdict` (saved on case). Input adds `payment` facts from the records: `payer_check` (did the buyer's linked PayPal account pay), `source`, `mandate_signed_with`. A `different` payer always needs a human | 404, 422 not linked, 502 LLM failed |
 | GET `/api/cases/:id/evidence-pack` | A | none | `application/pdf` | 404 |
 | POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal. PROVIDE_EVIDENCE also uploads the evidence pack PDF (multipart, `file1`).. SEND_MESSAGE on a buyer-regret verdict sends the evidence from the records (not the AI's free text), attaching the evidence PDF when PayPal accepts it and otherwise sending the same text alone. NO_ACTION is only a recorded review: nothing is sent and the case stays open (`analysis_status` is never `acted` for it). After a real action the dispute is re-read from PayPal, so `status` in the response is PayPal's current one. MAKE_OFFER or ACCEPT_CLAIM on a payment that was already refunded (also outside MandatePay) answers 409 `already_refunded` with the refund in `details`, unless the request sends `confirm_refunded: true` |
+| POST `/api/cases/:id/dismiss` | A | `{ dismissed: boolean }` | `{ dispute_id, dismissed_at }` | 404 case. Hides a dispute from every list and from the results, or restores it. Nothing is sent to PayPal, the case is kept, and a later poll or webhook does not bring it back. Audited as `case.dismiss` / `case.restore` |
 | GET `/api/products` | A | `?active=1` optional | `Product[]` | none |
 | GET `/api/shop/catalog` | A | `?currency=USD` optional | `ShopCatalogResponse`: the store name and what a buyer may browse (active, in stock, with `image_url`, `availability` in_stock or low_stock, `max_quantity`). No stock counts | none |
 | POST `/api/products` | A | `ProductInput` | `Product` (201) | 400 invalid, 409 duplicate SKU |
