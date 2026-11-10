@@ -1,6 +1,6 @@
 'use client';
 // OWNER: B. Voice for the request box, using the browser's built-in speech recognition (Chrome, Edge, Safari).
-// It only fills the text box. The buyer reads it, can edit it, and still has to click Create mandate: voice never
+// It types into the text box as the buyer speaks. The buyer reads it, can edit it, and still has to click Create mandate: voice never
 // signs or pays. Hidden when the browser has no speech recognition.
 import { useEffect, useRef, useState } from 'react';
 import u from '../_ui/ui.module.css';
@@ -42,12 +42,14 @@ function ctor(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-export default function VoiceButton({ onText, disabled }: { onText: (spoken: string) => void; disabled?: boolean }) {
+export default function VoiceButton({ value, onChange, disabled }: { value: string; onChange: (text: string) => void; disabled?: boolean }) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [lang, setLang] = useState('en-US');
   const [note, setNote] = useState<string | null>(null);
   const rec = useRef<Recognition | null>(null);
+  const latest = useRef(value); // what the box holds right now, so words are added after it
+  latest.current = value;
 
   useEffect(() => {
     setSupported(ctor() !== null);
@@ -72,12 +74,14 @@ export default function VoiceButton({ onText, disabled }: { onText: (spoken: str
     setNote(null);
     const r = new R();
     r.lang = lang;
-    r.continuous = false;
-    r.interimResults = false;
+    r.continuous = true; // keep listening until the buyer presses stop
+    r.interimResults = true; // words appear as they are spoken, not after stopping
+    const base = latest.current.trim();
     r.onresult = (e) => {
+      // In one listening session the results list holds everything said so far (finished and still-forming words).
       let spoken = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) spoken += e.results[i][0].transcript;
-      if (spoken.trim()) onText(spoken.trim());
+      for (let i = 0; i < e.results.length; i++) spoken += e.results[i][0].transcript;
+      onChange(`${base} ${spoken.trim()}`.trim().slice(0, 1000));
     };
     r.onerror = (e) => setNote(ERRORS[e.error] ?? 'Voice input stopped. You can type your request instead.');
     r.onend = () => setListening(false);
