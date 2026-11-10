@@ -1,5 +1,6 @@
 import { after } from 'next/server';
 import { autoAnalysePending } from '@/lib/analyst/runCase';
+import { audit } from '@/lib/audit';
 import { apiError } from '@/lib/http';
 import { PayPalConfigError, PayPalError, getPayPalClient, showDispute, verifyWebhookSignature } from '@/lib/paypal';
 import { drizzleDisputeStore } from '@/lib/paypal/deps';
@@ -26,7 +27,11 @@ export async function POST(req: Request) {
       req.headers,
       rawBody,
     );
-    if (!result.ok) return apiError(result.httpStatus, result.error, result.message);
+    if (!result.ok) {
+      // Recorded (no payload, no secrets) so Settings can show that PayPal is calling but being refused.
+      await audit(null, { action: 'webhook.rejected', details: { error: result.error, status: result.httpStatus } });
+      return apiError(result.httpStatus, result.error, result.message);
+    }
     // New or updated disputes are analysed once PayPal has its answer, so it never waits on the AI.
     if (result.handled === 'processed') after(() => autoAnalysePending().then(() => undefined));
     return Response.json({ ok: true, handled: result.handled });

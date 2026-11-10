@@ -80,7 +80,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/products` | A | `ProductInput` | `Product` (201) | 400 invalid, 409 duplicate SKU |
 | PATCH `/api/products/:id` | A | `UpdateProductRequest` | `Product` | 400, 404, 409 duplicate SKU |
 | POST `/api/agent/shop` | A | `AgentShopRequest` | `AgentShopResponse` | 404 mandate, 410 expired, 422 empty catalog / nothing fits, 500 LLM not configured, 502 LLM failed |
-| GET `/api/status` | A | none | connection status (no secrets) | none |
+| GET `/api/status` | A | none | connection status (no secrets), including `last_webhook_at` and `last_webhook_rejected` (when PayPal called the webhook and was refused, and the error code) | none |
 
 ## Rules
 

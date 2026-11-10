@@ -623,8 +623,13 @@ function NextStepCard({
     title = 'Response sent';
     text = `You sent: ${ACTION[detail.action_taken ?? ''] ?? detail.action_taken}. PayPal now says: ${paypalStatusLabel(detail.status).toLowerCase()}.`;
   } else if (!waitingOnStore) {
+    const underReview = detail.status === 'UNDER_REVIEW' || detail.status === 'UNDER_PAYPAL_REVIEW';
     title = paypalStatusLabel(detail.status);
-    text = 'Nothing to do right now. This page updates when PayPal or the buyer responds.';
+    text = underReview
+      ? 'PayPal has taken over this dispute and is deciding it, so PayPal allows no response from the store right now. This happens when the buyer asks PayPal to step in (escalates) or the dispute starts as a claim. If PayPal asks for evidence, the option appears here. The AI has still read the records, and you can download the evidence pack to keep it ready.'
+      : 'Nothing to do right now. This page updates when PayPal or the buyer responds.';
+    // Nothing can be sent, but the AI's view of the case is still worth having.
+    if (!verdict) primary = { label: busy === 'analyse' ? 'Analysing…' : "Get the AI's view", run: onAnalyse };
   } else if (!verdict || stale || detail.analysis_status === 'error') {
     title = 'Your response is needed';
     text = verdict ? "The AI's earlier advice is out of date. Ask it again for what to send." : 'Ask the AI what to send first.';
