@@ -228,31 +228,20 @@ export default function CaseDetailPage() {
         </Notice>
       )}
 
-      {detail.order?.refunded && (
-        <Notice tone={detail.order.refunded.covers_dispute === 'full' ? 'info' : 'warn'}>
-          {formatMoney(detail.order.refunded.value, detail.order.refunded.currency)}
-          {detail.order.refunded.pending ? ' (still pending at PayPal)' : ''} has been refunded on this payment
-          {detail.order.refunded.covers_dispute === 'full' ? ', the full disputed amount' : ', part of the disputed amount'}.
-          {detail.status && detail.status !== 'RESOLVED'
-            ? ` PayPal still shows the dispute as ${paypalStatusLabel(detail.status).toLowerCase()}: a refund made outside the dispute does not close it. Send a message saying so, or ask the buyer to close it.`
-            : ''}
-        </Notice>
-      )}
-      {detail.action_taken === 'NO_ACTION' && !acted && (
-        <Notice tone="warn">
-          This case was reviewed and no response was sent. PayPal still shows it as{' '}
-          {paypalStatusLabel(detail.status).toLowerCase()}, so nothing is settled until the store responds.
-        </Notice>
-      )}
-      {(() => {
-        const due = detail.analysis_status === 'acted' ? null : dueLabel(detail.response_due);
-        if (!due) return null;
-        return (
-          <Notice tone={due.tone === 'bad' ? 'bad' : due.tone === 'warn' ? 'warn' : 'info'}>
-            {due.text}. {detail.response_due?.party === 'seller' ? 'If the store does not respond by then, PayPal usually decides for the buyer.' : ''}
-          </Notice>
-        );
-      })()}
+      <NextStepCard
+        detail={detail}
+        verdict={verdict}
+        acted={acted}
+        busy={busy}
+        form={form}
+        onAnalyse={analyse}
+        onChoose={(p) => {
+          setForm(null);
+          setPending(p);
+        }}
+        onForm={setForm}
+        cur={cur}
+      />
 
       <div className={m.gridMain}>
         {/* AI recommendation and the human approval step */}
@@ -261,7 +250,6 @@ export default function CaseDetailPage() {
             <>
               <div className={m.verdictHead}>
                 <Badge tone={fault.tone}>{fault.label}</Badge>
-                {verdict.needs_human && !acted && <Badge tone="warn">Needs a human decision</Badge>}
               </div>
               <p className={m.headline}>{outcome.headline}</p>
               <p className={u.muted} style={{ margin: 0 }}>
@@ -269,7 +257,11 @@ export default function CaseDetailPage() {
               </p>
 
               <div className={m.recommend}>
-                <div className={m.recommendLabel}>Recommended action</div>
+                <div className={m.recommendLabel}>
+                  {verdict.action === 'NO_ACTION' && !acted && (detail.response_due?.party === 'seller' || detail.status === 'WAITING_FOR_SELLER_RESPONSE')
+                    ? 'Earlier advice (out of date)'
+                    : 'Recommended action'}
+                </div>
                 <div className={m.recommendMain}>
                   {describe(verdict.action, verdict.offer_type)}
                   {verdict.offer_amount ? ` · ${formatMoney(verdict.offer_amount, cur)}` : ''}
@@ -286,78 +278,14 @@ export default function CaseDetailPage() {
                 </p>
               </div>
 
-              {acted ? (
-                <Notice tone="good">
-                  Response sent: {ACTION[detail.action_taken ?? ''] ?? detail.action_taken}
-                  {detail.updated_at ? ` on ${formatDateTime(detail.updated_at)}` : ''}. PayPal now says:{' '}
-                  {paypalStatusLabel(detail.status).toLowerCase()}.
-                </Notice>
-              ) : (
-                <>
-                  <p className={u.muted} style={{ margin: '0 0 0.6rem' }}>
-                    Nothing is sent to PayPal until you review and approve it.
-                  </p>
-                  <div className={u.row}>
-                    <button
-                      className={u.btn}
-                      disabled={busy !== null}
-                      onClick={() => {
-                        setForm(null);
-                        setPending({ action: verdict.action, offerType: verdict.offer_type, amount: verdict.offer_amount, overriding: false });
-                      }}
-                    >
-                      Review and approve
-                    </button>
-                    {verdict.action === 'MAKE_OFFER' && (
-                      <button
-                        className={`${u.btn} ${u.btnSecondary}`}
-                        disabled={busy !== null}
-                        onClick={() => setForm(form === 'edit' ? null : 'edit')}
-                        aria-expanded={form === 'edit'}
-                      >
-                        Edit offer
-                      </button>
-                    )}
-                    <button
-                      className={`${u.btn} ${u.btnDanger}`}
-                      disabled={busy !== null}
-                      onClick={() => setForm(form === 'override' ? null : 'override')}
-                      aria-expanded={form === 'override'}
-                    >
-                      Override
-                    </button>
-                  </div>
-                  {form && (
-                    <DecisionForm
-                      key={form}
-                      mode={form}
-                      verdict={verdict}
-                      max={detail.amount}
-                      onCancel={() => setForm(null)}
-                      onSubmit={(override) =>
-                        setPending({
-                          action: override.action,
-                          offerType: override.offer_type,
-                          amount: override.offer_amount,
-                          overriding: form === 'override',
-                          override,
-                        })
-                      }
-                    />
-                  )}
-                </>
-              )}
             </>
           ) : (
             <>
-              <p className={u.muted} style={{ marginTop: 0 }}>
+              <p className={u.muted} style={{ margin: 0 }}>
                 {detail.analysis_status === 'error'
-                  ? 'The last analysis failed. You can try again.'
+                  ? 'The last analysis failed. Use Get a recommendation above to try again.'
                   : 'The AI has not looked at this dispute yet.'}
               </p>
-              <button className={u.btn} onClick={analyse} disabled={busy !== null}>
-                {busy === 'analyse' ? 'Analysing…' : 'Run AI analysis'}
-              </button>
             </>
           )}
         </Card>
@@ -626,4 +554,147 @@ function DecisionForm({
       </div>
     </form>
   );
+}
+
+/** The one place that says what is happening and what to do next. */
+function NextStepCard({
+  detail,
+  verdict,
+  acted,
+  busy,
+  form,
+  onAnalyse,
+  onChoose,
+  onForm,
+  cur,
+}: {
+  detail: CaseDetail;
+  verdict: Verdict | null;
+  acted: boolean;
+  busy: string | null;
+  form: 'edit' | 'override' | null;
+  onAnalyse: () => void;
+  onChoose: (p: Pending) => void;
+  onForm: (f: 'edit' | 'override' | null) => void;
+  cur: string;
+}) {
+  const resolved = detail.status === 'RESOLVED';
+  const waitingOnStore = detail.response_due?.party === 'seller' || detail.status === 'WAITING_FOR_SELLER_RESPONSE';
+  // Advice to do nothing while PayPal waits on the store is out of date (it predates the evidence-by-message rule).
+  const stale = !!verdict && verdict.action === 'NO_ACTION' && waitingOnStore;
+
+  const facts: string[] = [];
+  const due = acted || resolved ? null : dueLabel(detail.response_due);
+  if (due) facts.push(due.text);
+  const r = detail.order?.refunded;
+  if (r) facts.push(`Already refunded ${formatMoney(r.value, r.currency)}${r.pending ? ' (pending)' : ''}`);
+
+  let title: string;
+  let text: string;
+  let primary: { label: string; run: () => void } | null = null;
+
+  if (resolved) {
+    title = 'Resolved by PayPal';
+    text = detail.outcome ? `${plainOutcome(detail.outcome)}.` : 'PayPal has closed this dispute.';
+  } else if (acted) {
+    title = 'Response sent';
+    text = `You sent: ${ACTION[detail.action_taken ?? ''] ?? detail.action_taken}. PayPal now says: ${paypalStatusLabel(detail.status).toLowerCase()}.`;
+  } else if (!waitingOnStore) {
+    title = paypalStatusLabel(detail.status);
+    text = 'Nothing to do right now. This page updates when PayPal or the buyer responds.';
+  } else if (!verdict || stale || detail.analysis_status === 'error') {
+    title = 'Your response is needed';
+    text = verdict ? "The AI's earlier advice is out of date. Ask it again for what to send." : 'Ask the AI what to send first.';
+    primary = { label: busy === 'analyse' ? 'Analysing…' : 'Get a recommendation', run: onAnalyse };
+  } else {
+    title = 'Your response is needed';
+    text = r && (verdict.action === 'MAKE_OFFER' || verdict.action === 'ACCEPT_CLAIM')
+      ? 'The AI recommends the step below, but this buyer was already refunded: check before sending.'
+      : 'The AI recommends the step below. You will see exactly what is sent before it goes.';
+    primary = {
+      label: plainAction(verdict, cur),
+      run: () => onChoose({ action: verdict.action, offerType: verdict.offer_type, amount: verdict.offer_amount, overriding: false }),
+    };
+  }
+
+  return (
+    <Card id="next" title="Next step">
+      <p style={{ margin: 0, fontWeight: 600 }}>{title}</p>
+      <p className={u.muted} style={{ margin: '0.25rem 0 0' }}>
+        {text}
+      </p>
+      {facts.length > 0 && <p style={{ margin: '0.5rem 0 0', fontSize: '0.9em' }}>{facts.join(' · ')}</p>}
+      {primary && (
+        <div className={u.row} style={{ gap: '0.75rem', marginTop: '0.9rem', flexWrap: 'wrap' }}>
+          <button className={u.btn} onClick={primary.run} disabled={busy !== null}>
+            {primary.label}
+          </button>
+          {verdict && !stale && verdict.action === 'MAKE_OFFER' && (
+            <button className={u.linkButton} onClick={() => onForm(form === 'edit' ? null : 'edit')} aria-expanded={form === 'edit'}>
+              Change the amount
+            </button>
+          )}
+          {verdict && !stale && (
+            <button className={u.linkButton} onClick={() => onForm(form === 'override' ? null : 'override')} aria-expanded={form === 'override'}>
+              Choose something else
+            </button>
+          )}
+          {verdict && !stale && (
+            <button className={u.linkButton} onClick={onAnalyse} disabled={busy !== null}>
+              {busy === 'analyse' ? 'Analysing…' : 'Ask the AI again'}
+            </button>
+          )}
+        </div>
+      )}
+      {primary && verdict && form && (
+        <DecisionForm
+          key={form}
+          mode={form}
+          verdict={verdict}
+          max={detail.amount}
+          onCancel={() => onForm(null)}
+          onSubmit={(override) =>
+            onChoose({
+              action: override.action,
+              offerType: override.offer_type,
+              amount: override.offer_amount,
+              overriding: form === 'override',
+              override,
+            })
+          }
+        />
+      )}
+    </Card>
+  );
+}
+
+/** The recommended action as a button label. */
+function plainAction(v: Verdict, cur: string): string {
+  switch (v.action) {
+    case 'SEND_MESSAGE':
+      return v.fault === 'buyer_regret' ? 'Send the evidence to the buyer' : 'Send a message to the buyer';
+    case 'PROVIDE_EVIDENCE':
+      return 'Send the evidence to PayPal';
+    case 'MAKE_OFFER':
+      return v.offer_amount ? `Offer a ${formatMoney(v.offer_amount, cur)} refund` : 'Make an offer';
+    case 'ACCEPT_CLAIM':
+      return 'Accept the claim (refund the buyer)';
+    default:
+      return 'Record that no response is sent';
+  }
+}
+
+/** "RESOLVED_BUYER_FAVOUR (refunded 14.00 USD)" -> "PayPal decided for the buyer (refunded 14.00 USD)". */
+function plainOutcome(outcome: string): string {
+  const [code, ...rest] = outcome.split(' ');
+  const words: Record<string, string> = {
+    RESOLVED_BUYER_FAVOUR: 'PayPal decided for the buyer',
+    RESOLVED_SELLER_FAVOUR: 'PayPal decided for the store',
+    RESOLVED_WITH_PAYOUT: 'PayPal paid the buyer itself',
+    CANCELED_BY_BUYER: 'The buyer closed the dispute',
+    ACCEPTED: 'The claim was accepted',
+    DENIED: 'The claim was denied',
+  };
+  const lead = words[code] ?? code.replace(/_/g, ' ').toLowerCase();
+  return rest.length ? `${lead} ${rest.join(' ')}` : lead;
 }
