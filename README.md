@@ -16,7 +16,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Check: open http://localhost:3000/api/health, expect `{"ok":true,"service":"mandatepay"}`, and /merchant/settings
+Check: open http://localhost:3000/api/health, expect `{"ok":true,"service":"mandatepay","database":"up"}` (503 when the database is unreachable), and /merchant/settings
 shows what is connected.
 
 Nothing in the app is canned. To use it:
@@ -28,6 +28,22 @@ Nothing in the app is canned. To use it:
 4. **Pay** with the PayPal sandbox button (needs `NEXT_PUBLIC_PAYPAL_CLIENT_ID`).
 5. **Disputes** are real: open one as the sandbox buyer in PayPal's Resolution Center, then **Poll disputes**. Run the
    AI analysis, approve an action, download the PDF evidence pack.
+
+## What it does
+
+- **Mandates:** the buyer's request becomes limits (budget, items, deadline) signed with the buyer's own key (Ed25519, encrypted at rest). A cart guard checks every cart against it before anything is paid.
+- **Shopping:** an AI agent shops the real catalog within the mandate. Voice input fills the request box (browser speech recognition); the buyer still checks and signs.
+- **Payments:** PayPal sandbox checkout, a receipt hash tying cart, mandate and payment together, and a check that the payer is the buyer's linked PayPal account.
+- **Disputes:** webhooks and polling bring PayPal disputes in; the AI analyst recommends an action, code rules override anything unsafe, and a person approves. Evidence goes to PayPal as a PDF pack or as a message to the buyer.
+- **Before a dispute:** buyers report a problem on an order; clear agent mistakes are flagged for a refund. Refunds are refund-aware: never twice, including refunds made in the PayPal dashboard.
+- **Running the store:** roles (buyer, staff, owner, admin), settings, team, audit log, CSV exports, and a Results page.
+
+## Deploying
+
+Hosted on Vercel with Neon Postgres: **docs/DEPLOY.md** has the steps. Every environment variable is explained in
+`.env.example`; the ones Vercel needs are `DATABASE_URL`, the PayPal keys, `BETTER_AUTH_SECRET`,
+`MANDATE_BUYER_PRIVATE_KEY`, `MANDATE_AGENT_PRIVATE_KEY`, `MANDATE_KEY_ENCRYPTION_KEY`, `LLM_PROVIDER` and `LLM_API_KEY`.
+The app only talks to PayPal's sandbox host. Migrations run on every deploy (`vercel-build`). Point an uptime monitor at `/api/health`.
 
 ## Analyst accuracy
 

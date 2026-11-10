@@ -18,6 +18,7 @@ import { Badge, Card, Notice, PageHeader, ResultMark } from '../_ui/Ui';
 import { CHECK_RESULT, formatDay, formatMoney, ruleLabel, titleCase } from '../_ui/labels';
 import u from '../_ui/ui.module.css';
 import Checkout from './Checkout';
+import VoiceButton from './VoiceButton';
 import s from './buyer.module.css';
 
 type Draft = z.infer<typeof DraftMandateResponse>;
@@ -191,8 +192,16 @@ export default function BuyerPage() {
           <button className={u.btn} onClick={onDraft} disabled={busy !== null || text.trim() === ''}>
             {busy === 'draft' ? 'Working…' : draft ? 'Update mandate' : 'Create mandate'}
           </button>
+          <VoiceButton
+            disabled={busy !== null}
+            onText={(spoken) => setText((t) => `${t.trim()} ${spoken}`.trim().slice(0, 1000))}
+          />
           <span className={`${u.muted} ${s.count}`}>{text.length}/1000</span>
         </div>
+        <p className={u.muted} style={{ margin: '0.5rem 0 0', fontSize: '0.85em' }}>
+          Speaking only fills the box above. Your browser may send the audio to its speech service (Google or Apple) to turn it into text.
+          Nothing is signed or paid until you click Create mandate.
+        </p>
       </Card>
 
       {/* 2. Mandate */}
