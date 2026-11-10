@@ -11,7 +11,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 
 | Route | Permission (roles) |
 |---|---|
-| `/api/auth/*` | public: Better Auth sign-up (always a buyer), sign-in, sign-out, get-session |
+| `/api/auth/*` | public: Better Auth sign-up (always a buyer), sign-in (email, or PayPal at `/sign-in/social` with `provider: "paypal"`), sign-out, get-session. Signed in: `/link-social` and `/unlink-account` connect or disconnect PayPal; PayPal is never linked to an existing account by matching email |
 | POST `/api/mandates/draft`, POST `/api/mandates` | `shop` (everyone). The mandate is signed for the signed-in user; `buyer_ref` is their user id |
 | POST `/api/agent/shop`, POST `/api/carts/check`, POST `/api/orders` | `shop`, and the mandate must be the user's own (else 404) |
 | POST `/api/orders/:id/capture` | `shop`, and the order must be the user's own (else 404) |
@@ -58,7 +58,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/me/export` | A | none | JSON download of the person's account, mandates, carts and orders | none |
 | POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal |
 | GET `/api/cases` | A | none | `CaseRecord[]` | none |
-| GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order | 404 |
+| GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order. `order.payment_source` is `paypal` or `card`; `order.payer_check` is `match`, `different`, `not_linked` or `unknown` (did the buyer's linked PayPal account pay) | 404 |
 | POST `/api/cases/:id/analyse` | B | none | `Verdict` (saved on case) | 404, 502 LLM failed |
 | GET `/api/cases/:id/evidence-pack` | A | none | `application/pdf` | 404 |
 | POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal. PROVIDE_EVIDENCE also uploads the evidence pack PDF (multipart, `file1`). |

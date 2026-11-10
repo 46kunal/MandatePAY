@@ -361,6 +361,23 @@ export default function CaseDetailPage() {
             ? `Payment was captured on ${formatDateTime(detail.order.captured_at)}.`
             : 'No payment capture is recorded for this order.'}
         </p>
+        {detail.order && (
+          <p style={{ margin: '0.4rem 0 0' }}>
+            {detail.order.payment_source === 'paypal'
+              ? 'Paid with a PayPal account. '
+              : detail.order.payment_source === 'card'
+                ? 'Paid by card through PayPal guest checkout. '
+                : ''}
+            {
+              {
+                match: 'It is the PayPal account the buyer linked to MandatePay, so the buyer who signed the mandate paid.',
+                different: 'It is not the PayPal account the buyer linked to MandatePay. Check who paid before accepting the claim.',
+                not_linked: 'The buyer has not linked a PayPal account, so the payer cannot be matched to them.',
+                unknown: 'The payer was not recorded for this order.',
+              }[detail.order.payer_check]
+            }
+          </p>
+        )}
         <p className={u.muted} style={{ margin: '0.4rem 0 0' }}>
           No shipping or tracking information is available. PayPal&apos;s dispute data does not include it yet, so the AI
           could not check delivery.

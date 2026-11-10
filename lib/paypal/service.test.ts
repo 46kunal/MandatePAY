@@ -39,7 +39,7 @@ function memoryStore() {
     markCaptured: async (id, f) => {
       const o = orders.get(id);
       if (!o || o.captureId) return false;
-      orders.set(id, { ...o, status: f.status, captureId: f.captureId, receiptHash: f.receiptHash });
+      orders.set(id, { ...o, status: f.status, captureId: f.captureId, receiptHash: f.receiptHash, payerId: f.payerId, paymentSource: f.paymentSource } as OrderRow);
       return true;
     },
   };
@@ -70,7 +70,7 @@ async function setup(constraints: Constraints, opts: { exp?: number } = {}) {
     },
     captureOrder: async (id): Promise<CapturedOrder> => {
       paypal.captured.push(id);
-      return { paypalOrderId: id, captureId: `CAP-${id}`, status: 'COMPLETED', captureStatus: 'COMPLETED' };
+      return { paypalOrderId: id, captureId: `CAP-${id}`, status: 'COMPLETED', captureStatus: 'COMPLETED', payerId: 'PAYER-1', paymentSource: 'paypal' };
     },
     newCartId: () => `cart_${ledger.carts.size + 1}`,
   };
@@ -212,6 +212,16 @@ describe('placeOrder', () => {
 });
 
 describe('captureStoredOrder', () => {
+  it('stores who paid and how, from the capture', async () => {
+    const t = await setup(constraints);
+    const placed = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });
+    assert.ok(placed.ok && placed.status === 'created');
+    await captureStoredOrder(t.deps, placed.paypalOrderId);
+    const o = t.orders.get(placed.paypalOrderId) as OrderRow & { payerId?: string; paymentSource?: string };
+    assert.equal(o.payerId, 'PAYER-1');
+    assert.equal(o.paymentSource, 'paypal');
+  });
+
   async function placed() {
     const t = await setup(constraints);
     const r = await placeOrder(t.deps, { mandateId: t.mandateId, cart: goodCart, buyerApproved: false });

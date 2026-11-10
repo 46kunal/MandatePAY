@@ -25,6 +25,18 @@ export interface CapturedOrder {
   status: string;
   /** Capture status, e.g. COMPLETED or PENDING. */
   captureStatus: string;
+  /** The PayPal payer who paid, when PayPal says (guest card payers get one too). */
+  payerId?: string | null;
+  /** 'paypal' for a PayPal account, 'card' for guest card checkout, or another PayPal payment source name. */
+  paymentSource?: string | null;
+}
+
+/** Pure: the payer id and payment source from an order or capture response. */
+export function payerFromOrder(data: unknown): { payerId: string | null; paymentSource: string | null } {
+  const o = (data && typeof data === 'object' ? data : {}) as { payer?: { payer_id?: unknown }; payment_source?: Record<string, unknown> };
+  const payerId = typeof o.payer?.payer_id === 'string' && o.payer.payer_id ? o.payer.payer_id : null;
+  const paymentSource = o.payment_source && typeof o.payment_source === 'object' ? (Object.keys(o.payment_source)[0] ?? null) : null;
+  return { payerId, paymentSource };
 }
 
 /** "12.34" -> 1234. Amounts are strings with exactly two decimals (see contracts). */
@@ -103,6 +115,8 @@ export async function captureOrder(client: PayPalClient, paypalOrderId: string):
     id?: string;
     status?: string;
     purchase_units?: { payments?: { captures?: { id: string; status?: string }[] } }[];
+    payer?: { payer_id?: string };
+    payment_source?: Record<string, unknown>;
   }>(`/v2/checkout/orders/${encodeURIComponent(paypalOrderId)}/capture`, {
     method: 'POST',
     body: {},
@@ -112,11 +126,18 @@ export async function captureOrder(client: PayPalClient, paypalOrderId: string):
   if (!capture?.id) {
     throw new PayPalError('PayPal capture response had no capture id', { status: 502, details: data });
   }
+  let payer = payerFromOrder(data);
+  if (!payer.payerId) {
+    // A minimal capture response can leave out the payer; the order itself always has it. Best effort only.
+    payer = await getOrder(client, paypalOrderId).then(payerFromOrder, () => payer);
+  }
   return {
     paypalOrderId: data.id ?? paypalOrderId,
     captureId: capture.id,
     status: data.status ?? 'UNKNOWN',
     captureStatus: capture.status ?? 'UNKNOWN',
+    payerId: payer.payerId,
+    paymentSource: payer.paymentSource,
   };
 }
 

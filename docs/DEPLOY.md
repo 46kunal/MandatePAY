@@ -74,6 +74,20 @@ DATABASE_URL="<neon production url>" npm run auth:create-user -- --email you@exa
 The password goes to `.keys/new-user-<email>.txt` (or set `NEW_USER_PASSWORD` first). Sign in at
 `/merchant/login`, then delete the file. The same command with an existing email only changes the role.
 
+## 3c. Log in with PayPal (optional)
+
+Buyers can sign in with PayPal, or connect PayPal to an existing account from Account. The payer id PayPal returns is
+saved, so a payment (and any dispute on it) can be matched to the buyer who signed the mandate.
+
+1. PayPal developer dashboard, Sandbox, Apps & Credentials, open the MandatePay app.
+2. Under the app's features, switch on **Log in with PayPal** and open its advanced settings:
+   - Return URLs: `https://<your-vercel-domain>/api/auth/callback/paypal` and, for local work,
+     `http://localhost:3000/api/auth/callback/paypal` (if PayPal refuses localhost, test on the Vercel URL).
+   - Information requested: **email address** and **PayPal account information** (account verification and payer
+     id). Add the privacy policy and user agreement links PayPal asks for.
+3. Set `NEXT_PUBLIC_PAYPAL_LOGIN_ENABLED=1` in `.env` and in Vercel (Production and Preview), then redeploy. It is
+   read when the app is built, so it needs a redeploy, not only a restart.
+
 ## 4. Webhook for the hosted URL
 
 Register the deployment's webhook once per environment and put the printed id in `PAYPAL_WEBHOOK_ID`, then

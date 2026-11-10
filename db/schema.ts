@@ -18,6 +18,11 @@ export const users = pgTable('users', {
   image: text('image'),
   role: text('role').notNull().default('buyer'),
   disabledAt: ts('disabled_at'), // set by an admin: the person cannot sign in and existing sessions stop working
+  // The PayPal account linked with "Log in with PayPal" / "Connect PayPal". payer_id is the id PayPal puts on
+  // the orders this account pays, so a payment can be matched to the signed-in buyer.
+  paypalPayerId: text('paypal_payer_id').unique(),
+  paypalVerified: boolean('paypal_verified'),
+  paypalLinkedAt: ts('paypal_linked_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
@@ -142,6 +147,8 @@ export const orders = pgTable('orders', {
   approveUrl: text('approve_url'),
   captureId: text('capture_id').unique(),
   receiptHash: text('receipt_hash'), // sha256 over mandate + cart + order + capture ids
+  payerId: text('payer_id'), // the PayPal payer who paid (from the capture), compared with the buyer's linked account
+  paymentSource: text('payment_source'), // 'paypal' (a PayPal account) or 'card' (guest card checkout)
   createdAt: ts('created_at').notNull().defaultNow(),
   capturedAt: ts('captured_at'),
 });

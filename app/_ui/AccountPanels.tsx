@@ -178,3 +178,92 @@ export function SessionsCard() {
     </Card>
   );
 }
+
+/** The PayPal account linked to this MandatePay account: connect, check, disconnect. */
+export function PayPalCard() {
+  const { data, refetch } = useSession();
+  const [linked, setLinked] = useState<boolean | null>(null);
+  const [paypalAccountId, setPaypalAccountId] = useState<string | null>(null);
+  const [onlySignIn, setOnlySignIn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+  const enabled = process.env.NEXT_PUBLIC_PAYPAL_LOGIN_ENABLED === '1';
+
+  const load = useCallback(async () => {
+    const r = await authClient.listAccounts();
+    if (r.error) return setMsg({ ok: false, text: r.error.message ?? 'Could not read your sign-in methods.' });
+    const accounts = (r.data ?? []) as { providerId: string; accountId: string }[];
+    const providers = accounts.map((a) => a.providerId);
+    setPaypalAccountId(accounts.find((a) => a.providerId === 'paypal')?.accountId ?? null);
+    setLinked(providers.includes('paypal'));
+    setOnlySignIn(providers.length === 1 && providers[0] === 'paypal');
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function connect() {
+    setBusy(true);
+    setMsg(null);
+    const r = await authClient.linkSocial({ provider: 'paypal', callbackURL: window.location.pathname });
+    if (r?.error) {
+      setMsg({ ok: false, text: r.error.message ?? 'Could not start connecting PayPal.' });
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    if (!paypalAccountId) return;
+    setBusy(true);
+    setMsg(null);
+    const r = await authClient.unlinkAccount({ accountId: paypalAccountId });
+    setBusy(false);
+    if (r.error) return setMsg({ ok: false, text: r.error.message ?? 'Could not disconnect PayPal.' });
+    setMsg({ ok: true, text: 'PayPal disconnected' });
+    refetch();
+    void load();
+  }
+
+  const user = data?.user as { paypalPayerId?: string | null; paypalVerified?: boolean | null } | undefined;
+  return (
+    <Card
+      id="paypal"
+      title="PayPal account"
+      subtitle="Connecting PayPal lets the store match your payments to you, which strengthens your side if a payment is ever disputed."
+    >
+      {linked === null && !msg && <Skeleton height={40} label="Checking PayPal" />}
+      {linked === true && (
+        <div style={{ display: 'grid', gap: '0.6rem' }}>
+          <p style={{ margin: 0 }}>
+            Connected.{' '}
+            {user?.paypalPayerId
+              ? user.paypalVerified
+                ? 'PayPal says this account is verified.'
+                : 'PayPal says this account is not verified yet.'
+              : 'PayPal did not share the account details; reconnect to try again.'}
+          </p>
+          <div>
+            {onlySignIn ? (
+              <span className={u.muted}>You sign in with PayPal only, so it cannot be disconnected.</span>
+            ) : (
+              <button className={`${u.btn} ${u.btnSecondary}`} type="button" onClick={disconnect} disabled={busy}>
+                Disconnect PayPal
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {linked === false &&
+        (enabled ? (
+          <button className={u.btn} type="button" onClick={connect} disabled={busy}>
+            {busy ? 'Opening PayPal…' : 'Connect PayPal'}
+          </button>
+        ) : (
+          <p className={u.muted} style={{ margin: 0 }}>
+            Connecting PayPal is not switched on for this store yet.
+          </p>
+        ))}
+      <Message msg={msg} />
+    </Card>
+  );
+}
