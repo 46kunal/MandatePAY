@@ -336,6 +336,17 @@ export const MyMandate = z.object({
 export type MyMandate = z.infer<typeof MyMandate>;
 export const ListMyMandatesResponse = z.object({ mandates: z.array(MyMandate) });
 
+/** An agent key as the buyer sees it (never the key itself, which is shown once when it is made). */
+export const ApiKeyView = z.object({
+  id: z.string(),
+  name: z.string(),
+  prefix: z.string(),
+  created_at: z.string(),
+  last_used_at: z.string().nullable(),
+  revoked_at: z.string().nullable(),
+});
+export type ApiKeyView = z.infer<typeof ApiKeyView>;
+
 // ---------- store settings ----------
 
 /** Settings the store owner edits in the app. Secrets are not settings: they stay in environment variables. */

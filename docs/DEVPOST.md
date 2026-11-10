@@ -16,6 +16,7 @@ guess. Honest people lose either way. We wanted the buyer's intent to be a recor
 - A shopping agent picks real products inside those limits, or the buyer browses and adds items. A **cart guard** checks every cart against the mandate before PayPal is called; unsure matches are settled by AI, hard limits by plain code.
 - The buyer pays with **PayPal or a card** (PayPal Card Fields, with 3-D Secure when needed). A receipt hash ties the mandate, cart and payment together.
 - If something goes wrong, the buyer can **report a problem** and the store can refund directly. If it becomes a **PayPal dispute**, it arrives by webhook, and an **AI analyst** reads the signed mandate, the cart and the payment (including whether the buyer's own PayPal account paid) and recommends a response with the evidence it relied on.
+- **An MCP server** lets any outside AI agent shop for a buyer inside the mandates they signed: it can list products, test baskets against the guard and create the PayPal order, but it can never sign a mandate or pay. The buyer approves in PayPal.
 - Code rules override anything unsafe (an action PayPal does not allow, a second refund, a different payer, prompt injection in the buyer's text). **A person approves** everything before it goes to PayPal: a message with the evidence PDF, an offer, a refund, or accepting the claim.
 
 ## How we built it
@@ -41,8 +42,7 @@ In agentic commerce the hard part is not letting the agent buy, it is being able
 A signed, checkable record makes that cheap.
 
 ## What's next
-Email and push notifications for dispute deadlines, a second analyst pass for the unclear cases, an MCP server so any AI
-agent can shop under a MandatePay mandate, and the move from sandbox to PayPal live.
+Email and push notifications for dispute deadlines, a second analyst pass for the unclear cases, OAuth for remote MCP connectors, and the move from sandbox to PayPal live.
 
 ## Built with
 Next.js, TypeScript, PostgreSQL, Drizzle, PayPal Orders and Disputes APIs, PayPal Card Fields, Log in with PayPal, Gemini, Claude, Grok, Vercel, Neon

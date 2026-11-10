@@ -100,6 +100,27 @@ export const buyerKeys = pgTable('buyer_keys', {
   createdAt: ts('created_at').notNull().defaultNow(),
 });
 
+/**
+ * Agent keys: a buyer creates one so an outside AI agent (over MCP) can act for them, inside the mandates the buyer
+ * already signed. Only a SHA-256 hash is stored; the key itself is shown once, when it is created.
+ */
+export const apiKeys = pgTable(
+  'api_keys',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    name: text('name').notNull(),
+    prefix: text('prefix').notNull(), // the first characters, so the buyer can tell keys apart
+    keyHash: text('key_hash').notNull().unique(),
+    createdAt: ts('created_at').notNull().defaultNow(),
+    lastUsedAt: ts('last_used_at'),
+    revokedAt: ts('revoked_at'),
+  },
+  (t) => [index('api_keys_user_idx').on(t.userId)],
+);
+
 /** One row per confirmed open (checkout) mandate. */
 export const mandates = pgTable('mandates', {
   mandateId: text('mandate_id').primaryKey(), // "mnd_<hex>", also stored in PayPal custom_id

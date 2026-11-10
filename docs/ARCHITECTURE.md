@@ -46,6 +46,8 @@ flowchart LR
 | **Cart guard (fuzzy matching)** | Settles checks the rules cannot, such as whether a product fits the requested category. | Hard limits (budget, deadline, quantity) are plain code. The model only decides the "unsure" ones. |
 | **Dispute analyst** | Reads the dispute, the signed mandate, the cart and the payment facts, then proposes a verdict: who is at fault, what to do, an offer amount, a confidence, and evidence points that cite fields in the records. | `enforce()` overrides anything unsafe: an action PayPal does not allow, an offer above the disputed amount, a second refund, a different payer, injection-looking text, high value, low confidence. Those cases go to a person. Buyer text is treated as untrusted data. |
 
+| **MCP server for outside agents** | Not a model call: it lets any AI agent use the product. The agent lists mandates and products, tests baskets against the guard, and creates the PayPal order. | The agent cannot sign a mandate, set a price, get around a limit, or pay; the buyer approves in PayPal. See [MCP.md](MCP.md). |
+
 One interface (`lib/ai`) fronts Gemini (the default), Claude and Grok, with a timeout and a fallback model.
 
 **Measured, not assumed.** `npm run eval` scores the analyst on 28 hand-labelled disputes (not received, not as described,
@@ -66,7 +68,7 @@ fault 82%, action 86%, needs-a-person 89%, all checks 79%.
 ## Stack
 
 Next.js 16 (App Router), React 19, TypeScript, Postgres (Neon) with Drizzle, Better Auth, Zod contracts for every API,
-`pdfkit` for the evidence PDF, deployed on Vercel. 37 API routes, 13 migrations, 324 automated tests, CI on every push.
+`pdfkit` for the evidence PDF, deployed on Vercel. 40 API routes, 14 migrations, 339 automated tests, CI on every push.
 
 ## What is not done, plainly
 

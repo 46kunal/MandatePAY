@@ -470,6 +470,7 @@ export default function Landing() {
                     <li>Settles the cart checks that rules cannot</li>
                     <li>Reads a dispute against the record, scored on 28 labelled cases</li>
                     <li>Is overridden by code rules when an answer would be unsafe</li>
+                    <li>Lets your own AI agent shop inside your limits, but never pay for you</li>
                   </ul>
                 </div>
               </Reveal>
