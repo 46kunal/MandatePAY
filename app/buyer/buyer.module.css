@@ -421,3 +421,188 @@
     transition: none;
   }
 }
+
+/* ---------- Thinking text: shown while the AI works ---------- */
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--text-2);
+  font-size: 0.9375rem;
+}
+.thinkLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* A loading bar: it moves while the work is running, which is live status, so it may loop. */
+.thinkBar {
+  position: relative;
+  width: 56px;
+  height: 4px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.thinkBar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: sweep 1.1s var(--ease) infinite;
+}
+.thinkWord {
+  animation: enterUp 300ms var(--ease) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinkBar::after {
+    animation: none;
+    width: 100%;
+  }
+  .thinkWord {
+    animation: none;
+  }
+}
+
+/* ---------- Listening screen ---------- */
+@keyframes ripple {
+  from {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+.voiceOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px 40px;
+  background: var(--ink);
+  color: #f5f1e9;
+  animation: fade var(--t-menu) var(--ease) both;
+}
+.voiceClose {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #c4c8cf;
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.voiceClose:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.voiceClose:focus-visible,
+.voiceMic:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: 3px;
+}
+.voiceTitle {
+  align-self: flex-start;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+.voiceText,
+.voiceHint {
+  margin: 48px 0 0;
+  max-width: 44rem;
+  text-align: center;
+  font-family: var(--font-serif);
+  line-height: 1.3;
+}
+.voiceText {
+  font-size: clamp(1.5rem, 3.2vw, 2.5rem);
+  color: #fff;
+}
+.voiceHint {
+  font-size: 1.25rem;
+  color: #8993a3;
+}
+.voiceStage {
+  position: relative;
+  margin-top: auto;
+  width: 72px;
+  height: 72px;
+}
+/* The ring follows the loudness of the room (set from the microphone), so the screen feels like it is listening. */
+.voiceRing {
+  --level: 0;
+  position: absolute;
+  inset: -16px;
+  border-radius: 50%;
+  background: rgba(228, 90, 70, 0.28);
+  transform: scale(calc(0.8 + var(--level) * 0.9));
+  transition: transform 90ms linear;
+}
+.voiceRipple {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(228, 90, 70, 0.6);
+  animation: ripple 1.8s var(--ease) infinite;
+}
+.voiceMic {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #d83a2e;
+  color: #fff;
+  cursor: pointer;
+  transition: transform var(--t-fast) var(--ease);
+}
+.voiceMic:active {
+  transform: scale(0.97);
+}
+.voiceFoot {
+  margin: 32px 0 0;
+  font-size: 0.875rem;
+  color: #8993a3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voiceOverlay,
+  .voiceRipple {
+    animation: none;
+  }
+  .voiceRing {
+    transition: none;
+  }
+}

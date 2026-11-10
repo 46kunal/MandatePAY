@@ -18,6 +18,7 @@ import { Badge, Card, Notice, PageHeader, ResultMark } from '../../_ui/Ui';
 import { CHECK_RESULT, formatDay, formatMoney, ruleLabel, titleCase } from '../../_ui/labels';
 import u from '../../_ui/ui.module.css';
 import Checkout from '../Checkout';
+import Thinking from '../Thinking';
 import VoiceButton from '../VoiceButton';
 import s from '../buyer.module.css';
 
@@ -205,11 +206,12 @@ export default function BuyerPage() {
         />
         <div className={u.row} style={{ marginTop: '0.75rem' }}>
           <button className={u.btn} onClick={onDraft} disabled={busy !== null || text.trim() === ''}>
-            {busy === 'draft' ? 'Working…' : draft ? 'Update mandate' : 'Create mandate'}
+            {busy === 'draft' ? 'Creating…' : draft ? 'Update mandate' : 'Create mandate'}
           </button>
           <VoiceButton disabled={busy !== null} value={text} onChange={setText} />
           <span className={`${u.muted} ${s.count}`}>{text.length}/1000</span>
         </div>
+        {busy === 'draft' && <Thinking kind="draft" />}
         <p className={u.muted} style={{ margin: '8px 0 0' }}>
           Your browser may send speech to its speech service. Nothing is signed or paid until you create the mandate.
         </p>
@@ -256,6 +258,7 @@ export default function BuyerPage() {
                 >
                   {busy === 'confirm' ? 'Signing…' : 'Confirm and sign mandate'}
                 </button>
+                {busy === 'confirm' && <Thinking kind="confirm" />}
               </>
             )}
           </div>
@@ -275,6 +278,7 @@ export default function BuyerPage() {
             </button>
             {shopped && <span className={u.muted}>Chose from {shopped.considered} available products.</span>}
           </div>
+          {busy === 'shop' && <Thinking kind="shop" />}
           {shopped && <p className={s.quote}>Agent: &ldquo;{shopped.summary}&rdquo;</p>}
 
           <h3 style={{ margin: '1.25rem 0 0.25rem', fontSize: '1rem' }}>Browse {seller}</h3>
@@ -392,7 +396,7 @@ export default function BuyerPage() {
             );
           })}
 
-          {busy === 'check' && !guard && <p className={u.muted}>Checking this cart against your mandate…</p>}
+          {busy === 'check' && !guard && <Thinking kind="check" />}
           {guard && <GuardView guard={guard} />}
           {guard && (
             <Checkout
