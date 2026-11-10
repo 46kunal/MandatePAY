@@ -12,7 +12,14 @@ import { Card, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
 import u from '../../_ui/ui.module.css';
 import { ConnectionsCard, DataCard, TeamCard } from './sections';
 
-type Draft = { store_name: string; support_email: string; approval_threshold: string; human_review_over: string; min_confidence: string };
+type Draft = {
+  store_name: string;
+  support_email: string;
+  approval_threshold: string;
+  human_review_over: string;
+  min_confidence: string;
+  auto_analyse: boolean;
+};
 
 const toDraft = (s: StoreSettings): Draft => ({
   store_name: s.store_name ?? '',
@@ -20,6 +27,7 @@ const toDraft = (s: StoreSettings): Draft => ({
   approval_threshold: s.approval_threshold,
   human_review_over: s.human_review_over,
   min_confidence: String(Math.round(s.min_confidence * 100)),
+  auto_analyse: s.auto_analyse,
 });
 
 /** Turn what was typed into a PATCH body, or a message saying what to fix. */
@@ -38,6 +46,7 @@ function toPatch(d: Draft): { ok: true; body: Record<string, unknown> } | { ok: 
       approval_threshold: Number(d.approval_threshold).toFixed(2),
       human_review_over: Number(d.human_review_over).toFixed(2),
       min_confidence: Math.round(pct) / 100,
+      auto_analyse: d.auto_analyse,
     },
   };
 }
@@ -78,7 +87,7 @@ function StoreSettingsCard() {
     }
   }
 
-  const field = (key: keyof Draft, label: string, hint: string, type = 'text', placeholder?: string) => (
+  const field = (key: Exclude<keyof Draft, 'auto_analyse'>, label: string, hint: string, type = 'text', placeholder?: string) => (
     <div className={u.field}>
       <label htmlFor={`s-${key}`}>{label}</label>
       <input
@@ -107,6 +116,22 @@ function StoreSettingsCard() {
             {field('human_review_over', 'Human review over (USD)', 'Disputes at or above this always need a person.')}
             {field('min_confidence', 'Minimum AI confidence (%)', 'AI verdicts below this need a person.')}
           </div>
+          <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+            <input
+              id="s-auto_analyse"
+              type="checkbox"
+              checked={draft.auto_analyse}
+              disabled={busy || !canEdit}
+              onChange={(e) => setDraft((d) => (d ? { ...d, auto_analyse: e.target.checked } : d))}
+            />
+            <span>
+              Analyse new disputes automatically
+              <span className={u.muted} style={{ display: 'block', fontSize: '0.85em' }}>
+                As soon as a dispute arrives and PayPal lets the store respond, the AI analyses it (at most 3 at a time).
+                Nothing is sent to PayPal until a person approves.
+              </span>
+            </span>
+          </label>
           <div className={u.row} style={{ gap: '0.75rem' }}>
             {canEdit ? (
               <button className={u.btn} type="submit" disabled={busy}>

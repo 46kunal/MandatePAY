@@ -19,6 +19,7 @@ import {
   formatDateTime,
   formatMoney,
   reasonLabel,
+  dueLabel,
 } from '../../../_ui/labels';
 import { parseCase } from '../../../_ui/parse';
 import { errMsg } from '../../../_ui/useCases';
@@ -219,6 +220,16 @@ export default function CaseDetailPage() {
           {notice.text}
         </Notice>
       )}
+
+      {(() => {
+        const due = detail.analysis_status === 'acted' ? null : dueLabel(detail.response_due);
+        if (!due) return null;
+        return (
+          <Notice tone={due.tone === 'bad' ? 'bad' : due.tone === 'warn' ? 'warn' : 'info'}>
+            {due.text}. {detail.response_due?.party === 'seller' ? 'If the store does not respond by then, PayPal usually decides for the buyer.' : ''}
+          </Notice>
+        );
+      })()}
 
       <div className={m.gridMain}>
         {/* AI recommendation and the human approval step */}

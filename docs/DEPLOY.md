@@ -56,6 +56,7 @@ This writes `.keys/hosting.env` (gitignored) and prints only the key ids. Copy i
    | `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL` | As in your `.env` |
    | `PAYPAL_WEBHOOK_ID` | From step 4 |
    | `BETTER_AUTH_SECRET` | A new random value per environment (see `.env.example`); never reuse the local one |
+   | `MANDATE_KEY_ENCRYPTION_KEY` | 32 random bytes, base64 (command in `.env.example`). Encrypts each buyer's signing key. Never change it once buyers exist, or their stored keys can no longer sign |
 
    Store name and the approval and review limits are set in the app (Settings > Store and rules), not here.
 3. Deploy.

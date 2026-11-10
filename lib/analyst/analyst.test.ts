@@ -46,6 +46,29 @@ const proposal = (over: Partial<Verdict> = {}): Verdict => ({
 });
 
 describe('guardrails (enforce)', () => {
+  it('a payment by a different PayPal payer than the buyer linked always needs a person', () => {
+    const i = { ...input({ amount: { value: '50.00', currency: 'USD' } }), payment: { source: 'paypal', payer_check: 'different' as const, mandate_signed_with: 'buyer_key' as const } };
+    const out = enforce(proposal({ fault: 'buyer_regret', action: 'MAKE_OFFER', confidence: 0.95 }), i);
+    assert.equal(out.needs_human, true);
+    assert.match(out.reasoning, /different PayPal payer/);
+  });
+
+  it('a matching payer adds no flag, and payment facts can be cited as evidence', () => {
+    const i = { ...input({ amount: { value: '50.00', currency: 'USD' } }), payment: { source: 'paypal', payer_check: 'match' as const, mandate_signed_with: 'buyer_key' as const } };
+    const out = enforce(
+      proposal({
+        confidence: 0.95,
+        evidence_points: [
+          { claim: 'The buyer’s own PayPal account paid.', source: 'payment.payer_check' },
+          { claim: 'The buyer signed the mandate with their own key.', source: 'payment.mandate_signed_with' },
+        ],
+      }),
+      i,
+    );
+    assert.equal(out.evidence_points.length, 2);
+    assert.doesNotMatch(out.reasoning, /different PayPal payer/);
+  });
+
   it('leaves a sound, low-value proposal alone', () => {
     const out = enforce(proposal(), input({ amount: { value: '50.00', currency: 'USD' } }));
     assert.equal(out.action, 'MAKE_OFFER');

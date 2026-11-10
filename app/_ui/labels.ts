@@ -140,3 +140,19 @@ export function formatDay(iso: string): string {
 export function formatDateTime(iso?: string | null): string {
   return iso ? new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 }
+
+/** "Respond by 29 Nov (in 19 days)" / "Waiting for the buyer until 29 Nov" / overdue, from CaseRecord.response_due. */
+export function dueLabel(
+  due: { party: 'seller' | 'buyer'; at: string } | null | undefined,
+  now = Date.now(),
+): { text: string; tone: 'bad' | 'warn' | 'neutral' } | null {
+  if (!due) return null;
+  const ms = Date.parse(due.at) - now;
+  if (Number.isNaN(ms)) return null;
+  const days = Math.ceil(ms / 86_400_000);
+  const day = formatDay(due.at);
+  if (due.party === 'buyer') return { text: `Waiting for the buyer until ${day}`, tone: 'neutral' };
+  if (ms <= 0) return { text: `Response was due ${day}`, tone: 'bad' };
+  const left = days <= 1 ? 'today or tomorrow' : `in ${days} days`;
+  return { text: `Respond by ${day} (${left})`, tone: days <= 3 ? 'bad' : days <= 7 ? 'warn' : 'neutral' };
+}

@@ -1,6 +1,6 @@
 /** Real dependencies for the order service: Postgres via Drizzle, PayPal via the shared client, B's mandate code. */
 import type { Cart } from '../../contracts/schemas';
-import { checkCart, computeReceiptHash, createClosedMandate, hashCart, verifyClosedMandate } from '../mandate';
+import { checkCart, computeReceiptHash, createClosedMandate, getOrCreateBuyerKey, hashCart, isBuyerKid, openMandateSigner, verifyClosedMandate } from '../mandate';
 import { getPayPalClient } from './client';
 import type { DisputeStore, PollDeps } from './disputeService';
 import type { ActDeps, ActStore } from './caseActions';
@@ -217,7 +217,14 @@ export function defaultDeps(): OrderDeps {
     store: drizzleStore(),
     checkCart: (jws, cart) => checkCart(jws, cart),
     hashCart,
-    createClosedMandate,
+    // When the buyer approves a cart, their own key signs it, if their open mandate was signed with their own key.
+    createClosedMandate: async (input) => {
+      const open = openMandateSigner(input.openMandateJws);
+      if (input.approvedBy === 'buyer' && isBuyerKid(open.kid) && open.buyerRef) {
+        return createClosedMandate(input, { buyerKey: await getOrCreateBuyerKey(open.buyerRef) });
+      }
+      return createClosedMandate(input);
+    },
     verifyClosedMandate,
     computeReceiptHash,
     createOrder: (input) => createOrder(client, input),

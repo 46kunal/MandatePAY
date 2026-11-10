@@ -50,6 +50,20 @@
       "when": 1794305333987,
       "tag": "0006_paypal_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794308468541,
+      "tag": "0007_buyer_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794308883316,
+      "tag": "0008_auto_analyse",
+      "breakpoints": true
     }
   ]
 }

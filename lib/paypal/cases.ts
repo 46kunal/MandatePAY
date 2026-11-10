@@ -1,6 +1,9 @@
 /** Read side of disputes (owner: A): map case rows to the CaseRecord contract and load the detail view. */
 import type { CaseRecord, Verdict } from '../../contracts/schemas';
 import { payerCheck, type PayerCheck } from '../auth/paypalIdentity';
+import { isBuyerKid } from '../mandate/buyerKeys';
+import { openMandateSigner } from '../mandate/closed';
+import { responseDue, type RawDispute } from './disputes';
 import { fromMinor } from './orders';
 
 /** The columns of `cases` that the API exposes (a subset of the Drizzle row). */
@@ -20,6 +23,8 @@ export interface CaseRow {
   outcome: string | null;
   /** The user who sent the action to PayPal (null before sign-in existed or while not acted). */
   actedBy?: string | null;
+  /** The stored PayPal dispute, for the response deadline. */
+  rawDispute?: unknown;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +44,7 @@ export function toCaseRecord(row: CaseRow): CaseRecord {
     analysis_status: row.analysisStatus as CaseRecord['analysis_status'],
     action_taken: row.actionTaken,
     outcome: row.outcome,
+    response_due: responseDue(row.rawDispute as RawDispute | null | undefined),
     created_at: row.createdAt.toISOString(),
     updated_at: row.updatedAt.toISOString(),
   };
@@ -52,7 +58,14 @@ export async function listCaseRecords(): Promise<CaseRecord[]> {
 }
 
 export interface CaseDetail extends CaseRecord {
-  mandate: { mandate_id: string; buyer_ref: string; constraints: unknown; expires_at: string } | null;
+  mandate: {
+    mandate_id: string;
+    buyer_ref: string;
+    constraints: unknown;
+    expires_at: string;
+    /** 'buyer_key': signed with this buyer's own key. 'shared_key': the single demo key used before per-buyer keys. */
+    signed_with: 'buyer_key' | 'shared_key';
+  } | null;
   cart: { cart_id: string; cart: unknown; guard: unknown; approved_by: string | null; total_minor: number } | null;
   order: {
     paypal_order_id: string;
@@ -94,6 +107,7 @@ export async function getCaseDetail(disputeId: string): Promise<CaseDetail | und
       ? {
           mandate_id: mandate.mandateId,
           buyer_ref: mandate.buyerRef,
+          signed_with: isBuyerKid(openMandateSigner(mandate.jws).kid) ? 'buyer_key' : 'shared_key',
           constraints: mandate.constraints,
           expires_at: mandate.expiresAt.toISOString(),
         }

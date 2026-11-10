@@ -93,6 +93,12 @@ export function buildEvidenceModel(d: CaseDetail, generatedAt: Date = new Date()
       rows: [
         ['Mandate id', d.mandate.mandate_id],
         ['Buyer reference', d.mandate.buyer_ref],
+        [
+          'Signed with',
+          d.mandate.signed_with === 'buyer_key'
+            ? "This buyer's own signing key (the signature identifies the buyer)"
+            : 'The shared demo key (signed before per-buyer keys)',
+        ],
         ['Valid until', d.mandate.expires_at],
         ...constraintRows(d.mandate.constraints),
       ],

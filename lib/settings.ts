@@ -8,7 +8,7 @@
 import type { StoreSettings, UpdateStoreSettingsRequest } from '../contracts/schemas';
 import { fromMinor, toMinor } from './mandate/money';
 
-export const DEFAULTS = { humanReviewOver: '100.00', minConfidence: 0.7 } as const;
+export const DEFAULTS = { humanReviewOver: '100.00', minConfidence: 0.7, autoAnalyse: true } as const;
 const CACHE_MS = 5_000;
 
 export interface SettingsRow {
@@ -17,6 +17,7 @@ export interface SettingsRow {
   approvalThresholdMinor: number | null;
   humanReviewOverMinor: number | null;
   minConfidence: number | null;
+  autoAnalyse?: boolean | null;
   updatedAt: Date;
 }
 
@@ -33,6 +34,7 @@ export function resolveSettings(row: SettingsRow | undefined, env: SettingsEnv):
     approval_threshold: row?.approvalThresholdMinor != null ? fromMinor(row.approvalThresholdMinor) : env.APPROVAL_THRESHOLD,
     human_review_over: row?.humanReviewOverMinor != null ? fromMinor(row.humanReviewOverMinor) : DEFAULTS.humanReviewOver,
     min_confidence: row?.minConfidence ?? DEFAULTS.minConfidence,
+    auto_analyse: row?.autoAnalyse ?? DEFAULTS.autoAnalyse,
     updated_at: row ? row.updatedAt.toISOString() : null,
   };
 }
@@ -45,6 +47,7 @@ export function patchToColumns(patch: UpdateStoreSettingsRequest): Partial<Omit<
   if (patch.approval_threshold !== undefined) out.approvalThresholdMinor = toMinor(patch.approval_threshold);
   if (patch.human_review_over !== undefined) out.humanReviewOverMinor = toMinor(patch.human_review_over);
   if (patch.min_confidence !== undefined) out.minConfidence = patch.min_confidence;
+  if (patch.auto_analyse !== undefined) out.autoAnalyse = patch.auto_analyse;
   return out;
 }
 

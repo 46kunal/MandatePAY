@@ -6,7 +6,7 @@ import type { PollDisputesResponse } from '@/contracts/schemas';
 import type { z } from 'zod';
 import { apiFetch } from '@/app/_ui/api';
 import { Badge, Card, EmptyState, Notice, PageHeader, Skeleton } from '../../_ui/Ui';
-import { FAULT, STATUS, formatMoney, formatWhen, needsReview, reasonLabel } from '../../_ui/labels';
+import { FAULT, STATUS, formatMoney, formatWhen, needsReview, reasonLabel, dueLabel } from '../../_ui/labels';
 import { errMsg, useCases } from '../../_ui/useCases';
 import u from '../../_ui/ui.module.css';
 import m from '../merchant.module.css';
@@ -172,6 +172,7 @@ export default function DisputesPage() {
                       <th scope="col">Status</th>
                       <th scope="col">AI verdict</th>
                       <th scope="col">Confidence</th>
+                      <th scope="col">Deadline</th>
                       <th scope="col">Opened</th>
                     </tr>
                   </thead>
@@ -204,6 +205,12 @@ export default function DisputesPage() {
                             ) : (
                               <span className={u.muted}>—</span>
                             )}
+                          </td>
+                          <td>
+                            {(() => {
+                              const due = c.analysis_status === 'acted' ? null : dueLabel(c.response_due);
+                              return due ? <Badge tone={due.tone}>{due.text}</Badge> : <span className={u.muted}>—</span>;
+                            })()}
                           </td>
                           <td className={u.muted}>{formatWhen(c.created_at)}</td>
                         </tr>

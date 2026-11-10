@@ -270,5 +270,29 @@
     "mandate": { "max_total": { "value": "60.00", "currency": "USD" }, "required_attributes": { "color": "green" }, "request_text": "green scarf under 60" },
     "cart": { "items": [{ "name": "Green wool scarf", "unit_price": "50.00", "attributes": { "color": "green" } }] },
     "expect": { "fault": "unclear", "action": ["SEND_MESSAGE", "NO_ACTION", "PROVIDE_EVIDENCE"], "needs_human": true }
+  },
+  {
+    "id": "unauth-own-paypal-paid",
+    "note": "Unauthorised claim, but the buyer's own linked PayPal account paid and the mandate is signed with the buyer's own key",
+    "reason": "UNAUTHORISED",
+    "tracking": { "carrier": "UPS", "status": "DELIVERED" },
+    "amount": "39.00",
+    "messages": [{ "from": "BUYER", "text": "I never made this purchase, someone used my account." }],
+    "mandate": { "max_total": { "value": "50.00", "currency": "USD" }, "categories": ["headphones"], "request_text": "wired headphones under 50" },
+    "cart": { "items": [{ "name": "Wired headphones", "unit_price": "39.00" }] },
+    "payment": { "source": "paypal", "payer_check": "match", "mandate_signed_with": "buyer_key" },
+    "expect": { "fault": "buyer_regret", "action": ["PROVIDE_EVIDENCE"] }
+  },
+  {
+    "id": "unauth-different-payer",
+    "note": "Unauthorised claim and a PayPal account other than the buyer's linked one paid: may be genuine fraud",
+    "reason": "UNAUTHORISED",
+    "tracking": { "carrier": "UPS", "status": "DELIVERED" },
+    "amount": "39.00",
+    "messages": [{ "from": "BUYER", "text": "I did not buy this. I do not recognise this payment." }],
+    "mandate": { "max_total": { "value": "50.00", "currency": "USD" }, "categories": ["headphones"], "request_text": "wired headphones under 50" },
+    "cart": { "items": [{ "name": "Wired headphones", "unit_price": "39.00" }] },
+    "payment": { "source": "paypal", "payer_check": "different", "mandate_signed_with": "buyer_key" },
+    "expect": { "fault": "unclear", "action": ["SEND_MESSAGE", "NO_ACTION"], "needs_human": true }
   }
 ]

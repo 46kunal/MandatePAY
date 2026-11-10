@@ -12,7 +12,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | Route | Permission (roles) |
 |---|---|
 | `/api/auth/*` | public: Better Auth sign-up (always a buyer), sign-in (email, or PayPal at `/sign-in/social` with `provider: "paypal"`), sign-out, get-session. Signed in: `/link-social` and `/unlink-account` connect or disconnect PayPal; PayPal is never linked to an existing account by matching email |
-| POST `/api/mandates/draft`, POST `/api/mandates` | `shop` (everyone). The mandate is signed for the signed-in user; `buyer_ref` is their user id |
+| POST `/api/mandates/draft`, POST `/api/mandates` | `shop` (everyone). The mandate is signed with the signed-in user's own key (kid `buyer-u-…` in the JWS header, created on first use); `buyer_ref` is their user id, and verification requires the key's owner to be that buyer. Mandates signed before per-buyer keys carry the shared key's kid and still verify |
 | POST `/api/agent/shop`, POST `/api/carts/check`, POST `/api/orders` | `shop`, and the mandate must be the user's own (else 404) |
 | POST `/api/orders/:id/capture` | `shop`, and the order must be the user's own (else 404) |
 | GET `/api/orders` | signed in. Staff, owner, admin see all orders; a buyer sees only their own |
@@ -44,7 +44,7 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | POST `/api/orders` | A | `PlaceOrderRequest` | `PlaceOrderResponse` (`created` or `needs_approval`) | 422 `guard_blocked`, 502 PayPal |
 | POST `/api/orders/:id/capture` | A | none | `CaptureOrderResponse` | 404 order, 409 already captured, 502 PayPal |
 | POST `/api/webhooks/paypal` | A | PayPal event | `200` fast | 400 bad signature |
-| GET `/api/settings` | A | none | `StoreSettings` (defaults from env until saved) | none |
+| GET `/api/settings` | A | none | `StoreSettings` (defaults from env until saved; `auto_analyse` defaults to true) | none |
 | PATCH `/api/settings` | A | `UpdateStoreSettingsRequest` (any subset) | `StoreSettings` | 400 invalid body |
 | GET `/api/team` | A | none | `ListTeamResponse` | none |
 | POST `/api/team` | A | `SetTeamRoleRequest` | `AccountSummary` | 404 no account with that email, 409 `role_change_refused` |
@@ -56,10 +56,10 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/me/mandates` | A | none | `ListMyMandatesResponse` | none |
 | POST `/api/me/mandates/:id/revoke` | A | none | `MyMandate`. After this, cart checks, the agent and new orders on it answer 410 `mandate_revoked` | 404 not yours |
 | GET `/api/me/export` | A | none | JSON download of the person's account, mandates, carts and orders | none |
-| POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal |
+| POST `/api/disputes/poll` | A | none, or `PollDisputesRequest` `{ dispute_id }` to fetch one dispute by id (PayPal's list lags for new disputes) | `PollDisputesResponse` | 400 invalid id, 404 unknown dispute, 502 PayPal. After answering, cases that are linked, not analysed yet and actionable are analysed automatically (max 3 per call) when the `auto_analyse` setting is on; the webhook does the same after a processed event |
 | GET `/api/cases` | A | none | `CaseRecord[]` | none |
 | GET `/api/cases/:id` | A | none | `CaseRecord` plus mandate, cart, order. `order.payment_source` is `paypal` or `card`; `order.payer_check` is `match`, `different`, `not_linked` or `unknown` (did the buyer's linked PayPal account pay) | 404 |
-| POST `/api/cases/:id/analyse` | B | none | `Verdict` (saved on case) | 404, 502 LLM failed |
+| POST `/api/cases/:id/analyse` | B | none | `Verdict` (saved on case). Input adds `payment` facts from the records: `payer_check` (did the buyer's linked PayPal account pay), `source`, `mandate_signed_with`. A `different` payer always needs a human | 404, 422 not linked, 502 LLM failed |
 | GET `/api/cases/:id/evidence-pack` | A | none | `application/pdf` | 404 |
 | POST `/api/cases/:id/act` | A | `ActOnCaseRequest` | updated `CaseRecord` | 400 invalid body, 403 needs human approval, 404 case, 409 already acted, 422 action or offer not allowed / no verdict, 502 PayPal. PROVIDE_EVIDENCE also uploads the evidence pack PDF (multipart, `file1`). |
 | GET `/api/products` | A | `?active=1` optional | `Product[]` | none |
