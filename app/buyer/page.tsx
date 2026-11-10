@@ -192,10 +192,7 @@ export default function BuyerPage() {
           <button className={u.btn} onClick={onDraft} disabled={busy !== null || text.trim() === ''}>
             {busy === 'draft' ? 'Working…' : draft ? 'Update mandate' : 'Create mandate'}
           </button>
-          <VoiceButton
-            disabled={busy !== null}
-            onText={(spoken) => setText((t) => `${t.trim()} ${spoken}`.trim().slice(0, 1000))}
-          />
+          <VoiceButton disabled={busy !== null} value={text} onChange={setText} />
           <span className={`${u.muted} ${s.count}`}>{text.length}/1000</span>
         </div>
         <p className={u.muted} style={{ margin: '0.5rem 0 0', fontSize: '0.85em' }}>
