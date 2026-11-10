@@ -11,12 +11,14 @@ Built for the PayPal "Build What's Next with PayPal and AI" hackathon. Sandbox o
 | **Live app** | https://mandate-pay.vercel.app |
 | **For judges** | [docs/JUDGES.md](docs/JUDGES.md): a five-minute test path, how it meets the requirements, honest limits |
 | **How it works** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the flow, every PayPal API we use, every AI feature, the trust model |
+| **Agent access (MCP)** | [docs/MCP.md](docs/MCP.md): any AI agent can shop for a buyer inside their signed mandate |
 | **Submission text** | [docs/DEVPOST.md](docs/DEVPOST.md) |
 | **API reference** | [contracts/api.md](contracts/api.md): every route, with its schema in `contracts/schemas.ts` |
 
 **PayPal:** Orders v2, Smart Buttons and Card Fields (3-D Secure), refunds, the Customer Disputes API (message, evidence,
 offer, accept), verified webhooks, Log in with PayPal. **AI:** mandate drafting, a shopping agent, AI-assisted cart checks and
-a dispute analyst with code guardrails, scored on 28 labelled disputes.
+a dispute analyst with code guardrails, scored on 28 labelled disputes. **MCP server:** outside AI agents can shop for a buyer
+inside the mandates they signed, but can never sign one or pay.
 
 ## Quick start
 

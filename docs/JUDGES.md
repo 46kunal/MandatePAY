@@ -15,6 +15,7 @@ the signed record so it can recommend a fair response. A person approves every r
 | **Meaningful PayPal use** | Orders v2 and Card Fields checkout, refunds, the Customer Disputes API (message, evidence, offer, accept), verified webhooks, Log in with PayPal. Full map in [ARCHITECTURE.md](ARCHITECTURE.md#where-paypal-is-used). |
 | **Meaningful AI use** | Mandate drafting, a shopping agent, AI-assisted cart checks, and a dispute analyst with code guardrails. Scored on 28 labelled disputes (79% on every check at once). See [Where AI is used](ARCHITECTURE.md#where-ai-is-used). |
 | **Working prototype** | Deployed and live; real PayPal sandbox orders and real sandbox disputes, no canned data. 324 automated tests, CI on every push. |
+| **Agents** | An MCP server (`/api/mcp`) lets any AI agent shop under a buyer's signed mandate: [MCP.md](MCP.md). |
 | **Documented** | This guide, ARCHITECTURE.md, `contracts/api.md` (every route), `.env.example` (every variable), `docs/DEPLOY.md`. |
 
 ## Try it in about five minutes
@@ -36,6 +37,18 @@ future expiry, any 3-digit code.
 3. Check **Mandate vs cart** and the **reasoning**, then approve the action. It goes to PayPal; the evidence PDF can be downloaded from the same page.
 4. **Orders → Refund** for a partial or full refund (it will not refund twice, even after a refund made in the PayPal dashboard).
 5. **Results** shows disputes handled, how often people kept the AI's advice, the guard's activity and the analyst's test-set accuracy.
+
+## Connect your own AI agent (MCP)
+
+MandatePay is also an MCP server. As the buyer, open **Account → Agent access → Create a key**, then, for example:
+
+```bash
+claude mcp add --transport http mandatepay https://mandate-pay.vercel.app/api/mcp --header "Authorization: Bearer <key>"
+```
+
+Ask the agent to shop within your mandate. It can list mandates and products, test baskets against the guard
+(`check_cart`), and create the PayPal order (`place_order`), but it gets only an approval link: it cannot sign a mandate or
+pay. Details in [MCP.md](MCP.md).
 
 ## Credentials for testing
 

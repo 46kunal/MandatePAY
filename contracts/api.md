@@ -37,6 +37,8 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/admin/health` | `system:read` (admin) |
 | GET `/api/me/mandates`, POST `/api/me/mandates/:id/revoke`, GET `/api/me/export` | `shop`, own data only |
 | GET `/api/me/orders`, POST `/api/me/orders/:id/report` | `shop`, own orders only |
+| GET and POST `/api/me/keys`, DELETE `/api/me/keys/:id` | `shop`, own agent keys only |
+| POST `/api/mcp` | An agent key (`Authorization: Bearer mpk_...`) made by the buyer; acts only inside that buyer's own mandates |
 
 ## Routes
 
@@ -62,6 +64,10 @@ session cookie. Signed out: **401 `unauthenticated`**. Signed in without the per
 | GET `/api/export/orders`, `/api/export/disputes` | A | none | `text/csv` download (formulas defused) | none |
 | GET `/api/me/mandates` | A | none | `ListMyMandatesResponse` | none |
 | GET `/api/me/orders` | A | none | `ListMyOrdersResponse`: the buyer's own paid orders, newest first, each with its latest `report` | none. Each order also carries `seller` (the store's name) and `images` (picture links the store added) |
+| GET `/api/me/keys` | A | none | `{ keys: ApiKeyView[] }`: the buyer's agent keys (never the keys themselves) | none |
+| POST `/api/me/keys` | A | `{ name }` | `{ key, ...ApiKeyView }` (201). The key is shown once; only its hash is stored | 409 `too_many_keys` (5 active at most) |
+| DELETE `/api/me/keys/:id` | A | none | `{ id, revoked: true }`; the agent using the key is cut off at once | 404 not this buyer's active key |
+| POST `/api/mcp` | A | JSON-RPC 2.0 (MCP): `initialize`, `ping`, `tools/list`, `tools/call` for `list_mandates`, `list_products`, `check_cart`, `place_order`, `get_order` | JSON-RPC result, or 202 for notifications. A refusal is a tool result with `isError: true` | 401 no or bad key, 405 GET. 60 calls a minute. The agent cannot sign mandates, set prices or pay; see `docs/MCP.md` |
 | POST `/api/me/orders/:id/report` | A | `CreateReportRequest` | `ProblemReport` (201). `assessment` is computed from the cart guard result at checkout, never from the buyer's text: `agent_mistake` when a check did not pass | 404 not the buyer's order, 409 `not_paid` / `report_open` |
 | GET `/api/reports` | A | none | `ListReportsResponse`: every report, open first, with `buyer_email`, `order_total`, `items` | none |
 | POST `/api/reports/:id/resolve` | A | `ResolveReportRequest` (`outcome` refund or close; `reply` is shown to the buyer) | `ResolveReportResponse` | 404 report, 409 `already_answered`, 403 refund without `orders:refund`, plus the refund errors of POST `/api/orders/:id/refund` |

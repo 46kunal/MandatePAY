@@ -29,7 +29,7 @@ describe('API route security', () => {
   it('finds the routes', () => assert.ok(all.length > 25));
 
   it('every route checks the caller unless it is on the public list', () => {
-    const open = all.filter((r) => !/requirePermission|sessionUser|authorize\(/.test(r.src) && !(r.rel in PUBLIC)).map((r) => r.rel);
+    const open = all.filter((r) => !/requirePermission|sessionUser|authorize\(|requireApiKey/.test(r.src) && !(r.rel in PUBLIC)).map((r) => r.rel);
     assert.deepEqual(open, [], `These routes do not check who is calling: ${open.join(', ')}`);
   });
 
