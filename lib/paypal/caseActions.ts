@@ -76,13 +76,20 @@ const fail = (httpStatus: 403 | 404 | 409 | 422 | 502, error: string, message: s
 /** PayPal accepts long notes, but keep them well under the limit. */
 const MAX_NOTE = 2000;
 
-/** Text sent to PayPal, built only from the verdict (the merchant-facing claims and their cited sources). */
+/**
+ * Note sent to PayPal with an offer, an acceptance or evidence: the AI's reasoning and its claims. Our internal
+ * bookkeeping never goes out: no "(source: ...)" field paths and no "[Guardrails]" notes.
+ */
 export function buildNote(verdict: Verdict | null, fallback: string): string {
   if (!verdict) return fallback;
-  const points = verdict.evidence_points.map((p, i) => `${i + 1}. ${p.claim} (source: ${p.source})`);
-  const text = [verdict.reasoning, ...points].filter(Boolean).join('\n');
+  const reasoning = verdict.reasoning.split('\n[Guardrails]')[0].trim();
+  const points = verdict.evidence_points.map((p, i) => `${i + 1}. ${p.claim}`);
+  const text = [reasoning, ...points].filter(Boolean).join('\n');
   return (text || fallback).slice(0, MAX_NOTE);
 }
+
+/** A message to the buyer when the records-based message is unavailable. Never the AI's own notes. */
+const NEUTRAL_MESSAGE = 'Hello. We are reviewing this dispute and will follow up here shortly. Thank you for your patience.';
 
 export async function actOnCase(deps: ActDeps, disputeId: string, input: ActInput): Promise<ActResult> {
   const found = await deps.store.getCase(disputeId);
@@ -141,9 +148,10 @@ export async function actOnCase(deps: ActDeps, disputeId: string, input: ActInpu
       break;
     case 'SEND_MESSAGE':
       send = async () => {
-        // When the AI judged this as buyer regret, the message states the evidence from the records.
-        const evidence = verdict?.fault === 'buyer_regret' && deps.evidenceMessage ? await deps.evidenceMessage(disputeId) : null;
-        return deps.actions.sendMessage(disputeId, evidence?.text ?? buildNote(verdict, 'Message from the merchant.'), evidence?.files);
+        // What the buyer reads is always built from the records (mandate, order, payment, refunds) with the PDF attached,
+        // never the AI's own reasoning, which is written for the merchant.
+        const evidence = deps.evidenceMessage ? await deps.evidenceMessage(disputeId) : null;
+        return deps.actions.sendMessage(disputeId, evidence?.text ?? NEUTRAL_MESSAGE, evidence?.files);
       };
       break;
     case 'ACCEPT_CLAIM':

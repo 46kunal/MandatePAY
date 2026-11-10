@@ -82,7 +82,8 @@ describe('actOnCase: happy paths', () => {
     assert.equal(r.ok, true);
     assert.deepEqual(s.calls.map((c) => c.fn), ['provideEvidence']);
     assert.match(String(s.calls[0].args[1]), /cart matched the mandate/);
-    assert.match(String(s.calls[0].args[1]), /mandates\.constraints\.required_attributes\.color/);
+    assert.match(String(s.calls[0].args[1]), /Buyer asked for white/);
+    assert.doesNotMatch(String(s.calls[0].args[1]), /source:|required_attributes/);
     if (r.ok) {
       assert.equal(r.row.analysisStatus, 'acted');
       assert.equal(r.row.actionTaken, 'PROVIDE_EVIDENCE');
@@ -163,13 +164,21 @@ describe('actOnCase: happy paths', () => {
     assert.deepEqual(s.calls[0].args[2], [pdf]);
   });
 
-  it('SEND_MESSAGE for any other fault sends the analysis notes, not the evidence message', async () => {
-    const s = setup({ row: { verdict: verdict({ fault: 'unclear', action: 'SEND_MESSAGE', reasoning: 'Please tell us more.' }) } });
-    let asked = false;
-    s.deps.evidenceMessage = async () => ((asked = true), { text: 'x', files: [] });
+  it('SEND_MESSAGE for any fault sends the records-based message with the PDF, never the AI reasoning', async () => {
+    const s = setup({ row: { verdict: verdict({ fault: 'unclear', action: 'SEND_MESSAGE', reasoning: 'Internal: the buyer message is vague. (source: dispute.messages[0].text)' }) } });
+    const pdf = { filename: 'evidence.pdf', contentType: 'application/pdf', bytes: new Uint8Array([37, 80, 68, 70]) as Uint8Array<ArrayBuffer> };
+    s.deps.evidenceMessage = async () => ({ text: 'Record of this purchase', files: [pdf] });
     await actOnCase(s.deps, 'PP-D-1', approve);
-    assert.equal(asked, false);
-    assert.match(String(s.calls[0].args[1]), /Please tell us more/);
+    assert.equal(s.calls[0].args[1], 'Record of this purchase');
+    assert.deepEqual(s.calls[0].args[2], [pdf]);
+  });
+
+  it('without a records-based message the buyer gets a neutral line, not the AI notes', async () => {
+    const s = setup({ row: { verdict: verdict({ fault: 'unclear', action: 'SEND_MESSAGE', reasoning: 'Internal: vague. (source: dispute.reason)' }) } });
+    await actOnCase(s.deps, 'PP-D-1', approve);
+    const sent = String(s.calls[0].args[1]);
+    assert.doesNotMatch(sent, /source:|Internal/);
+    assert.match(sent, /reviewing this dispute/);
   });
 });
 
@@ -336,6 +345,15 @@ describe('actOnCase: PayPal failures', () => {
 
   it('rethrows non-PayPal errors', async () => {
     await assert.rejects(actOnCase(setup({}, new TypeError('boom')).deps, 'PP-D-1', approve), /boom/);
+  });
+});
+
+describe('buildNote: no internal bookkeeping goes to PayPal', () => {
+  it('drops source paths and guardrail notes', () => {
+    const n = buildNote(verdict({ reasoning: 'The cart matches.\n[Guardrails] Confidence low.' }), 'f');
+    assert.doesNotMatch(n, /source:|Guardrails|Confidence low/);
+    assert.match(n, /The cart matches/);
+    assert.match(n, /Buyer asked for white/);
   });
 });
 

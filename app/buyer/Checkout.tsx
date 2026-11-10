@@ -8,6 +8,7 @@ import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
 import type { Cart, CaptureOrderResponse, GuardResult, PlaceOrderResponse } from '@/contracts/schemas';
 import type { z } from 'zod';
 import { ApiClientError, apiFetch } from '@/app/_ui/api';
+import CardPay from './CardPay';
 import { formatMoney } from '../_ui/labels';
 import { Notice } from '../_ui/Ui';
 import u from '../_ui/ui.module.css';
@@ -50,9 +51,9 @@ export default function Checkout({
 
   const needsApproval = (guard.verdict === 'escalate' || serverNeedsApproval) && !approved;
 
-  async function place(): Promise<Extract<Placed, { status: 'created' }>> {
+  async function place(funding: 'paypal' | 'card' = 'paypal'): Promise<Extract<Placed, { status: 'created' }>> {
     const r = await apiFetch<Placed>('/api/orders', {
-      body: { mandate_id: mandateId, cart, buyer_approved: approved },
+      body: { mandate_id: mandateId, cart, buyer_approved: approved, funding },
     });
     if (r.data.status === 'needs_approval') {
       setServerNeedsApproval(true);
@@ -119,7 +120,7 @@ export default function Checkout({
         <PayPalScriptProvider
           // Re-mount if the currency changes; the SDK script is loaded per currency.
           key={cart.currency}
-          options={{ clientId: CLIENT_ID, currency: cart.currency, intent: 'capture' }}
+          options={{ clientId: CLIENT_ID, currency: cart.currency, intent: 'capture', components: 'buttons,card-fields' }}
         >
           <PayPalButtons
             style={{ layout: 'vertical' }}
@@ -157,6 +158,28 @@ export default function Checkout({
               setError('Payment was cancelled. You have not been charged.');
             }}
             onError={(e) => setError((prev) => prev ?? errMsg(e))}
+          />
+          <CardPay
+            total={formatMoney(guard.total, guard.currency)}
+            error={error}
+            onError={(m) => setError(m || null)}
+            createOrder={async () => {
+              setError(null);
+              try {
+                return (await place('card')).paypal_order_id;
+              } catch (e) {
+                setError(errMsg(e));
+                throw e;
+              }
+            }}
+            onApproved={async (orderId) => {
+              try {
+                setPaid(await capture(orderId));
+                onPaid();
+              } catch (e) {
+                setError(errMsg(e));
+              }
+            }}
           />
         </PayPalScriptProvider>
       ) : (

@@ -194,6 +194,17 @@ describe('orders', () => {
     assert.equal(p.intent, 'CAPTURE');
   });
 
+  it('a card order asks for 3-D Secure when needed, has no PayPal approval window, and its own request id', async () => {
+    const p = buildOrderPayload({ mandateId: 'mnd_1', cartId: 'cart_1', cart, funding: 'card' }, 'http://localhost:3000');
+    assert.deepEqual(p.payment_source, { card: { attributes: { verification: { method: 'SCA_WHEN_REQUIRED' } } } });
+    const f = fakeFetch(() => ({ status: 201, json: { id: 'ORDER_CARD', status: 'CREATED', links: [] } }));
+    const client = new PayPalClient(config, { fetch: f.impl });
+    const created = await createOrder(client, { mandateId: 'mnd_1', cartId: 'cart_1', cart, funding: 'card' });
+    assert.equal(created.paypalOrderId, 'ORDER_CARD');
+    assert.equal(created.approveUrl, undefined);
+    assert.equal(f.apiCalls()[0].headers['PayPal-Request-Id'], 'order-cart_1-card');
+  });
+
   it('creates an order and returns the approval link', async () => {
     const f = fakeFetch(() => ({
       status: 201,

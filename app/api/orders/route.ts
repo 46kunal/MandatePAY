@@ -41,6 +41,7 @@ export async function POST(req: Request) {
       mandateId: body.data.mandate_id,
       cart: body.data.cart,
       buyerApproved: body.data.buyer_approved,
+      funding: body.data.funding,
     });
     if (!result.ok) return apiError(result.httpStatus, result.error, result.message, result.details);
 
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
         ? {
             status: 'created',
             paypal_order_id: result.paypalOrderId,
-            approve_url: result.approveUrl,
+            ...(result.approveUrl ? { approve_url: result.approveUrl } : {}),
             cart_id: result.cartId,
             guard: result.guard,
           }
