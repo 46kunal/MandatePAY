@@ -10,6 +10,7 @@ import { audit, type AuditActor } from '../audit';
 import { fromMinor } from '../paypal/orders';
 import { summariseRefunds } from '../paypal/refunds';
 import { assessReport, toProblemReport } from './assess';
+import { getSettings } from '../settings';
 
 /** The buyer's paid orders, newest first, each with its latest report. */
 export async function listMyOrders(userId: string): Promise<MyOrder[]> {
@@ -30,6 +31,12 @@ export async function listMyOrders(userId: string): Promise<MyOrder[]> {
     .orderBy(desc(schema.orders.createdAt))
     .limit(100);
   const ids = rows.map((r) => r.paypalOrderId);
+  const [settings, pictures] = await Promise.all([
+    getSettings(),
+    db.select({ sku: schema.products.sku, imageUrl: schema.products.imageUrl }).from(schema.products),
+  ]);
+  const imageBySku = new Map(pictures.filter((p) => p.imageUrl).map((p) => [p.sku, p.imageUrl as string]));
+  const seller = settings.store_name?.trim() || 'MandatePay Store';
   const reports = ids.length
     ? await db.select().from(schema.problemReports).where(inArray(schema.problemReports.paypalOrderId, ids)).orderBy(desc(schema.problemReports.createdAt))
     : [];
@@ -43,6 +50,8 @@ export async function listMyOrders(userId: string): Promise<MyOrder[]> {
       status: r.status,
       paid_at: r.capturedAt ? r.capturedAt.toISOString() : null,
       refunded: refunded > 0 ? fromMinor(refunded) : null,
+      seller,
+      images: r.cart.items.map((i) => imageBySku.get(i.sku)).filter((x): x is string => !!x),
       report: latest ? toProblemReport(latest, r.currency) : null,
     };
   });

@@ -87,7 +87,18 @@ export function MyOrdersCard() {
             <tbody>
               {orders.map((o) => (
                 <tr key={o.paypal_order_id}>
-                  <td>{o.items.join(', ')}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                      {o.images.slice(0, 2).map((src) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={src} src={src} alt="" width={44} height={44} style={{ borderRadius: 6, objectFit: 'cover' }} referrerPolicy="no-referrer" />
+                      ))}
+                      <div>
+                        {o.items.join(', ')}
+                        <div className={u.muted}>Sold by {o.seller}</div>
+                      </div>
+                    </div>
+                  </td>
                   <td className={u.num}>
                     {formatMoney(o.total.value, o.total.currency)}
                     {o.refunded && <div className={u.muted}>refunded {formatMoney(o.refunded, o.total.currency)}</div>}

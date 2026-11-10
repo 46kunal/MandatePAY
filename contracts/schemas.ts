@@ -378,6 +378,8 @@ export const ProductInput = z
     stock: z.number().int().min(0),
     /** Working days from order to delivery; becomes the cart's delivery_eta */
     delivery_days: z.number().int().min(0).max(365),
+    /** A picture of the product shown to buyers. https only. */
+    image_url: z.string().trim().max(500).url().refine((v) => v.startsWith('https://'), 'Use an https:// link').optional(),
   })
   .strict();
 export type ProductInput = z.infer<typeof ProductInput>;
@@ -486,6 +488,8 @@ export const MyOrder = z.object({
   status: z.string(),
   paid_at: z.string().nullable(),
   refunded: Amount.nullable(),
+  seller: z.string(), // the store's name
+  images: z.array(z.string()), // picture links for the items, where the store added them
   report: ProblemReport.nullable(), // the latest report on this order
 });
 export type MyOrder = z.infer<typeof MyOrder>;
@@ -550,4 +554,30 @@ export const ResolveReportResponse = z.object({
   report_id: z.string(),
   status: ReportStatus,
   refund: RefundOrderResponse.optional(),
+});
+
+// ---------- what a buyer sees of the store ----------
+
+/**
+ * One product as a buyer sees it. There is no stock count and no store-only field: availability is a word, and
+ * max_quantity is the most a buyer can add in one order.
+ */
+export const BuyerProduct = z.object({
+  sku: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  category: z.string(),
+  unit_price: Amount,
+  currency: CurrencyCode,
+  attributes: z.record(z.string(), z.string()),
+  delivery_days: z.number().int(),
+  image_url: z.string().optional(),
+  availability: z.enum(['in_stock', 'low_stock']),
+  max_quantity: z.number().int().positive(),
+});
+export type BuyerProduct = z.infer<typeof BuyerProduct>;
+
+export const ShopCatalogResponse = z.object({
+  seller: z.string(), // the store's name
+  products: z.array(BuyerProduct),
 });

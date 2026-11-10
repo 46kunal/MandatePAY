@@ -78,6 +78,13 @@
       "when": 1794315553423,
       "tag": "0010_problem_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794334949474,
+      "tag": "0011_product_images",
+      "breakpoints": true
     }
   ]
 }

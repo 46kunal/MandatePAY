@@ -4,8 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { authClient, useSession } from '@/lib/auth/client';
-import { isMerchantRole } from '@/lib/auth/roles';
-import { Notice } from './Ui';
+import { canOpen } from '@/lib/auth/routes';
 import u from './ui.module.css';
 
 const ROLE_LABEL: Record<string, string> = { buyer: 'Buyer', staff: 'Staff', owner: 'Owner', admin: 'Admin' };
@@ -66,15 +65,15 @@ function BuyerTopRight() {
   const role = (data?.user as { role?: string } | undefined)?.role;
   return (
     <div className={u.userBox}>
-      {isMerchantRole(role) && (
+      {canOpen(role, 'merchant') && (
         <Link href="/merchant" className={u.topLink}>
-          Merchant dashboard →
+          Store dashboard →
         </Link>
       )}
       <Link href="/buyer/account" className={u.topLink}>
-        Account
+        My orders &amp; account
       </Link>
-      <UserBox after="/login" />
+      <UserBox after="/" />
     </div>
   );
 }
@@ -94,11 +93,8 @@ const NAV: { href: string; label: string; exact?: boolean; adminOnly?: boolean }
 
 export function MerchantShell({ children }: { children: ReactNode }) {
   const path = usePathname() ?? '';
-  const { data, isPending } = useSession();
-  // The sign-in page has no sidebar.
-  if (path === '/merchant/login') return <div className={u.root}>{children}</div>;
+  const { data } = useSession();
   const role = (data?.user as { role?: string } | undefined)?.role;
-  const blocked = !isPending && data?.user && !isMerchantRole(role);
   return (
     <div className={u.root}>
       <div className={u.app}>
@@ -119,22 +115,17 @@ export function MerchantShell({ children }: { children: ReactNode }) {
             </ul>
           </nav>
           <div className={u.navFoot} style={{ display: 'grid', gap: '0.5rem' }}>
-            <UserBox after="/merchant/login" />
-            <span>
-              Shopping as a buyer? <Link href="/buyer">Open the buyer view</Link>
-            </span>
+            <UserBox after="/" />
+            {canOpen(role, 'buyer') && (
+              <span>
+                Shopping as a buyer? <Link href="/buyer">Open the buyer view</Link>
+              </span>
+            )}
           </div>
         </aside>
         <div className={u.main}>
               <main className={u.content}>
-                {blocked ? (
-                  <Notice tone="warn">
-                    This area is for the store team. You are signed in with a buyer account.{' '}
-                    <Link href="/buyer">Go to your shopping page</Link>
-                  </Notice>
-                ) : (
-                  children
-                )}
+                {children}
               </main>
         </div>
       </div>

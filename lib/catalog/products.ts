@@ -17,6 +17,7 @@ export interface ProductRow {
   attributes: Record<string, string>;
   stock: number;
   deliveryDays: number;
+  imageUrl: string | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +35,7 @@ export function toProduct(r: ProductRow): Product {
     attributes: r.attributes ?? {},
     stock: r.stock,
     delivery_days: r.deliveryDays,
+    ...(r.imageUrl ? { image_url: r.imageUrl } : {}),
     active: r.active,
     created_at: r.createdAt.toISOString(),
     updated_at: r.updatedAt.toISOString(),
@@ -56,6 +58,7 @@ export function rowFromInput(input: ProductInput): Omit<ProductRow, 'productId' 
     ),
     stock: input.stock,
     deliveryDays: input.delivery_days,
+    imageUrl: input.image_url?.trim() || null,
   };
 }
 

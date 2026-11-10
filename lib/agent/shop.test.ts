@@ -27,6 +27,7 @@ const product = (over: Partial<ProductRow>): ProductRow => ({
   attributes: { color: 'white', size: '10' },
   stock: 5,
   deliveryDays: 4,
+  imageUrl: null,
   active: true,
   createdAt: NOW,
   updatedAt: NOW,

@@ -211,3 +211,62 @@
     grid-column: 2;
   }
 }
+
+/* Browsing the store */
+.shopGrid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.shopCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface, var(--bg));
+}
+.shopImg {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: var(--bg-2);
+}
+.shopImgFallback {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--bg-2);
+}
+.shopBody {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem;
+  flex: 1;
+}
+.shopFoot {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bg-2);
+  flex: none;
+}
+.cartLead {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}

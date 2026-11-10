@@ -46,7 +46,7 @@ const STAFF: readonly Permission[] = [
 ];
 
 const GRANTS: Record<Role, readonly Permission[]> = {
-  buyer: ['shop', 'products:read'],
+  buyer: ['shop'], // the catalog a buyer browses is GET /api/shop/catalog; the raw product list is store-only
   staff: STAFF,
   owner: [...STAFF, 'cases:approve', 'settings:write', 'team:manage', 'audit:read', 'orders:refund'],
   admin: PERMISSIONS,
@@ -61,7 +61,7 @@ export function can(role: unknown, permission: Permission): boolean {
   return isRole(role) && GRANTS[role].includes(permission);
 }
 
-/** Merchant-side people: they use the dashboard and sign in at /merchant/login. */
+/** Merchant-side people: they use the dashboard and sign in at /login like everyone. */
 export function isMerchantRole(role: unknown): boolean {
   return role === 'staff' || role === 'owner' || role === 'admin';
 }

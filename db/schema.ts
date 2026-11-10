@@ -128,6 +128,7 @@ export const products = pgTable('products', {
   attributes: jsonb('attributes').$type<Record<string, string>>().notNull().default({}),
   stock: integer('stock').notNull(),
   deliveryDays: integer('delivery_days').notNull(),
+  imageUrl: text('image_url'), // https link to a picture, shown to buyers
   active: boolean('active').notNull().default(true),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),

@@ -1,16 +1,16 @@
 'use client';
-// OWNER: C. Buyer view: request -> signed mandate -> the AI agent shops the merchant catalog -> cart and mandate
-// check -> PayPal checkout. Every step calls the real API; errors are shown as they are.
-import { useState } from 'react';
+// OWNER: C. Buyer view: request -> signed mandate -> shop the store yourself or let the agent pick -> cart and
+// mandate check -> checkout. Every step calls the real API; errors are shown as they are.
+import { useCallback, useState } from 'react';
 import type {
   AgentPick,
   AgentShopResponse,
+  BuyerProduct,
   Cart,
   Constraints,
   CreateMandateResponse,
   DraftMandateResponse,
   GuardResult,
-  Product,
 } from '@/contracts/schemas';
 import type { z } from 'zod';
 import { ApiClientError, apiFetch } from '@/app/_ui/api';
@@ -25,7 +25,7 @@ type Draft = z.infer<typeof DraftMandateResponse>;
 type Created = z.infer<typeof CreateMandateResponse>;
 type Shopped = z.infer<typeof AgentShopResponse>;
 
-const STEPS = ['Request', 'Mandate', 'Agent', 'Review', 'Checkout'];
+const STEPS = ['Request', 'Mandate', 'Shop', 'Review', 'Checkout'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function errMsg(e: unknown): string {
@@ -34,7 +34,7 @@ function errMsg(e: unknown): string {
 }
 
 /** Rebuild a cart from catalog data after the buyer edits it, so names, prices and delivery always come from the catalog. */
-function cartFrom(lines: { sku: string; quantity: number }[], catalog: Product[], base: Cart): Cart | null {
+function cartFrom(lines: { sku: string; quantity: number }[], catalog: BuyerProduct[], base: Omit<Cart, 'items'>): Cart | null {
   const bySku = new Map(catalog.map((p) => [p.sku, p]));
   const items = lines
     .filter((l) => l.quantity > 0 && bySku.has(l.sku))
@@ -59,7 +59,8 @@ export default function BuyerPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [mandate, setMandate] = useState<Created | null>(null);
   const [shopped, setShopped] = useState<Shopped | null>(null);
-  const [catalog, setCatalog] = useState<Product[]>([]);
+  const [catalog, setCatalog] = useState<BuyerProduct[]>([]);
+  const [seller, setSeller] = useState('the store');
   const [cart, setCart] = useState<Cart | null>(null);
   const [guard, setGuard] = useState<GuardResult | null>(null);
   const [addSku, setAddSku] = useState('');
@@ -107,19 +108,25 @@ export default function BuyerPage() {
     if (data) {
       setMandate(data);
       clearCart();
+      void loadCatalog(data.constraints.max_total.currency);
     }
   }
+
+  /** What the buyer may browse: pictures, prices, the seller and availability (never stock counts). */
+  const loadCatalog = useCallback(async (currency: string) => {
+    try {
+      const r = await apiFetch<{ seller: string; products: BuyerProduct[] }>(`/api/shop/catalog?currency=${encodeURIComponent(currency)}`);
+      setCatalog(r.data.products);
+      setSeller(r.data.seller);
+    } catch {
+      setCatalog([]);
+    }
+  }, []);
 
   async function onShop() {
     if (!mandate) return;
     clearCart();
-    const [result, products] = await Promise.all([
-      run('shop', () => apiFetch<Shopped>('/api/agent/shop', { body: { mandate_id: mandate.mandate_id } })),
-      apiFetch<Product[]>('/api/products?active=1')
-        .then((r) => r.data)
-        .catch(() => [] as Product[]),
-    ]);
-    setCatalog(products.filter((p) => p.currency === mandate.constraints.max_total.currency && p.stock > 0));
+    const result = await run('shop', () => apiFetch<Shopped>('/api/agent/shop', { body: { mandate_id: mandate.mandate_id } }));
     if (result) {
       setShopped(result);
       setCart(result.cart);
@@ -129,8 +136,9 @@ export default function BuyerPage() {
 
   /** Any change by the buyer is checked against the mandate again, so the result is never out of date. */
   async function changeCart(lines: { sku: string; quantity: number }[]) {
-    if (!mandate || !cart) return;
-    const next = cartFrom(lines, catalog, cart);
+    if (!mandate) return;
+    const base = cart ?? { currency: mandate.constraints.max_total.currency, merchant: seller };
+    const next = cartFrom(lines, catalog, base);
     setGuard(null);
     setPaid(false);
     setCart(next);
@@ -142,7 +150,12 @@ export default function BuyerPage() {
   }
 
   const lines = cart?.items.map((i) => ({ sku: i.sku, quantity: i.quantity })) ?? [];
-  const addable = catalog.filter((p) => !lines.some((l) => l.sku === p.sku));
+  const inCart = (sku: string) => lines.find((l) => l.sku === sku)?.quantity ?? 0;
+  function addToCart(p: BuyerProduct) {
+    const have = inCart(p.sku);
+    if (have >= p.max_quantity) return;
+    changeCart(have ? lines.map((l) => (l.sku === p.sku ? { ...l, quantity: have + 1 } : l)) : [...lines, { sku: p.sku, quantity: 1 }]);
+  }
   const reasonFor = (sku: string): AgentPick | undefined => shopped?.picks.find((p) => p.sku === sku);
 
   return (
@@ -248,20 +261,69 @@ export default function BuyerPage() {
         </Card>
       )}
 
-      {/* 3. Agent */}
+      {/* 3. Shop: pick things yourself, or let the agent choose */}
       {mandate && (
         <Card
           id="agent"
-          title="3. Let your agent shop"
-          subtitle="The agent reads the merchant's catalog and picks what fits your signed mandate. Prices come from the catalog, not the AI."
+          title="3. Choose what to buy"
+          subtitle="Browse and add things yourself, or let your agent pick for you. Either way, only what fits your mandate can be bought."
         >
           <div className={u.row}>
             <button className={u.btn} onClick={onShop} disabled={busy !== null}>
-              {busy === 'shop' ? 'Agent is shopping…' : shopped ? 'Ask the agent again' : 'Ask the agent to shop'}
+              {busy === 'shop' ? 'Agent is shopping…' : shopped ? 'Ask the agent again' : 'Let my agent pick for me'}
             </button>
-            {shopped && <span className={u.muted}>Chose from {shopped.considered} in-stock products.</span>}
+            {shopped && <span className={u.muted}>Chose from {shopped.considered} available products.</span>}
           </div>
           {shopped && <p className={s.quote}>Agent: &ldquo;{shopped.summary}&rdquo;</p>}
+
+          <h3 style={{ margin: '1.25rem 0 0.25rem', fontSize: '1rem' }}>Browse {seller}</h3>
+          {catalog.length === 0 ? (
+            <p className={u.muted}>Nothing is available in {mandate.constraints.max_total.currency} right now.</p>
+          ) : (
+            <div className={s.shopGrid} style={{ marginTop: '0.75rem' }}>
+              {catalog.map((p) => {
+                const have = inCart(p.sku);
+                return (
+                  <article key={p.sku} className={s.shopCard}>
+                    {p.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className={s.shopImg} src={p.image_url} alt={p.name} loading="lazy" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className={s.shopImgFallback} aria-hidden="true">
+                        {p.name.slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <div className={s.shopBody}>
+                      <strong>{p.name}</strong>
+                      <span className={u.muted}>Sold by {seller}</span>
+                      <div className={s.chips}>
+                        {Object.entries(p.attributes).map(([k, v]) => (
+                          <span key={k} className={s.chip}>
+                            {titleCase(k)}: {v}
+                          </span>
+                        ))}
+                      </div>
+                      {p.description && <span className={u.muted}>{p.description}</span>}
+                      <span className={u.muted}>
+                        Delivery in about {p.delivery_days} day{p.delivery_days === 1 ? '' : 's'}
+                        {p.availability === 'low_stock' ? ' · Selling fast' : ''}
+                      </span>
+                      <div className={s.shopFoot}>
+                        <span className={s.price}>{formatMoney(p.unit_price, p.currency)}</span>
+                        <button
+                          className={have ? `${u.btn} ${u.btnSecondary}` : u.btn}
+                          onClick={() => addToCart(p)}
+                          disabled={busy !== null || have >= p.max_quantity}
+                        >
+                          {have ? `In cart (${have}) · Add one more` : 'Add to cart'}
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </Card>
       )}
 
@@ -270,17 +332,29 @@ export default function BuyerPage() {
         <Card id="cart" title="4. Your cart and mandate check" subtitle="Change anything you like; the cart is checked against your mandate again.">
           {cart.items.map((i) => {
             const pick = reasonFor(i.sku);
-            const stock = catalog.find((p) => p.sku === i.sku)?.stock ?? i.quantity;
+            const item = catalog.find((p) => p.sku === i.sku);
+            const stock = item?.max_quantity ?? i.quantity;
             return (
               <div key={i.sku} className={s.cartItem}>
-                <div>
+                <div className={s.cartLead}>
+                  {item?.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className={s.thumb} src={item.image_url} alt="" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className={`${s.thumb} ${s.shopImgFallback}`} style={{ aspectRatio: '1', fontSize: '1.2rem' }} aria-hidden="true">
+                      {i.name.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
                   <strong>{i.name}</strong>
+                  <div className={u.muted}>Sold by {seller}</div>
                   <div className={u.muted}>
                     {[i.category, ...Object.entries(i.attributes ?? {}).map(([k, v]) => `${titleCase(k)}: ${v}`)]
                       .filter(Boolean)
                       .join(' · ')}
                   </div>
                   {pick && <div className={u.muted}>Why the agent chose it: {pick.reason}</div>}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className={s.price}>{formatMoney(i.unit_price, cart.currency)}</div>
@@ -314,32 +388,6 @@ export default function BuyerPage() {
             );
           })}
 
-          {addable.length > 0 && (
-            <div className={u.row} style={{ margin: '0.75rem 0' }}>
-              <label className={u.srOnly} htmlFor="add-product">
-                Add a product
-              </label>
-              <select id="add-product" value={addSku} onChange={(e) => setAddSku(e.target.value)} disabled={busy !== null}>
-                <option value="">Add another product from the catalog…</option>
-                {addable.map((p) => (
-                  <option key={p.sku} value={p.sku}>
-                    {p.name} · {formatMoney(p.unit_price, p.currency)}
-                  </option>
-                ))}
-              </select>
-              <button
-                className={`${u.btn} ${u.btnSecondary}`}
-                disabled={!addSku || busy !== null}
-                onClick={() => {
-                  changeCart([...lines, { sku: addSku, quantity: 1 }]);
-                  setAddSku('');
-                }}
-              >
-                Add
-              </button>
-            </div>
-          )}
-
           {busy === 'check' && !guard && <p className={u.muted}>Checking this cart against your mandate…</p>}
           {guard && <GuardView guard={guard} />}
           {guard && (
@@ -353,7 +401,7 @@ export default function BuyerPage() {
           )}
         </Card>
       )}
-      {mandate && shopped && !cart && <Notice tone="warn">Your cart is empty. Ask the agent again or add a product.</Notice>}
+      {mandate && (shopped || catalog.length > 0) && !cart && <Notice tone="warn">Your cart is empty. Add something from the store above, or ask your agent.</Notice>}
     </>
   );
 }
