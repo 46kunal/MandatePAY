@@ -59,7 +59,7 @@ export interface LedgerStore {
   /** Sets capture fields only if the order has no capture yet. Returns false when it already had one. */
   markCaptured(
     paypalOrderId: string,
-    fields: { status: string; captureId: string; receiptHash: string },
+    fields: { status: string; captureId: string; receiptHash: string; payerId?: string | null; paymentSource?: string | null },
   ): Promise<boolean>;
 }
 
@@ -228,6 +228,8 @@ export async function captureStoredOrder(deps: OrderDeps, paypalOrderId: string)
     status: captured.status,
     captureId: captured.captureId,
     receiptHash,
+    payerId: captured.payerId ?? null,
+    paymentSource: captured.paymentSource ?? null,
   });
   if (!stored) {
     return { ok: false, httpStatus: 409, error: 'already_captured', message: 'This order was already captured.' };

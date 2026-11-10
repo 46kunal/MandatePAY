@@ -43,6 +43,20 @@ function constraintRows(constraints: unknown): [string, string][] {
   return rows;
 }
 
+function paidWith(source: string | null): string {
+  if (source === 'paypal') return 'PayPal account';
+  if (source === 'card') return 'Card (PayPal guest checkout)';
+  return source ?? 'not recorded';
+}
+
+/** What the payer check means, in words a dispute reviewer reads. */
+const PAYER_WORDS: Record<'match' | 'different' | 'not_linked' | 'unknown', string> = {
+  match: 'The PayPal account that paid is the one the buyer linked to MandatePay',
+  different: 'Paid by a different PayPal payer than the account the buyer linked',
+  not_linked: 'The buyer has not linked a PayPal account',
+  unknown: 'Payer not recorded for this order',
+};
+
 export function buildEvidenceModel(d: CaseDetail, generatedAt: Date = new Date()): EvidenceModel {
   const sections: EvidenceSection[] = [];
 
@@ -66,6 +80,8 @@ export function buildEvidenceModel(d: CaseDetail, generatedAt: Date = new Date()
         ['Order status', d.order.status],
         ['Captured at', d.order.captured_at ?? 'n/a'],
         ['Receipt hash', d.order.receipt_hash ?? 'n/a'],
+        ['Paid with', paidWith(d.order.payment_source)],
+        ['Payer', PAYER_WORDS[d.order.payer_check]],
       ],
     });
   }

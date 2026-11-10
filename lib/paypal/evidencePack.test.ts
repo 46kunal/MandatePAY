@@ -50,7 +50,15 @@ const detail = (over: Partial<CaseDetail> = {}): CaseDetail => ({
     },
     guard: { verdict: 'allow', checks: [{ rule: 'max_total', status: 'pass', detail: 'Total 89.00 is within the limit.' }] },
   },
-  order: { paypal_order_id: 'ORD1', status: 'COMPLETED', capture_id: 'CAP1', receipt_hash: 'sha256:abc', captured_at: '2026-11-09T10:51:42.632Z' },
+  order: {
+    paypal_order_id: 'ORD1',
+    status: 'COMPLETED',
+    capture_id: 'CAP1',
+    receipt_hash: 'sha256:abc',
+    captured_at: '2026-11-09T10:51:42.632Z',
+    payment_source: 'paypal',
+    payer_check: 'match',
+  },
   ...over,
 });
 
@@ -58,7 +66,8 @@ describe('buildEvidenceModel', () => {
   it('includes the payment record, mandate, cart, guard checks and analysis', () => {
     const text = evidenceModelToText(buildEvidenceModel(detail(), new Date('2026-11-09T12:00:00Z')));
     for (const expected of [
-      'PP-R-1', 'ORD1', 'CAP1', 'sha256:abc', 'mnd_1', 'Maximum total: 110.00 USD', 'color = white, size = 10',
+      'PP-R-1', 'ORD1', 'CAP1', 'sha256:abc', 'Paid with: PayPal account',
+      'The PayPal account that paid is the one the buyer linked to MandatePay', 'mnd_1', 'Maximum total: 110.00 USD', 'color = white, size = 10',
       'white trainers size 10 under $110', 'cart_1', 'Total: 89.00 USD', 'color=white, size=10', 'max_total | pass',
       'Assessed fault: merchant', 'mandate.constraints.required_attributes.color',
     ]) {

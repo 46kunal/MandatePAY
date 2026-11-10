@@ -1,5 +1,6 @@
 /** Read side of disputes (owner: A): map case rows to the CaseRecord contract and load the detail view. */
 import type { CaseRecord, Verdict } from '../../contracts/schemas';
+import { payerCheck, type PayerCheck } from '../auth/paypalIdentity';
 import { fromMinor } from './orders';
 
 /** The columns of `cases` that the API exposes (a subset of the Drizzle row). */
@@ -59,6 +60,10 @@ export interface CaseDetail extends CaseRecord {
     capture_id: string | null;
     receipt_hash: string | null;
     captured_at: string | null;
+    /** 'paypal' (PayPal account) or 'card' (guest card checkout); null for orders captured before this was recorded. */
+    payment_source: string | null;
+    /** Was it paid by the PayPal account the buyer linked to MandatePay? */
+    payer_check: PayerCheck;
   } | null;
 }
 
@@ -78,6 +83,9 @@ export async function getCaseDetail(disputeId: string): Promise<CaseDetail | und
   ].filter((c) => c !== undefined);
   const [order] = match.length ? await db.select().from(schema.orders).where(or(...match)).limit(1) : [];
   const [cart] = order ? await db.select().from(schema.carts).where(eq(schema.carts.cartId, order.cartId)).limit(1) : [];
+  const [buyer] = mandate
+    ? await db.select({ paypalPayerId: schema.users.paypalPayerId }).from(schema.users).where(eq(schema.users.id, mandate.userId)).limit(1)
+    : [];
 
   return {
     ...toCaseRecord(row),
@@ -100,6 +108,8 @@ export async function getCaseDetail(disputeId: string): Promise<CaseDetail | und
           capture_id: order.captureId,
           receipt_hash: order.receiptHash,
           captured_at: order.capturedAt?.toISOString() ?? null,
+          payment_source: order.paymentSource,
+          payer_check: payerCheck(order.payerId, buyer?.paypalPayerId),
         }
       : null,
   };

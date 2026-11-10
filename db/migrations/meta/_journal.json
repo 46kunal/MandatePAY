@@ -43,6 +43,13 @@
       "when": 1794258629832,
       "tag": "0005_audit_revoke",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794305333987,
+      "tag": "0006_paypal_identity",
+      "breakpoints": true
     }
   ]
 }

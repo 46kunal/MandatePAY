@@ -15,6 +15,20 @@ function safeNext(next: string | null, fallback: string): string {
 
 type Mode = 'sign-in' | 'sign-up';
 
+/** Shown only once "Log in with PayPal" is turned on for the PayPal app (see docs/DEPLOY.md). */
+const PAYPAL_LOGIN = process.env.NEXT_PUBLIC_PAYPAL_LOGIN_ENABLED === '1';
+
+/** Better Auth's ?error= codes after a PayPal sign-in, in words. */
+function paypalErrorText(code: string | null): string | null {
+  if (!code) return null;
+  if (code === 'unable_to_link_account' || code === 'account_not_linked') {
+    return 'An account with this email already exists. Sign in with your password, then connect PayPal from your Account page.';
+  }
+  if (code === 'email_not_found') return 'PayPal did not share an email address, so no account could be created.';
+  if (code === 'account_already_linked_to_different_user') return 'That PayPal account is already connected to another MandatePay account.';
+  return 'PayPal sign-in did not finish. Try again, or sign in with your email.';
+}
+
 export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -26,7 +40,19 @@ export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => paypalErrorText(params.get('error')));
+
+  async function continueWithPayPal() {
+    setBusy(true);
+    setError(null);
+    const back = `/login?next=${encodeURIComponent(next)}`;
+    const r = await authClient.signIn.social({ provider: 'paypal', callbackURL: next, errorCallbackURL: back });
+    // On success the browser is already on its way to PayPal.
+    if (r?.error) {
+      setError(r.error.message ?? 'Could not start PayPal sign-in.');
+      setBusy(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,6 +99,20 @@ export function AuthForm({ side }: { side: 'buyer' | 'merchant' }) {
         MandatePay
       </Link>
       <Card title={title} subtitle={subtitle}>
+        {side === 'buyer' && PAYPAL_LOGIN && (
+          <div style={{ display: 'grid', gap: '0.6rem', marginBottom: '1rem' }}>
+            <button className={u.btn} type="button" onClick={continueWithPayPal} disabled={busy}>
+              Continue with PayPal
+            </button>
+            <span className={u.muted} style={{ fontSize: '0.85em' }}>
+              Links your PayPal account, so the payments you make can be matched to you. Paying by card without PayPal? Use
+              your email below.
+            </span>
+            <div className={u.muted} style={{ textAlign: 'center', fontSize: '0.85em' }}>
+              or with email
+            </div>
+          </div>
+        )}
         <form onSubmit={submit} style={{ display: 'grid', gap: '0.8rem' }}>
           {mode === 'sign-up' && (
             <div className={u.field}>
