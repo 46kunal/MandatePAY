@@ -114,6 +114,12 @@ export function resolvePath(root: unknown, path: string): unknown {
 
 // ---------- guardrails ----------
 
+const HEDGING = /\b(maybe|perhaps|not sure|unsure|flat ?mate|room ?mate|neighbou?r|family|someone (else )?(took|has|signed)|will check|let me check|come back|might have)\b/i;
+
+function buyerText(d: { messages: { from: string; text: string }[] }): string {
+  return d.messages.filter((m) => /buyer/i.test(m.from)).map((m) => m.text).join(' ');
+}
+
 export function enforce(proposed: Verdict, input: AnalystInput, opts: AnalystOptions = {}): Verdict {
   const { dispute } = input;
   const notes: string[] = [];
@@ -190,6 +196,13 @@ export function enforce(proposed: Verdict, input: AnalystInput, opts: AnalystOpt
     needsHuman = true;
   }
   if (proposed.fault === 'unclear') needsHuman = true;
+
+  // Delivered, yet the buyer hedges ("maybe my flatmate took it", "I will check"): someone else may have the parcel, so
+  // a person decides before money moves. Reading buyer text here can only add a review, never remove one.
+  if (dispute.reason === 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED' && dispute.tracking?.status?.toUpperCase() === 'DELIVERED' && HEDGING.test(buyerText(dispute))) {
+    notes.push('Tracking says delivered and the buyer is unsure who has the parcel (they hedge in their message).');
+    needsHuman = true;
+  }
 
   if (input.payment?.payer_check === 'different') {
     notes.push("Paid by a different PayPal payer than the buyer's linked account.");

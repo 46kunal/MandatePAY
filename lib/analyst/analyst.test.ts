@@ -138,6 +138,29 @@ function modelSays(v: Verdict): LlmProvider & { calls: ProviderCall[] } {
   return { name: 'scripted', deterministic: false, calls, complete: async (c) => (calls.push(c), v) };
 }
 
+describe('delivered but the buyer is unsure who has the parcel', () => {
+  const notReceived = (text: string, status = 'DELIVERED') =>
+    input({ reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED', tracking: { carrier: 'RM', status }, messages: [{ from: 'BUYER', text }] });
+
+  it('a hedging buyer on a delivered parcel needs a person', () => {
+    const out = enforce(proposal({ fault: 'buyer_regret', action: 'SEND_MESSAGE', offer_type: undefined, offer_amount: undefined }), notReceived('Maybe my flatmate took it, I will check and come back.'));
+    assert.equal(out.needs_human, true);
+    assert.match(out.reasoning, /unsure who has the parcel/);
+  });
+
+  it('a plain claim on a delivered parcel is not flagged by this rule', () => {
+    const out = enforce(proposal({ fault: 'buyer_regret', action: 'SEND_MESSAGE', offer_type: undefined, offer_amount: undefined }), notReceived('I never got it.'));
+    assert.doesNotMatch(out.reasoning, /unsure who has the parcel/);
+  });
+
+  it('hedging words do nothing when the parcel is not delivered, and merchant text is ignored', () => {
+    const lost = enforce(proposal(), notReceived('Maybe it is lost.', 'LOST'));
+    assert.doesNotMatch(lost.reasoning, /unsure who has the parcel/);
+    const seller = enforce(proposal(), input({ reason: 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED', tracking: { status: 'DELIVERED' }, messages: [{ from: 'SELLER', text: 'Maybe a neighbour has it.' }] }));
+    assert.doesNotMatch(seller.reasoning, /unsure who has the parcel/);
+  });
+});
+
 describe('analyseCase: the model proposes, the guardrails decide', () => {
   it('passes the dispute, mandate and cart to the model and returns a valid verdict', async () => {
     const m = modelSays(proposal({ offer_amount: '89.99' }));
