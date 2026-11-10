@@ -5,7 +5,7 @@ used to measure the analyst. Report accuracy in the README and the demo video.
 
 ## Files
 
-- `cases.json`: 25 labelled cases. Each has the dispute reason, tracking, amount, messages, the mandate constraints, the cart, and `expect` (`fault`, a list of acceptable `action`s, and optionally `needs_human`).
+- `cases.json`: 28 labelled cases. Each has the dispute reason, tracking, amount, messages, the mandate constraints, the cart, and `expect` (`fault`, a list of acceptable `action`s, and optionally `needs_human`).
 - `run.ts`: scores them. `npm run eval` prints the summary and the failures; `npm run eval -- --verbose` lists every case.
 
 ## Labelling rules
