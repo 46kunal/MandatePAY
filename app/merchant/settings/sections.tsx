@@ -18,6 +18,7 @@ interface Status {
   llm_configured: boolean;
   merchant_name: string | null;
   last_webhook_at: string | null;
+  last_webhook_rejected?: { at: string; error: string } | null;
 }
 
 function Row({ ok, label, good, bad }: { ok: boolean; label: string; good: string; bad: string }) {
@@ -68,7 +69,9 @@ export function ConnectionsCard() {
           good={
             status.last_webhook_at
               ? `Dispute updates arrive as PayPal sends them. Last one ${formatDateTime(status.last_webhook_at)}.`
-              : 'Dispute updates arrive as PayPal sends them. None received yet.'
+              : status.last_webhook_rejected
+                ? `PayPal is calling this store but was refused (${status.last_webhook_rejected.error}) at ${formatDateTime(status.last_webhook_rejected.at)}. Check that PAYPAL_WEBHOOK_ID matches the webhook registered for this app.`
+                : 'Dispute updates arrive as PayPal sends them. None received yet.'
           }
           bad="Optional. Without PAYPAL_WEBHOOK_ID, use Check PayPal for new disputes."
         />

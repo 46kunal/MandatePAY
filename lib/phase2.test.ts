@@ -114,11 +114,14 @@ describe('auto-analysis and deadlines', async () => {
     assert.equal(shouldAutoAnalyse({ analysisStatus: 'pending', mandateId: 'mnd_1', rawDispute: actionable }), true);
   });
 
-  it('skips cases already analysed, not linked, or still under PayPal review', () => {
+  it('skips cases already analysed or not linked to an order', () => {
     assert.equal(shouldAutoAnalyse({ analysisStatus: 'analysed', mandateId: 'mnd_1', rawDispute: actionable }), false);
     assert.equal(shouldAutoAnalyse({ analysisStatus: 'pending', mandateId: null, rawDispute: actionable }), false);
-    const underReview = { dispute_id: 'PP-1', status: 'UNDER_REVIEW', links: [{ rel: 'self', href: 'x', method: 'GET' }] };
-    assert.equal(shouldAutoAnalyse({ analysisStatus: 'pending', mandateId: 'mnd_1', rawDispute: underReview }), false);
+  });
+
+  it('analyses a new dispute even when it is already under PayPal review', () => {
+    const underReview = { dispute_id: 'PP-1', status: 'UNDER_PAYPAL_REVIEW', links: [{ rel: 'self', href: 'x', method: 'GET' }] };
+    assert.equal(shouldAutoAnalyse({ analysisStatus: 'pending', mandateId: 'mnd_1', rawDispute: underReview }), true);
   });
 
   it('reads who PayPal is waiting on and until when', () => {

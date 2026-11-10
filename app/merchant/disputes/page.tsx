@@ -54,6 +54,38 @@ export default function DisputesPage() {
     }
   }
 
+  // New disputes arrive by PayPal notification, and this page also asks PayPal itself every minute while it is open,
+  // so nobody has to click anything. (PayPal's list can lag a few minutes; the by-id box below covers that.)
+  const [feed, setFeed] = useState<{ last: string | null; refused: string | null; configured: boolean } | null>(null);
+  useEffect(() => {
+    let stop = false;
+    async function quiet() {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const r = await apiFetch<Poll>('/api/disputes/poll', { method: 'POST' });
+        if (!stop && r.data.new_cases > 0) {
+          reload();
+          setPollMsg({ ok: true, text: `Found ${r.data.new_cases} new dispute${r.data.new_cases === 1 ? '' : 's'}.` });
+        }
+      } catch {
+        /* the Check button shows errors; a background check stays quiet */
+      }
+      try {
+        const st = await apiFetch<{ webhooks_configured: boolean; last_webhook_at: string | null; last_webhook_rejected?: { error: string } | null }>('/api/status');
+        if (!stop) setFeed({ last: st.data.last_webhook_at, refused: st.data.last_webhook_rejected?.error ?? null, configured: st.data.webhooks_configured });
+      } catch {
+        /* status is only a hint */
+      }
+    }
+    void quiet();
+    const t = setInterval(quiet, 60_000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const shown = useMemo(() => {
     if (!cases) return null;
     if (filter === 'dismissed') return dismissed;
@@ -161,6 +193,18 @@ export default function DisputesPage() {
           <Skeleton height={56} />
           <Skeleton height={56} />
         </div>
+      )}
+
+      {feed && (
+        <p className={u.muted} style={{ margin: '0 0 0.75rem', fontSize: '0.88rem' }} role="status">
+          {feed.refused
+            ? `PayPal is sending dispute notifications but this store refused them (${feed.refused}). The page checks PayPal itself every minute meanwhile.`
+            : feed.last
+              ? `Live: PayPal notified this store ${formatWhen(feed.last)}. This page also checks PayPal every minute.`
+              : feed.configured
+                ? 'No PayPal notification has arrived yet. This page checks PayPal itself every minute, and PayPal can take a few minutes to list a new dispute.'
+                : 'Notifications are not set up, so this page checks PayPal itself every minute.'}
+        </p>
       )}
 
       {cases && cases.length === 0 && dismissed.length === 0 && (

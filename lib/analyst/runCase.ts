@@ -87,10 +87,9 @@ export function shouldAutoAnalyse(c: {
   mandateId: string | null;
   rawDispute: unknown;
 }): boolean {
-  if (c.analysisStatus !== 'pending' || !c.mandateId || !c.rawDispute) return false;
-  // Only once PayPal lets the seller do something; analysing while it is under review would see no options.
-  const actions = toDisputeSummary(c.rawDispute as RawDispute).allowed_actions.filter((a) => a !== 'NO_ACTION');
-  return actions.length > 0;
+  // Any linked, never-analysed case, whatever PayPal's status. Under PayPal review the store cannot respond, but the
+  // AI's view of who is at fault and the records are still worth having ready.
+  return c.analysisStatus === 'pending' && Boolean(c.mandateId) && Boolean(c.rawDispute);
 }
 
 /** At most this many analyses per webhook or poll, to protect the AI quota. */

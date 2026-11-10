@@ -21,6 +21,7 @@ export async function GET(req: Request) {
     llm_configured: Boolean(c.LLM_PROVIDER?.trim() && c.LLM_API_KEY?.trim()),
     merchant_name: (await getSettings()).store_name,
     last_webhook_at: await lastWebhookAt(),
+    last_webhook_rejected: await lastWebhookRejected(),
   });
 }
 
@@ -32,4 +33,16 @@ async function lastWebhookAt(): Promise<string | null> {
     .orderBy(desc(schema.events.receivedAt))
     .limit(1);
   return last ? last.at.toISOString() : null;
+}
+
+/** The latest time PayPal called the webhook and was refused (wrong webhook id, bad signature), and why. */
+async function lastWebhookRejected(): Promise<{ at: string; error: string } | null> {
+  const [last] = await db
+    .select({ at: schema.auditLog.at, details: schema.auditLog.details })
+    .from(schema.auditLog)
+    .where(eq(schema.auditLog.action, 'webhook.rejected'))
+    .orderBy(desc(schema.auditLog.at))
+    .limit(1);
+  if (!last) return null;
+  return { at: last.at.toISOString(), error: typeof last.details?.error === 'string' ? last.details.error : 'rejected' };
 }
