@@ -4,6 +4,7 @@ import { payerCheck, type PayerCheck } from '../auth/paypalIdentity';
 import { isBuyerKid } from '../mandate/buyerKeys';
 import { openMandateSigner } from '../mandate/closed';
 import { responseDue, type RawDispute } from './disputes';
+import { refreshOrderRefunds, refundedView, type RefundCover, type RefundRecord } from './refunds';
 import { fromMinor } from './orders';
 
 /** The columns of `cases` that the API exposes (a subset of the Drizzle row). */
@@ -81,6 +82,10 @@ export interface CaseDetail extends CaseRecord {
     payment_source: string | null;
     /** Was it paid by the PayPal account the buyer linked to MandatePay? */
     payer_check: PayerCheck;
+    /** Refunds PayPal reports on this payment, including ones made outside MandatePay. */
+    refunds: RefundRecord[];
+    /** Total refunded and how much of the disputed amount it covers; null when nothing was refunded. */
+    refunded: { value: string; currency: string; pending: boolean; covers_dispute: RefundCover } | null;
   } | null;
 }
 
@@ -100,6 +105,8 @@ export async function getCaseDetail(disputeId: string): Promise<CaseDetail | und
   ].filter((c) => c !== undefined);
   const [order] = match.length ? await db.select().from(schema.orders).where(or(...match)).limit(1) : [];
   const [cart] = order ? await db.select().from(schema.carts).where(eq(schema.carts.cartId, order.cartId)).limit(1) : [];
+  // What the buyer already got back (also refunds made in the PayPal dashboard). A snapshot under 2 minutes old is reused.
+  const refunds = order ? await refreshOrderRefunds(order.paypalOrderId, { maxAgeMs: 120_000 }) : [];
   const [buyer] = mandate
     ? await db.select({ paypalPayerId: schema.users.paypalPayerId }).from(schema.users).where(eq(schema.users.id, mandate.userId)).limit(1)
     : [];
@@ -128,6 +135,8 @@ export async function getCaseDetail(disputeId: string): Promise<CaseDetail | und
           captured_at: order.capturedAt?.toISOString() ?? null,
           payment_source: order.paymentSource,
           payer_check: payerCheck(order.payerId, buyer?.paypalPayerId),
+          refunds,
+          refunded: refundedView(refunds, row.amountMinor),
         }
       : null,
   };

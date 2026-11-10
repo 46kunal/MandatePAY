@@ -41,10 +41,15 @@ const baseRow = (over: Partial<CaseRow> = {}): CaseRow => ({
   ...over,
 });
 
-function setup(c: { row?: Partial<CaseRow>; rawDispute?: RawDispute | null } = {}, paypalError?: Error) {
+function setup(
+  c: { row?: Partial<CaseRow>; rawDispute?: RawDispute | null; refunded?: ActCase['refunded'] } = {},
+  paypalError?: Error,
+) {
   const calls: { fn: string; args: unknown[] }[] = [];
   let row: CaseRow | undefined = baseRow(c.row);
-  const found: ActCase | undefined = row ? { row, rawDispute: c.rawDispute === undefined ? raw() : c.rawDispute } : undefined;
+  const found: ActCase | undefined = row
+    ? { row, rawDispute: c.rawDispute === undefined ? raw() : c.rawDispute, refunded: c.refunded ?? null }
+    : undefined;
   const rec = (fn: string) => async (...args: unknown[]) => {
     if (paypalError) throw paypalError;
     calls.push({ fn, args });
@@ -169,6 +174,31 @@ describe('actOnCase: happy paths', () => {
 });
 
 describe('actOnCase: guards', () => {
+  const refunded = { value: '45.00', currency: 'USD', pending: true, covers_dispute: 'partial' as const };
+
+  it('409 already_refunded before an offer on a refunded payment, and PayPal is not called', async () => {
+    const s = setup({ refunded, row: { verdict: verdict({ action: 'MAKE_OFFER', offer_type: 'REFUND', offer_amount: '20.00' }) } });
+    const r = await actOnCase(s.deps, 'PP-D-1', approve);
+    assert.ok(!r.ok && r.httpStatus === 409 && r.error === 'already_refunded');
+    assert.match(!r.ok ? r.message : '', /already refunded 45\.00 USD \(still pending\)/);
+    assert.equal(s.calls.length, 0);
+  });
+
+  it('the same offer goes out once the person confirms they saw the refund', async () => {
+    const s = setup({ refunded, row: { verdict: verdict({ action: 'MAKE_OFFER', offer_type: 'REFUND', offer_amount: '20.00' }) } });
+    const r = await actOnCase(s.deps, 'PP-D-1', { ...approve, confirmRefunded: true });
+    assert.equal(r.ok, true);
+    assert.deepEqual(s.calls.map((c) => c.fn), ['makeOffer']);
+  });
+
+  it('accepting a claim on a refunded payment also needs the confirmation; a message does not', async () => {
+    const accept = setup({ refunded, row: { verdict: verdict({ action: 'ACCEPT_CLAIM' }) } });
+    const r = await actOnCase(accept.deps, 'PP-D-1', approve);
+    assert.ok(!r.ok && r.error === 'already_refunded');
+    const msg = setup({ refunded, row: { verdict: verdict({ action: 'SEND_MESSAGE' }) } });
+    assert.equal((await actOnCase(msg.deps, 'PP-D-1', approve)).ok, true);
+  });
+
   it('404 for an unknown case', async () => {
     const r = await actOnCase(setup().deps, 'nope', approve);
     assert.deepEqual([r.ok, !r.ok && r.httpStatus], [false, 404]);

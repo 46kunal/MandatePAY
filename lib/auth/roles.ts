@@ -16,6 +16,7 @@ export const PERMISSIONS = [
   'products:read',
   'products:write',
   'orders:read:all',
+  'orders:refund', // send money back to a buyer through PayPal
   'cases:read', // disputes, evidence packs, the mandate ledger
   'cases:analyse',
   'cases:act', // send an action whose verdict needs no person
@@ -47,7 +48,7 @@ const STAFF: readonly Permission[] = [
 const GRANTS: Record<Role, readonly Permission[]> = {
   buyer: ['shop', 'products:read'],
   staff: STAFF,
-  owner: [...STAFF, 'cases:approve', 'settings:write', 'team:manage', 'audit:read'],
+  owner: [...STAFF, 'cases:approve', 'settings:write', 'team:manage', 'audit:read', 'orders:refund'],
   admin: PERMISSIONS,
 };
 

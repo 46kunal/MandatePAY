@@ -4,6 +4,7 @@
  */
 import type { Cart, OrderSummary } from '../../contracts/schemas';
 import { fromMinor } from './orders';
+import { summariseRefunds, type RefundRecord } from './refunds';
 
 export interface OrderListRow {
   paypalOrderId: string;
@@ -18,6 +19,7 @@ export interface OrderListRow {
   currency: string;
   cart: Cart;
   disputeId: string | null;
+  refunds?: RefundRecord[] | null;
 }
 
 export function toOrderSummary(r: OrderListRow): OrderSummary {
@@ -34,6 +36,10 @@ export function toOrderSummary(r: OrderListRow): OrderSummary {
     created_at: r.createdAt.toISOString(),
     ...(r.capturedAt ? { captured_at: r.capturedAt.toISOString() } : {}),
     ...(r.disputeId ? { dispute_id: r.disputeId } : {}),
+    ...(() => {
+      const s = summariseRefunds(r.refunds ?? []);
+      return s.total_minor > 0 ? { refunded: fromMinor(s.total_minor), refund_pending: s.pending } : {};
+    })(),
   };
 }
 
@@ -55,6 +61,7 @@ export async function listOrders(opts: { userId?: string; limit?: number } = {})
       currency: carts.currency,
       cart: carts.cart,
       disputeId: cases.disputeId,
+      refunds: orders.refunds,
     })
     .from(orders)
     .innerJoin(carts, eq(carts.cartId, orders.cartId))

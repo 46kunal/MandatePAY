@@ -162,6 +162,10 @@ export const orders = pgTable('orders', {
   approveUrl: text('approve_url'),
   captureId: text('capture_id').unique(),
   receiptHash: text('receipt_hash'), // sha256 over mandate + cart + order + capture ids
+  // Refunds on this payment as PayPal reports them (including ones made in the PayPal dashboard, outside MandatePay).
+  // A snapshot, refreshed from PayPal when a dispute is read, analysed or acted on. See lib/paypal/refunds.ts.
+  refunds: jsonb('refunds').$type<{ id: string; status: string; amount_minor: number; currency: string; created_at: string | null }[]>().notNull().default([]),
+  refundsCheckedAt: ts('refunds_checked_at'),
   payerId: text('payer_id'), // the PayPal payer who paid (from the capture), compared with the buyer's linked account
   paymentSource: text('payment_source'), // 'paypal' (a PayPal account) or 'card' (guest card checkout)
   createdAt: ts('created_at').notNull().defaultNow(),

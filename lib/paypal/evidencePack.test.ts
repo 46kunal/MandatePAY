@@ -60,6 +60,8 @@ const detail = (over: Partial<CaseDetail> = {}): CaseDetail => ({
     captured_at: '2026-11-09T10:51:42.632Z',
     payment_source: 'paypal',
     payer_check: 'match',
+    refunds: [],
+    refunded: null,
   },
   ...over,
 });
@@ -106,6 +108,16 @@ describe('renderEvidencePdf', () => {
 });
 
 describe('evidenceMessageText', () => {
+  it('tells the buyer about a refund, and asks to close the dispute when it covers everything', () => {
+    const base = detail();
+    const partial = evidenceMessageText(detail({ order: { ...base.order!, refunded: { value: '85.40', currency: 'USD', pending: true, covers_dispute: 'partial' } } }));
+    assert.match(partial, /The store has refunded 85\.40 USD on this payment \(PayPal still shows it as pending\)\./);
+    assert.match(partial, /please tell us exactly what/);
+    const full = evidenceMessageText(detail({ order: { ...base.order!, refunded: { value: '89.00', currency: 'USD', pending: false, covers_dispute: 'full' } } }));
+    assert.match(full, /refunded 89\.00 USD on this payment\./);
+    assert.match(full, /full amount has been refunded, we ask that this dispute be closed/);
+  });
+
   it('states the proof from the records: mandate, cart, payment, payer, receipt hash', () => {
     const t = evidenceMessageText(detail());
     for (const expected of [
