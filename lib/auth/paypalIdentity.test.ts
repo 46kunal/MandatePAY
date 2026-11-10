@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { payerFromOrder } from '../paypal/orders';
-import { parsePayPalIdentity, payerCheck, paypalAuthorizeUrl, PAYPAL_SCOPES } from './paypalIdentity';
+import { parsePayPalIdentity, payerCheck, paypalAuthorizeUrl, paypalProfileToUser, PAYPAL_SCOPES } from './paypalIdentity';
 
 describe('parsePayPalIdentity', () => {
   it('reads the payer id and verified flag from PayPal userinfo', () => {
@@ -48,5 +48,40 @@ describe('payerFromOrder', () => {
     );
     assert.deepEqual(payerFromOrder({ payer: { payer_id: 'G1' }, payment_source: { card: {} } }), { payerId: 'G1', paymentSource: 'card' });
     assert.deepEqual(payerFromOrder({ id: 'X' }), { payerId: null, paymentSource: null });
+  });
+});
+
+describe('paypalProfileToUser', () => {
+  it('takes the email from the PayPal emails list (schema paypalv1.1), primary first', () => {
+    const u = paypalProfileToUser({
+      user_id: 'https://www.paypal.com/webapps/auth/identity/user/abc',
+      name: 'Kunal Buyer',
+      payer_id: 'QYR5Z8XDVJNXQ',
+      verified_account: 'true',
+      emails: [
+        { value: 'old@example.com', primary: false, confirmed: true },
+        { value: 'SB-Buyer@Personal.Example.com', primary: true, confirmed: true },
+      ],
+    });
+    assert.deepEqual(u, { email: 'sb-buyer@personal.example.com', emailVerified: true, name: 'Kunal Buyer' });
+  });
+
+  it('still works when PayPal sends a single email field', () => {
+    assert.deepEqual(paypalProfileToUser({ email: 'a@b.test', email_verified: true, given_name: 'A', family_name: 'B' }), {
+      email: 'a@b.test',
+      emailVerified: true,
+      name: 'A B',
+    });
+  });
+
+  it('an unconfirmed address is not marked verified', () => {
+    const u = paypalProfileToUser({ emails: [{ value: 'x@y.test', primary: true, confirmed: false }], verified_account: false });
+    assert.equal(u.email, 'x@y.test');
+    assert.equal(u.emailVerified, false);
+  });
+
+  it('no email at all: returns nothing for email, so sign-in reports it', () => {
+    assert.equal(paypalProfileToUser({ user_id: 'x', emails: [] }).email, undefined);
+    assert.equal(paypalProfileToUser(null).email, undefined);
   });
 });

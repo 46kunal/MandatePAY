@@ -74,3 +74,39 @@ export function payerCheck(orderPayerId: string | null | undefined, buyerPayerId
   if (!buyerPayerId) return 'not_linked';
   return orderPayerId === buyerPayerId ? 'match' : 'different';
 }
+
+interface PayPalEmail {
+  value?: unknown;
+  primary?: unknown;
+  confirmed?: unknown;
+}
+
+const truthy = (v: unknown) => v === true || v === 'true';
+
+/**
+ * PayPal profile -> the user fields Better Auth stores. PayPal's userinfo (schema=paypalv1.1) puts the address in an
+ * `emails` list ({ value, primary, confirmed }) rather than a single `email`, which Better Auth's PayPal provider
+ * reads, so a PayPal sign-in found no email. Prefer the primary address, then any confirmed one, then the first.
+ */
+export function paypalProfileToUser(profile: unknown): { email?: string; emailVerified?: boolean; name?: string } {
+  const p = (profile && typeof profile === 'object' ? profile : {}) as Record<string, unknown>;
+  const list = (Array.isArray(p.emails) ? p.emails : []) as PayPalEmail[];
+  const valid = list.filter((e): e is PayPalEmail & { value: string } => typeof e?.value === 'string' && e.value.includes('@'));
+  const pick = valid.find((e) => truthy(e.primary)) ?? valid.find((e) => truthy(e.confirmed)) ?? valid[0];
+  const single = typeof p.email === 'string' && p.email.includes('@') ? p.email : undefined;
+
+  const email = (single ?? pick?.value)?.trim().toLowerCase();
+  const out: { email?: string; emailVerified?: boolean; name?: string } = {};
+  if (email) {
+    out.email = email;
+    // Confirmed by PayPal: the app only accepts PayPal accounts with a confirmed email (dashboard setting).
+    out.emailVerified = single ? truthy(p.email_verified) : truthy(pick?.confirmed) || truthy(p.email_verified) || truthy(p.verified_account);
+  }
+  const name = typeof p.name === 'string' && p.name.trim() ? p.name.trim() : [p.given_name, p.family_name].filter((x) => typeof x === 'string' && x).join(' ');
+  if (name) out.name = name;
+  if (!email) {
+    // Field names only, never values: shows in the server log why a PayPal sign-in had no email.
+    console.warn(`[paypal-login] PayPal userinfo had no email; fields received: ${Object.keys(p).sort().join(', ')}`);
+  }
+  return out;
+}
