@@ -23,7 +23,8 @@
     "db:push": "drizzle-kit push",
     "eval": "tsx --env-file=.env eval/run.ts",
     "keys:export": "tsx scripts/keys-export.ts",
-    "auth:create-user": "tsx scripts/auth-create-user.ts"
+    "auth:create-user": "tsx scripts/auth-create-user.ts",
+    "seed:demo": "tsx scripts/seed-demo.ts"
   },
   "dependencies": {
     "@paypal/react-paypal-js": "^10.6.1",

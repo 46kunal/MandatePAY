@@ -28,6 +28,7 @@ const product = (over: Partial<ProductRow>): ProductRow => ({
   stock: 5,
   deliveryDays: 4,
   imageUrl: null,
+  seller: null,
   active: true,
   createdAt: NOW,
   updatedAt: NOW,

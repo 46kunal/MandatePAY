@@ -150,6 +150,7 @@ export const products = pgTable('products', {
   stock: integer('stock').notNull(),
   deliveryDays: integer('delivery_days').notNull(),
   imageUrl: text('image_url'), // https link to a picture, shown to buyers
+  seller: text('seller'), // the brand that sells it; null means the store itself
   active: boolean('active').notNull().default(true),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),

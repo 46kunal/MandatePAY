@@ -33,9 +33,10 @@ export async function listMyOrders(userId: string): Promise<MyOrder[]> {
   const ids = rows.map((r) => r.paypalOrderId);
   const [settings, pictures] = await Promise.all([
     getSettings(),
-    db.select({ sku: schema.products.sku, imageUrl: schema.products.imageUrl }).from(schema.products),
+    db.select({ sku: schema.products.sku, imageUrl: schema.products.imageUrl, seller: schema.products.seller }).from(schema.products),
   ]);
   const imageBySku = new Map(pictures.filter((p) => p.imageUrl).map((p) => [p.sku, p.imageUrl as string]));
+  const sellerBySku = new Map(pictures.map((p) => [p.sku, p.seller]));
   const seller = settings.store_name?.trim() || 'MandatePay Store';
   const reports = ids.length
     ? await db.select().from(schema.problemReports).where(inArray(schema.problemReports.paypalOrderId, ids)).orderBy(desc(schema.problemReports.createdAt))
@@ -50,7 +51,8 @@ export async function listMyOrders(userId: string): Promise<MyOrder[]> {
       status: r.status,
       paid_at: r.capturedAt ? r.capturedAt.toISOString() : null,
       refunded: refunded > 0 ? fromMinor(refunded) : null,
-      seller,
+      // Who sold it: the brands of the items bought (the store's own name for items with no brand).
+      seller: [...new Set(r.cart.items.map((i) => sellerBySku.get(i.sku) ?? seller))].join(', ') || seller,
       images: r.cart.items.map((i) => imageBySku.get(i.sku)).filter((x): x is string => !!x),
       report: latest ? toProblemReport(latest, r.currency) : null,
     };
