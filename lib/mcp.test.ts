@@ -16,6 +16,7 @@ const product = (over: Partial<BuyerProduct> = {}): BuyerProduct => ({
   currency: 'USD',
   attributes: { color: 'white', size: '10' },
   delivery_days: 4,
+  seller: 'Stride Lab',
   availability: 'in_stock',
   max_quantity: 5,
   ...over,

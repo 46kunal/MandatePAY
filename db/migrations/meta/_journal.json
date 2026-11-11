@@ -99,6 +99,13 @@
       "when": 1794348793493,
       "tag": "0013_api_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794389726014,
+      "tag": "0014_product_seller",
+      "breakpoints": true
     }
   ]
 }

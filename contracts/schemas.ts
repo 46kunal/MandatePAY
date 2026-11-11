@@ -393,6 +393,8 @@ export const ProductInput = z
     delivery_days: z.number().int().min(0).max(365),
     /** A picture of the product shown to buyers. https only. */
     image_url: z.string().trim().max(500).url().refine((v) => v.startsWith('https://'), 'Use an https:// link').optional(),
+    /** The brand that sells it, shown to buyers as "Sold by". Leave out for the store itself. */
+    seller: z.string().trim().min(1).max(60).optional(),
   })
   .strict();
 export type ProductInput = z.infer<typeof ProductInput>;
@@ -585,6 +587,7 @@ export const BuyerProduct = z.object({
   attributes: z.record(z.string(), z.string()),
   delivery_days: z.number().int(),
   image_url: z.string().optional(),
+  seller: z.string(), // the brand that sells it (the store's name when none is set)
   availability: z.enum(['in_stock', 'low_stock']),
   max_quantity: z.number().int().positive(),
 });

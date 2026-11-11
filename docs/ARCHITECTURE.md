@@ -68,7 +68,7 @@ fault 82%, action 86%, needs-a-person 89%, all checks 79%.
 ## Stack
 
 Next.js 16 (App Router), React 19, TypeScript, Postgres (Neon) with Drizzle, Better Auth, Zod contracts for every API,
-`pdfkit` for the evidence PDF, deployed on Vercel. 40 API routes, 14 migrations, 339 automated tests, CI on every push.
+`pdfkit` for the evidence PDF, deployed on Vercel. 40 API routes, 15 migrations, 339 automated tests, CI on every push.
 
 ## What is not done, plainly
 

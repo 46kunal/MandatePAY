@@ -300,7 +300,7 @@ export default function BuyerPage() {
                     )}
                     <div className={s.shopBody}>
                       <strong>{p.name}</strong>
-                      <span className={u.muted}>Sold by {seller}</span>
+                      <span className={u.muted}>Sold by {p.seller}</span>
                       <div className={s.chips}>
                         {Object.entries(p.attributes).map(([k, v]) => (
                           <span key={k} className={s.chip}>
@@ -355,7 +355,7 @@ export default function BuyerPage() {
                   )}
                   <div>
                   <strong>{i.name}</strong>
-                  <div className={u.muted}>Sold by {seller}</div>
+                  <div className={u.muted}>Sold by {item?.seller ?? seller}</div>
                   <div className={u.muted}>
                     {[i.category, ...Object.entries(i.attributes ?? {}).map(([k, v]) => `${titleCase(k)}: ${v}`)]
                       .filter(Boolean)

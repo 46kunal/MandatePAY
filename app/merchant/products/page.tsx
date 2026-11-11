@@ -19,6 +19,7 @@ const EMPTY = {
   stock: '1',
   delivery_days: '3',
   image_url: '',
+  seller: '',
 };
 type Form = typeof EMPTY;
 
@@ -60,6 +61,7 @@ function toInput(f: Form): ProductInput | string {
     stock: Math.max(0, Math.floor(Number(f.stock) || 0)),
     delivery_days: Math.max(0, Math.floor(Number(f.delivery_days) || 0)),
     ...(f.image_url.trim() ? { image_url: f.image_url.trim() } : {}),
+    ...(f.seller.trim() ? { seller: f.seller.trim() } : {}),
   };
 }
 
@@ -160,6 +162,7 @@ export default function ProductsPage() {
             {field('stock', 'In stock', { type: 'number', min: 0, required: true })}
             {field('delivery_days', 'Delivery (days)', { type: 'number', min: 0, max: 365, required: true })}
             {field('attributes', 'Attributes', { placeholder: 'color=white, size=10' })}
+            {field('seller', 'Seller brand (optional)', { placeholder: 'Shown to buyers as Sold by' })}
             {field('image_url', 'Picture link (optional)', { type: 'url', placeholder: 'https://… (shown to buyers)' })}
           </div>
           <div className={u.field} style={{ marginTop: '0.75rem' }}>
@@ -221,7 +224,7 @@ export default function ProductsPage() {
                         <div>
                       <strong>{p.name}</strong>
                       <div className={u.muted}>
-                        {[p.sku, p.category, ...Object.entries(p.attributes).map(([k, v]) => `${titleCase(k)}: ${v}`)].join(' · ')}
+                        {[p.sku, p.seller, p.category, ...Object.entries(p.attributes).map(([k, v]) => `${titleCase(k)}: ${v}`)].filter(Boolean).join(' · ')}
                       </div>
                         </div>
                       </div>
