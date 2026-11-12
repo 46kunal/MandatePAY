@@ -13,7 +13,7 @@ Built for the **"Build What's Next with PayPal and AI"** hackathon. PayPal sandb
 | | |
 |---|---|
 | **Live app** | https://mandate-pay.vercel.app |
-| **Demo video (3 min)** | `<YouTube link>` |
+| **Demo video (3 min)** | https://youtu.be/q6SA3VV74ao |
 | **For judges** | [docs/JUDGES.md](docs/JUDGES.md): a five-minute test path, how it meets the requirements, honest limits |
 | **How it works** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the flow, every PayPal API we use, every AI feature, the trust model |
 | **Agent access (MCP)** | [docs/MCP.md](docs/MCP.md): any AI agent can shop for a buyer inside their signed mandate |
