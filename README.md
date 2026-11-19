@@ -164,7 +164,15 @@ claude mcp add --transport http mandatepay https://mandate-pay.vercel.app/api/mc
 
 Full details and safety notes: [docs/MCP.md](docs/MCP.md).
 
-## Analyst accuracy
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Postgres (Neon's pooled string on Vercel) |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `NEXT_PUBLIC_PAYPAL_CLIENT_ID`, `PAYPAL_BASE_URL` | PayPal sandbox app |
+| `PAYPAL_WEBHOOK_ID` | Webhook verification (polling also works without it) |
+| `NEXT_PUBLIC_PAYPAL_LOGIN_ENABLED` | Switches on Log in with PayPal |
+| `BETTER_AUTH_SECRET`, `APP_BASE_URL` | Sign-in sessions |
+| `MANDATE_BUYER_PRIVATE_KEY`, `MANDATE_AGENT_PRIVATE_KEY`, `MANDATE_KEY_ENCRYPTION_KEY` | Mandate signing (hosted); `npm run keys:export` creates them |
+| `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL` | The AI model (`gemini`, `anthropic` or `grok`) |
 
 `npm run eval` scores the case analyst on **28 hand-labelled disputes**: not received, not as described, unauthorised, credit
 not processed, high value, restricted actions, three prompt-injection cases, payer mismatch, the inquiry stage where PayPal
